@@ -10,3 +10,14 @@ export { createPaymentRequirement, paymentRequirement, PaymentRequirementBuilder
 // Metadata builder exports
 export { createMetadata, httpResource, mcpResource, MetadataBuilder } from "./metadataBuilder.js";
 export type { ResourceMetadata, HttpResourceMetadata, McpResourceMetadata } from "./metadataBuilder.js";
+
+// Validation exports
+export {
+  validateRouteTemplate,
+  validateJsonSchema,
+  validateSchemaPair,
+  validateMcpToolMetadata,
+  validateHttpEndpointMetadata,
+  matchRouteParamsToSchema
+} from "./validation.js";
+export type { ValidationResult } from "./validation.js";
