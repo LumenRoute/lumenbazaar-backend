@@ -375,7 +375,12 @@ function resourcePayload(sellerId: string) {
     assetIssuer: localIssuerPublicKey,
     amount: "0.05",
     inputSchema: {
-      type: "object"
+      type: "object",
+      properties: {
+        city: {
+          type: "string"
+        }
+      }
     },
     outputSchema: {
       type: "object"

@@ -12,7 +12,8 @@ import {
   type ResourceVersion,
   decodeCursor,
   encodeCursor,
-  normalizeLimit
+  normalizeLimit,
+  validateRouteTemplate
 } from "@lumenbazaar/shared";
 import {
   assertStellarPublicKey,
@@ -269,6 +270,7 @@ function normalizeResourceInput<T extends CreateResourceInput | (Resource & Upda
   config: AppConfig
 ): T {
   assertStellarPublicKey(input.payTo, "payTo");
+  validateRouteTemplate(input.routeTemplate, input.inputSchema as JsonObject);
   const amount = normalizeExactAmount(input.amount);
   const assetCode = input.assetCode.toUpperCase();
   requireSupportedAsset(config, input.network, assetCode, input.assetIssuer);
