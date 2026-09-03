@@ -6,5 +6,7 @@ export * from "./clients.js";
 export * from "./hash.js";
 export * from "./paymentAttemptStore.js";
 export * from "./paymentPayload.js";
+export * from "./settlement.js";
+export * from "./settlementStore.js";
 export * from "./verification.js";
 export * from "./x402Adapter.js";

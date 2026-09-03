@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 
 import { loadConfig } from "@lumenbazaar/shared";
-import { type PaymentVerificationService } from "@lumenbazaar/stellar-payments";
+import {
+  type PaymentVerificationService,
+  type SettlementService
+} from "@lumenbazaar/stellar-payments";
 
 import { registerErrorHandling } from "./http/errors.js";
 import { registerFacilitatorRoutes } from "./routes/facilitator.js";
@@ -13,6 +16,7 @@ import { createMetricsService } from "./services/metrics.js";
 export type BuildApiAppOptions = {
   logger?: boolean;
   verificationService?: PaymentVerificationService;
+  settlementService?: SettlementService;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -35,8 +39,16 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   registerFacilitatorRoutes(
     app,
     options.verificationService === undefined
-      ? { config }
-      : { config, verificationService: options.verificationService }
+      ? options.settlementService === undefined
+        ? { config }
+        : { config, settlementService: options.settlementService }
+      : options.settlementService === undefined
+        ? { config, verificationService: options.verificationService }
+        : {
+            config,
+            verificationService: options.verificationService,
+            settlementService: options.settlementService
+          }
   );
 
   return app;

@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { LumenError } from "@lumenbazaar/shared";
-import { PaymentVerificationService, type X402StellarAdapter } from "@lumenbazaar/stellar-payments";
+import { LumenError, loadConfig, localIssuerPublicKey } from "@lumenbazaar/shared";
+import {
+  InMemoryPaymentAttemptStore,
+  PaymentVerificationService,
+  SettlementService,
+  type X402StellarAdapter
+} from "@lumenbazaar/stellar-payments";
 
 import { buildApiApp } from "./app.js";
 import { parseBody } from "./http/validation.js";
@@ -81,84 +86,16 @@ describe("API server base", () => {
         };
       }
     };
+    const config = loadConfig({});
     const app = buildApiApp({
       logger: false,
-      verificationService: new PaymentVerificationService(
-        {
-          nodeEnv: "test",
-          lumenEnv: "local",
-          api: {
-            host: "127.0.0.1",
-            port: 0,
-            publicUrl: "http://localhost"
-          },
-          databaseUrl: "postgresql://postgres:postgres@localhost:5432/lumenbazaar",
-          redisUrl: "redis://localhost:6379",
-          facilitatorAccount: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-          features: {
-            uptoScheme: false
-          },
-          networks: {
-            "stellar:testnet": {
-              id: "stellar:testnet",
-              displayName: "Stellar Testnet",
-              passphrase: "Test SDF Network ; September 2015",
-              rpcUrl: "https://soroban-testnet.stellar.org",
-              horizonUrl: "https://horizon-testnet.stellar.org",
-              assets: [
-                {
-                  code: "USDC",
-                  issuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-                  decimals: 7
-                }
-              ]
-            },
-            "stellar:pubnet": {
-              id: "stellar:pubnet",
-              displayName: "Stellar Pubnet",
-              passphrase: "Public Global Stellar Network ; September 2015",
-              rpcUrl: "https://mainnet.sorobanrpc.com",
-              horizonUrl: "https://horizon.stellar.org",
-              assets: [
-                {
-                  code: "USDC",
-                  issuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-                  decimals: 7
-                }
-              ]
-            }
-          }
-        },
-        { adapter }
-      )
+      verificationService: new PaymentVerificationService(config, { adapter })
     });
 
     const response = await app.inject({
       method: "POST",
       url: "/v1/verify",
-      payload: {
-        paymentPayload: {
-          scheme: "exact",
-          network: "stellar:testnet",
-          asset: {
-            code: "USDC",
-            issuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
-          },
-          amount: "0.05",
-          payTo: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-          expiresAtLedger: 10,
-          authorization: {
-            signature: "sig"
-          }
-        },
-        paymentRequirements: {
-          scheme: "exact",
-          network: "stellar:testnet",
-          amount: "0.05",
-          payTo: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
-        },
-        currentLedger: 9
-      }
+      payload: exactPaymentRequest()
     });
 
     expect(response.statusCode).toBe(200);
@@ -168,6 +105,51 @@ describe("API server base", () => {
       adapter: "@x402/stellar"
     });
     expect(response.json().paymentHash).toHaveLength(64);
+    await app.close();
+  });
+
+  it("settles verified exact payment requests through the facilitator route", async () => {
+    const adapter: X402StellarAdapter = {
+      async verifyExact() {
+        return {
+          valid: true,
+          adapter: "@x402/stellar"
+        };
+      },
+      async settleExact() {
+        return {
+          transactionHash: "tx_api_settle",
+          ledger: 456,
+          adapter: "@x402/stellar"
+        };
+      }
+    };
+    const config = loadConfig({});
+    const attemptStore = new InMemoryPaymentAttemptStore();
+    const verificationService = new PaymentVerificationService(config, { adapter, attemptStore });
+    const settlementService = new SettlementService(config, { adapter, attemptStore });
+    const app = buildApiApp({
+      logger: false,
+      verificationService,
+      settlementService
+    });
+    const verified = await verificationService.verify(exactPaymentRequest());
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/settle",
+      payload: {
+        paymentAttemptId: verified.paymentAttemptId,
+        ...exactPaymentRequest()
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      transactionHash: "tx_api_settle",
+      ledger: 456,
+      status: "settled"
+    });
     await app.close();
   });
 
@@ -237,3 +219,29 @@ describe("API server base", () => {
     await app.close();
   });
 });
+
+function exactPaymentRequest() {
+  return {
+    paymentPayload: {
+      scheme: "exact",
+      network: "stellar:testnet",
+      asset: {
+        code: "USDC",
+        issuer: localIssuerPublicKey
+      },
+      amount: "0.05",
+      payTo: localIssuerPublicKey,
+      expiresAtLedger: 10,
+      authorization: {
+        signature: "sig"
+      }
+    },
+    paymentRequirements: {
+      scheme: "exact",
+      network: "stellar:testnet",
+      amount: "0.05",
+      payTo: localIssuerPublicKey
+    },
+    currentLedger: 9
+  };
+}
