@@ -5,6 +5,7 @@ import Fastify from "fastify";
 import { loadConfig } from "@lumenbazaar/shared";
 
 import { registerErrorHandling } from "./http/errors.js";
+import { registerFacilitatorRoutes } from "./routes/facilitator.js";
 import { registerMetadataRoutes } from "./routes/metadata.js";
 import { createMetricsService } from "./services/metrics.js";
 
@@ -29,6 +30,7 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     config,
     metrics: createMetricsService()
   });
+  registerFacilitatorRoutes(app, { config });
 
   return app;
 }

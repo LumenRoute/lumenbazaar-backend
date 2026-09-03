@@ -41,6 +41,36 @@ describe("API server base", () => {
     await app.close();
   });
 
+  it("returns x402 exact support with reserved extension fields", async () => {
+    const app = buildApiApp({ logger: false });
+
+    const response = await app.inject({ method: "GET", url: "/v1/supported" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      schemes: [
+        {
+          name: "exact",
+          network: "stellar:testnet",
+          extensions: {
+            x402Version: "1",
+            upto: false
+          }
+        },
+        {
+          name: "exact",
+          network: "stellar:pubnet"
+        }
+      ],
+      extensions: {
+        bazaar: true,
+        upto: false,
+        uptoContracts: []
+      }
+    });
+    await app.close();
+  });
+
   it("returns stable envelopes for application errors", async () => {
     const app = buildApiApp({ logger: false });
     app.get("/boom", async () => {
