@@ -17,6 +17,7 @@ import { registerResourceRoutes } from "./routes/resources.js";
 import { registerSellerRoutes } from "./routes/sellers.js";
 import { CatalogService } from "./services/cataloging.js";
 import { CatalogValidationService } from "./services/catalogValidation.js";
+import { DiscoveryService } from "./services/discovery.js";
 import { createMetricsService } from "./services/metrics.js";
 import { ResourceService } from "./services/resources.js";
 import { SellerService } from "./services/sellers.js";
@@ -30,6 +31,7 @@ export type BuildApiAppOptions = {
   resourceService?: ResourceService;
   catalogValidationService?: CatalogValidationService;
   catalogService?: CatalogService;
+  discoveryService?: DiscoveryService;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -64,10 +66,11 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     options.catalogValidationService ?? new CatalogValidationService(config, sellerService);
   const catalogService =
     options.catalogService ?? new CatalogService(catalogValidationService, resourceService);
+  const discoveryService = options.discoveryService ?? new DiscoveryService(resourceService);
 
   registerSellerRoutes(app, { sellerService });
   registerResourceRoutes(app, { resourceService });
-  registerDiscoveryRoutes(app, { catalogValidationService, catalogService });
+  registerDiscoveryRoutes(app, { catalogValidationService, catalogService, discoveryService });
 
   return app;
 }

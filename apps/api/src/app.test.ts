@@ -321,6 +321,23 @@ describe("API server base", () => {
       catalogEventId: expect.stringMatching(/^catalog_event_/),
       indexingStatus: "queued"
     });
+
+    const browse = await app.inject({
+      method: "GET",
+      url: "/v1/discovery/resources?network=stellar:testnet&asset=USDC&type=http&extension=bazaar"
+    });
+
+    expect(browse.statusCode).toBe(200);
+    expect(browse.json()).toMatchObject({
+      resources: [
+        {
+          id: response.json().resourceId,
+          name: "Paid Weather API"
+        }
+      ],
+      partialResults: false,
+      nextCursor: null
+    });
     await app.close();
   });
 

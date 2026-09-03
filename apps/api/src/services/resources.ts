@@ -17,6 +17,7 @@ import {
 } from "@lumenbazaar/shared";
 import {
   assertStellarPublicKey,
+  compareExactAmounts,
   normalizeExactAmount,
   requireSupportedAsset
 } from "@lumenbazaar/stellar-payments";
@@ -51,6 +52,9 @@ export const listResourcesSchema = z.object({
   network: z.enum(["stellar:testnet", "stellar:pubnet"]).optional(),
   asset: z.string().optional(),
   type: z.enum(["http", "mcp"]).optional(),
+  minPrice: z.string().optional(),
+  maxPrice: z.string().optional(),
+  extension: z.string().optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().optional()
 });
@@ -288,7 +292,13 @@ function resourceMatchesFilters(resource: Resource, filters: ListResourceFilters
     (filters.status === undefined || resource.status === filters.status) &&
     (filters.network === undefined || resource.network === filters.network) &&
     (filters.asset === undefined || resource.assetCode === filters.asset.toUpperCase()) &&
-    (filters.type === undefined || resource.type === filters.type)
+    (filters.type === undefined || resource.type === filters.type) &&
+    (filters.minPrice === undefined ||
+      compareExactAmounts(resource.amount, filters.minPrice) >= 0) &&
+    (filters.maxPrice === undefined ||
+      compareExactAmounts(resource.amount, filters.maxPrice) <= 0) &&
+    (filters.extension === undefined ||
+      Boolean(resource.extensions[filters.extension as keyof typeof resource.extensions]))
   );
 }
 
