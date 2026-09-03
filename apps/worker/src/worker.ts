@@ -4,6 +4,8 @@ import { type AppConfig, loadConfig } from "@lumenbazaar/shared";
 
 import { createBullMqConnection, queueNames, type QueueName } from "./queues.js";
 import { handleSettlementConfirmation } from "./workers/settlementConfirmation.js";
+import { handleResourceIndexing } from "./workers/resourceIndexing.js";
+import { handleSearchSync } from "./workers/searchSync.js";
 
 export type WorkerJob = {
   id: string;
@@ -94,6 +96,24 @@ export class BullMqWorkerBackend implements WorkerBackend {
             id: String(job.id),
             name: job.name,
             queueName: queueNames.settlementConfirmation,
+            data: job.data
+          });
+        },
+        {
+          connection: this.connection
+        }
+      )
+    );
+
+    // Add search sync worker
+    this.workers.push(
+      new Worker(
+        queueNames.searchSync,
+        async (job: Job<Record<string, unknown>>) => {
+          this.processed.push({
+            id: String(job.id),
+            name: job.name,
+            queueName: queueNames.searchSync,
             data: job.data
           });
         },

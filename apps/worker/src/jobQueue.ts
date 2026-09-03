@@ -4,6 +4,8 @@ import { type AppConfig } from "@lumenbazaar/shared";
 
 import { createBullMqQueue, queueNames } from "./queues.js";
 import { type SettlementConfirmationJobData } from "./workers/settlementConfirmation.js";
+import { type ResourceIndexingJobData } from "./workers/resourceIndexing.js";
+import { type SearchSyncJobData } from "./workers/searchSync.js";
 
 export type JobQueues = {
   settlementConfirmation: Queue;
@@ -33,6 +35,38 @@ export async function enqueueSettlementConfirmation(
   { delayMs = 5000, maxAttempts = 30 } = {}
 ) {
   return queue.add("settlement-confirmation", data, {
+    attempts: maxAttempts,
+    backoff: {
+      type: "exponential",
+      delay: delayMs
+    },
+    removeOnComplete: true,
+    removeOnFail: false
+  });
+}
+
+export async function enqueueResourceIndexing(
+  queue: Queue,
+  data: ResourceIndexingJobData,
+  { delayMs = 1000, maxAttempts = 5 } = {}
+) {
+  return queue.add("resource-indexing", data, {
+    attempts: maxAttempts,
+    backoff: {
+      type: "exponential",
+      delay: delayMs
+    },
+    removeOnComplete: true,
+    removeOnFail: false
+  });
+}
+
+export async function enqueueSearchSync(
+  queue: Queue,
+  data: SearchSyncJobData,
+  { delayMs = 1000, maxAttempts = 3 } = {}
+) {
+  return queue.add("search-sync", data, {
     attempts: maxAttempts,
     backoff: {
       type: "exponential",
