@@ -19,4 +19,9 @@ export function registerSellerRoutes(app: FastifyInstance, options: SellerRouteO
     const params = parseParams(request, z.object({ sellerId: z.string().min(1) }));
     return sellerService.getSeller(params.sellerId);
   });
+
+  app.post("/v1/sellers/:sellerId/verify-domain", async (request) => {
+    const params = parseParams(request, z.object({ sellerId: z.string().min(1) }));
+    return sellerService.verifyDomain(params.sellerId, parseBody(request, z.unknown()));
+  });
 }

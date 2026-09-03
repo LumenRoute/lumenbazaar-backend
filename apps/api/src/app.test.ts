@@ -201,6 +201,30 @@ describe("API server base", () => {
       walletAddress: localIssuerPublicKey,
       domain: "seller.example"
     });
+
+    const challenge = await app.inject({
+      method: "POST",
+      url: `/v1/sellers/${created.json().id}/verify-domain`,
+      payload: {
+        method: "dns"
+      }
+    });
+    const verified = await app.inject({
+      method: "POST",
+      url: `/v1/sellers/${created.json().id}/verify-domain`,
+      payload: {
+        evidence: challenge.json().challenge
+      }
+    });
+
+    expect(challenge.json()).toMatchObject({
+      method: "dns",
+      verified: false
+    });
+    expect(verified.json()).toMatchObject({
+      verified: true,
+      domainVerifiedAt: expect.any(String)
+    });
     await app.close();
   });
 

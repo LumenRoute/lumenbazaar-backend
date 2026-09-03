@@ -37,4 +37,28 @@ describe("SellerService", () => {
       })
     ).rejects.toThrow("Domain is invalid");
   });
+
+  it("creates and verifies seller domain challenges", async () => {
+    const service = new SellerService();
+    const seller = await service.createSeller({
+      displayName: "Weather Seller",
+      walletAddress: localIssuerPublicKey,
+      domain: "seller.example"
+    });
+    const challenge = await service.verifyDomain(seller.id, { method: "well-known" });
+
+    expect(challenge).toMatchObject({
+      sellerId: seller.id,
+      domain: "seller.example",
+      method: "well-known",
+      verified: false
+    });
+
+    const verified = await service.verifyDomain(seller.id, { evidence: challenge.challenge });
+
+    expect(verified.verified).toBe(true);
+    await expect(service.getSeller(seller.id)).resolves.toMatchObject({
+      domainVerifiedAt: expect.any(String)
+    });
+  });
 });
