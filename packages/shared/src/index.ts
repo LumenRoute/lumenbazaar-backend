@@ -1,1 +1,1 @@
-export const lumenBazaarBackendName = "lumenbazaar-backend";
+export const serviceName = "lumenbazaar-backend";

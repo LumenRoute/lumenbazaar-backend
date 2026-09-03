@@ -1,0 +1,13 @@
+{
+  "name": "@lumenbazaar/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/main.ts",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@lumenbazaar/shared": "workspace:*"
+  }
+}

@@ -70,6 +70,68 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.10.1)(vite@8.2.2(@types/node@24.10.1)(jiti@2.7.0)(tsx@4.20.6))
 
+  apps/api:
+    dependencies:
+      '@lumenbazaar/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+
+  apps/examples/paid-mcp-tool:
+    dependencies:
+      '@lumenbazaar/shared':
+        specifier: workspace:*
+        version: link:../../../packages/shared
+
+  apps/examples/paid-rag-api:
+    dependencies:
+      '@lumenbazaar/shared':
+        specifier: workspace:*
+        version: link:../../../packages/shared
+
+  apps/examples/paid-weather-api:
+    dependencies:
+      '@lumenbazaar/shared':
+        specifier: workspace:*
+        version: link:../../../packages/shared
+
+  apps/mcp-server:
+    dependencies:
+      '@lumenbazaar/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+
+  apps/worker:
+    dependencies:
+      '@lumenbazaar/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+
+  packages/buyer-sdk:
+    dependencies:
+      '@lumenbazaar/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/seller-sdk:
+    dependencies:
+      '@lumenbazaar/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/shared: {}
+
+  packages/stellar-payments:
+    dependencies:
+      '@lumenbazaar/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/testkit:
+    dependencies:
+      '@lumenbazaar/shared':
+        specifier: workspace:*
+        version: link:../shared
+
 packages:
 
   '@esbuild/aix-ppc64@0.25.12':
