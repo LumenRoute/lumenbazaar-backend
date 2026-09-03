@@ -1,0 +1,40 @@
+import { randomUUID } from "node:crypto";
+
+import { type Receipt } from "@lumenbazaar/shared";
+
+export type CreateReceiptInput = Omit<Receipt, "id" | "createdAt" | "updatedAt">;
+
+export type ReceiptStore = {
+  createReceipt: (input: CreateReceiptInput) => Promise<Receipt>;
+  getReceipt: (receiptId: string) => Promise<Receipt | undefined>;
+  getReceiptByAttempt: (paymentAttemptId: string) => Promise<Receipt | undefined>;
+};
+
+export class InMemoryReceiptStore implements ReceiptStore {
+  private readonly receipts = new Map<string, Receipt>();
+  private readonly byAttempt = new Map<string, string>();
+
+  async createReceipt(input: CreateReceiptInput) {
+    const now = new Date().toISOString();
+    const receipt: Receipt = {
+      id: `receipt_${randomUUID().replaceAll("-", "").slice(0, 24)}`,
+      ...input,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    this.receipts.set(receipt.id, receipt);
+    this.byAttempt.set(receipt.paymentAttemptId, receipt.id);
+
+    return receipt;
+  }
+
+  async getReceipt(receiptId: string) {
+    return this.receipts.get(receiptId);
+  }
+
+  async getReceiptByAttempt(paymentAttemptId: string) {
+    const receiptId = this.byAttempt.get(paymentAttemptId);
+    return receiptId === undefined ? undefined : this.receipts.get(receiptId);
+  }
+}

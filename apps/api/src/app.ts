@@ -5,6 +5,7 @@ import Fastify from "fastify";
 import { loadConfig } from "@lumenbazaar/shared";
 import {
   type PaymentVerificationService,
+  type ReceiptService,
   type SettlementService
 } from "@lumenbazaar/stellar-payments";
 
@@ -17,6 +18,7 @@ export type BuildApiAppOptions = {
   logger?: boolean;
   verificationService?: PaymentVerificationService;
   settlementService?: SettlementService;
+  receiptService?: ReceiptService;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -38,18 +40,31 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   });
   registerFacilitatorRoutes(
     app,
-    options.verificationService === undefined
-      ? options.settlementService === undefined
-        ? { config }
-        : { config, settlementService: options.settlementService }
-      : options.settlementService === undefined
-        ? { config, verificationService: options.verificationService }
-        : {
-            config,
-            verificationService: options.verificationService,
-            settlementService: options.settlementService
-          }
+    compactFacilitatorOptions({
+      config,
+      verificationService: options.verificationService,
+      settlementService: options.settlementService,
+      receiptService: options.receiptService
+    })
   );
 
   return app;
+}
+
+function compactFacilitatorOptions(options: {
+  config: ReturnType<typeof loadConfig>;
+  verificationService?: PaymentVerificationService | undefined;
+  settlementService?: SettlementService | undefined;
+  receiptService?: ReceiptService | undefined;
+}) {
+  return {
+    config: options.config,
+    ...(options.verificationService === undefined
+      ? {}
+      : { verificationService: options.verificationService }),
+    ...(options.settlementService === undefined
+      ? {}
+      : { settlementService: options.settlementService }),
+    ...(options.receiptService === undefined ? {} : { receiptService: options.receiptService })
+  };
 }

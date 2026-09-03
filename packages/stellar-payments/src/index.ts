@@ -6,6 +6,8 @@ export * from "./clients.js";
 export * from "./hash.js";
 export * from "./paymentAttemptStore.js";
 export * from "./paymentPayload.js";
+export * from "./receipt.js";
+export * from "./receiptStore.js";
 export * from "./settlement.js";
 export * from "./settlementStore.js";
 export * from "./verification.js";

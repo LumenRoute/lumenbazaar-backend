@@ -8,6 +8,7 @@ import {
   parseVerifyPaymentRequest
 } from "./paymentPayload.js";
 import { InMemoryPaymentAttemptStore, type PaymentAttemptStore } from "./paymentAttemptStore.js";
+import { ReceiptService } from "./receipt.js";
 import { InMemorySettlementStore, type SettlementStore } from "./settlementStore.js";
 import {
   type X402SettlementResult,
@@ -28,10 +29,12 @@ export type SettlementServiceOptions = {
   adapter?: X402StellarAdapter;
   attemptStore?: PaymentAttemptStore;
   settlementStore?: SettlementStore;
+  receiptService?: ReceiptService;
 };
 
 export type SettlementServiceResult = {
   settlementId: string;
+  receiptId: string;
   transactionHash: string;
   ledger: number;
   network: NormalizedVerifyPaymentRequest["paymentPayload"]["network"];
@@ -42,6 +45,7 @@ export class SettlementService {
   private readonly adapter: X402StellarAdapter;
   private readonly attemptStore: PaymentAttemptStore;
   private readonly settlementStore: SettlementStore;
+  private readonly receiptService: ReceiptService;
 
   constructor(
     private readonly config: AppConfig,
@@ -50,6 +54,7 @@ export class SettlementService {
     this.adapter = options.adapter ?? createX402StellarAdapter();
     this.attemptStore = options.attemptStore ?? new InMemoryPaymentAttemptStore();
     this.settlementStore = options.settlementStore ?? new InMemorySettlementStore();
+    this.receiptService = options.receiptService ?? new ReceiptService();
   }
 
   async settle(input: unknown): Promise<SettlementServiceResult> {
@@ -96,9 +101,11 @@ export class SettlementService {
     });
 
     await this.attemptStore.updatePaymentAttempt(attempt.id, { status: "settled" });
+    const receipt = await this.receiptService.finalizeSettlementReceipt(attempt, settlement);
 
     return {
       settlementId: settlement.id,
+      receiptId: receipt.id,
       transactionHash: adapterResult.transactionHash,
       ledger: adapterResult.ledger,
       network: normalized.paymentPayload.network,
@@ -108,6 +115,10 @@ export class SettlementService {
 
   async getSettlementByTransactionHash(transactionHash: string) {
     return this.settlementStore.getSettlementByTransactionHash(transactionHash);
+  }
+
+  getReceiptService() {
+    return this.receiptService;
   }
 
   private async settleWithAdapter(

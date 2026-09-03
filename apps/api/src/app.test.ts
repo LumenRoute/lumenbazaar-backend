@@ -5,6 +5,7 @@ import { LumenError, loadConfig, localIssuerPublicKey } from "@lumenbazaar/share
 import {
   InMemoryPaymentAttemptStore,
   PaymentVerificationService,
+  ReceiptService,
   SettlementService,
   type X402StellarAdapter
 } from "@lumenbazaar/stellar-payments";
@@ -127,11 +128,17 @@ describe("API server base", () => {
     const config = loadConfig({});
     const attemptStore = new InMemoryPaymentAttemptStore();
     const verificationService = new PaymentVerificationService(config, { adapter, attemptStore });
-    const settlementService = new SettlementService(config, { adapter, attemptStore });
+    const receiptService = new ReceiptService();
+    const settlementService = new SettlementService(config, {
+      adapter,
+      attemptStore,
+      receiptService
+    });
     const app = buildApiApp({
       logger: false,
       verificationService,
-      settlementService
+      settlementService,
+      receiptService
     });
     const verified = await verificationService.verify(exactPaymentRequest());
 
@@ -147,8 +154,21 @@ describe("API server base", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       transactionHash: "tx_api_settle",
+      receiptId: expect.stringMatching(/^receipt_/),
       ledger: 456,
       status: "settled"
+    });
+
+    const receipt = await app.inject({
+      method: "GET",
+      url: `/v1/receipts/${response.json().receiptId}`
+    });
+
+    expect(receipt.statusCode).toBe(200);
+    expect(receipt.json()).toMatchObject({
+      paymentAttemptId: verified.paymentAttemptId,
+      transactionHash: "tx_api_settle",
+      status: "finalized"
     });
     await app.close();
   });
