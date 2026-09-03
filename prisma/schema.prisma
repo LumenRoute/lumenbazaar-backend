@@ -19,6 +19,9 @@ model Seller {
   resources        Resource[]
   paymentAttempts  PaymentAttempt[]
   receipts         Receipt[]
+  catalogEvents    CatalogEvent[]
+  mcpServers       McpServer[]
+  searchDocuments  SearchDocument[]
 
   @@index([domain])
 }
@@ -63,6 +66,9 @@ model Resource {
   paymentRequirements PaymentRequirement[]
   paymentAttempts     PaymentAttempt[]
   receipts            Receipt[]
+  catalogEvents       CatalogEvent[]
+  mcpTools            McpTool[]
+  searchDocument      SearchDocument?
 
   @@index([sellerId])
   @@index([network, assetCode])
@@ -174,4 +180,148 @@ model Receipt {
   @@index([sellerId, status])
   @@index([resourceId, status])
   @@index([transactionHash])
+}
+
+model CatalogEvent {
+  id         String    @id @default(cuid())
+  resourceId String?
+  sellerId   String?
+  type       String
+  status     String
+  reason     String?
+  metadata   Json
+  createdAt  DateTime  @default(now())
+  resource   Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  seller     Seller?   @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+
+  @@index([resourceId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([type, status])
+}
+
+model McpServer {
+  id        String    @id @default(cuid())
+  sellerId  String?
+  name      String
+  baseUrl   String
+  status    String    @default("active")
+  metadata  Json
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  seller    Seller?   @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  tools     McpTool[]
+
+  @@index([sellerId, status])
+}
+
+model McpTool {
+  id           String    @id @default(cuid())
+  serverId     String
+  resourceId   String?
+  name         String
+  description  String
+  inputSchema  Json
+  outputSchema Json
+  metadata     Json
+  createdAt    DateTime  @default(now())
+  server       McpServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  resource     Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+
+  @@unique([serverId, name])
+  @@index([resourceId])
+}
+
+model SearchDocument {
+  id         String    @id @default(cuid())
+  resourceId String    @unique
+  sellerId   String
+  body       String
+  ranking    Json
+  indexedAt  DateTime?
+  stale      Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  resource   Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  seller     Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@index([stale])
+}
+
+model ConformanceRun {
+  id          String    @id @default(cuid())
+  network     String
+  suite       String
+  status      String
+  results     Json
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([network, status])
+  @@index([createdAt])
+}
+
+model NetworkStatus {
+  id             String   @id @default(cuid())
+  network        String   @unique
+  status         String
+  latestLedger   Int?
+  rpcHealthy     Boolean  @default(false)
+  horizonHealthy Boolean  @default(false)
+  checkedAt      DateTime @default(now())
+  metadata       Json
+
+  @@index([status])
+}
+
+model ApiClient {
+  id            String           @id @default(cuid())
+  name          String
+  publicKey     String?          @unique
+  status        String           @default("active")
+  rateLimitTier String           @default("default")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  rateLimits    RateLimitEvent[]
+
+  @@index([status, rateLimitTier])
+}
+
+model RateLimitEvent {
+  id          String     @id @default(cuid())
+  apiClientId String?
+  route       String
+  key         String
+  limit       Int
+  remaining   Int
+  resetAt     DateTime
+  createdAt   DateTime   @default(now())
+  apiClient   ApiClient? @relation(fields: [apiClientId], references: [id], onDelete: SetNull)
+
+  @@index([apiClientId, createdAt])
+  @@index([route, createdAt])
+  @@index([key, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorType  String
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String?
+  metadata   Json
+  createdAt  DateTime @default(now())
+
+  @@index([actorType, actorId])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
+}
+
+model OperatorConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
 }
