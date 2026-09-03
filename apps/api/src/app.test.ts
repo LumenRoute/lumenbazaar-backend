@@ -14,6 +14,30 @@ describe("API server base", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["x-request-id"]).toBeDefined();
+    expect(response.json()).toMatchObject({
+      ok: true,
+      service: "lumenbazaar-backend",
+      app: "api"
+    });
+    await app.close();
+  });
+
+  it("returns version, metrics, and supported networks", async () => {
+    const app = buildApiApp({ logger: false });
+
+    const version = await app.inject({ method: "GET", url: "/version" });
+    const metrics = await app.inject({ method: "GET", url: "/metrics" });
+    const networks = await app.inject({ method: "GET", url: "/v1/networks" });
+
+    expect(version.json()).toMatchObject({
+      service: "lumenbazaar-backend",
+      version: "0.1.0"
+    });
+    expect(metrics.body).toContain("lumenbazaar_api_uptime_seconds");
+    expect(networks.json().networks.map((network: { id: string }) => network.id)).toEqual([
+      "stellar:testnet",
+      "stellar:pubnet"
+    ]);
     await app.close();
   });
 
