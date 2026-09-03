@@ -17,6 +17,8 @@ model Seller {
   updatedAt        DateTime       @updatedAt
   domains          SellerDomain[]
   resources        Resource[]
+  paymentAttempts  PaymentAttempt[]
+  receipts         Receipt[]
 
   @@index([domain])
 }
@@ -59,6 +61,8 @@ model Resource {
   versions            ResourceVersion[]
   schemas             ResourceSchema[]
   paymentRequirements PaymentRequirement[]
+  paymentAttempts     PaymentAttempt[]
+  receipts            Receipt[]
 
   @@index([sellerId])
   @@index([network, assetCode])
@@ -99,4 +103,75 @@ model PaymentRequirement {
 
   @@index([network, assetCode])
   @@index([payTo])
+}
+
+model PaymentAttempt {
+  id              String      @id @default(cuid())
+  resourceId      String?
+  sellerId        String?
+  paymentHash     String      @unique
+  network         String
+  assetCode       String
+  assetIssuer     String
+  amount          Decimal     @db.Decimal(24, 7)
+  payTo           String
+  status          String      @default("received")
+  failureCode     String?
+  failureReason   String?
+  expiresAtLedger Int?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  resource        Resource?   @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  seller          Seller?     @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  settlement      Settlement?
+  receipt         Receipt?
+
+  @@index([network, status])
+  @@index([sellerId, status])
+  @@index([resourceId, status])
+}
+
+model Settlement {
+  id               String         @id @default(cuid())
+  paymentAttemptId String         @unique
+  transactionHash  String?        @unique
+  ledger           Int?
+  network          String
+  amount           Decimal        @db.Decimal(24, 7)
+  assetCode        String
+  assetIssuer      String
+  status           String         @default("pending")
+  settledAt        DateTime?
+  createdAt        DateTime       @default(now())
+  paymentAttempt   PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Cascade)
+
+  @@index([network, status])
+  @@index([ledger])
+}
+
+model Receipt {
+  id               String         @id @default(cuid())
+  paymentAttemptId String         @unique
+  resourceId       String?
+  sellerId         String?
+  transactionHash  String?
+  ledger           Int?
+  network          String
+  amount           Decimal        @db.Decimal(24, 7)
+  assetCode        String
+  assetIssuer      String
+  status           String         @default("pending")
+  settledAt        DateTime?
+  failureCode      String?
+  failureReason    String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  paymentAttempt   PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Cascade)
+  resource         Resource?      @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  seller           Seller?        @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+
+  @@index([network, status])
+  @@index([sellerId, status])
+  @@index([resourceId, status])
+  @@index([transactionHash])
 }
