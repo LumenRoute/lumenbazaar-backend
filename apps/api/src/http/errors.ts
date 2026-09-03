@@ -1,7 +1,7 @@
 import { type FastifyError, type FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 
-import { LumenError, failure } from "@lumenbazaar/shared";
+import { LumenError, failure, mapInfrastructureError, toPublicError } from "@lumenbazaar/shared";
 
 export function registerErrorHandling(app: FastifyInstance) {
   app.setNotFoundHandler(async (request, reply) => {
@@ -18,16 +18,7 @@ export function registerErrorHandling(app: FastifyInstance) {
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof LumenError) {
-      return reply.status(error.statusCode).send(
-        failure(
-          {
-            code: error.code,
-            message: error.message,
-            details: error.details
-          },
-          request.id
-        )
-      );
+      return reply.status(error.statusCode).send(failure(toPublicError(error), request.id));
     }
 
     if (error instanceof ZodError || isFastifyValidationError(error)) {
@@ -45,17 +36,13 @@ export function registerErrorHandling(app: FastifyInstance) {
       );
     }
 
-    request.log.error({ err: error }, "Unhandled API error");
+    const mappedError = mapInfrastructureError(error);
 
-    return reply.status(500).send(
-      failure(
-        {
-          code: "INTERNAL_ERROR",
-          message: "Internal server error."
-        },
-        request.id
-      )
-    );
+    request.log.error({ code: mappedError.code, err: error }, "Unhandled API error");
+
+    return reply
+      .status(mappedError.statusCode)
+      .send(failure(toPublicError(mappedError), request.id));
   });
 }
 
