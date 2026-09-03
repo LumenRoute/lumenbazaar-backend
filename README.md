@@ -22,7 +22,13 @@ pnpm install
 pnpm check
 ```
 
-Local services are defined in `docker-compose.yml` once the database and worker layers are enabled.
+Start local dependencies with:
+
+```bash
+docker compose up postgres redis
+```
+
+The Compose file also includes API and worker service definitions for full local runs.
 
 ## Repository Layout
 
