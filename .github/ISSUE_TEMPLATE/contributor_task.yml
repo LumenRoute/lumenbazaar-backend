@@ -1,0 +1,62 @@
+name: Contributor task
+description: Scoped implementation task for the LumenBazaar backend.
+title: "Backend: "
+labels:
+  - backend
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What needs to be implemented.
+    validations:
+      required: true
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Requirements and context
+      description: Relevant protocol, product, or repository context.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Files, packages, endpoints, or modules in scope.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How maintainers can verify the work.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Test requirements
+      description: Expected local, integration, or conformance checks.
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Relevant files
+      description: Important paths for the task.
+    validations:
+      required: false
+  - type: textarea
+    id: execution
+    attributes:
+      label: Suggested execution
+      description: Recommended implementation order.
+    validations:
+      required: false
+  - type: textarea
+    id: guidelines
+    attributes:
+      label: Guidelines
+      description: Repository-specific constraints.
+    validations:
+      required: false
