@@ -12,6 +12,7 @@ import {
 
 import { buildApiApp } from "./app.js";
 import { parseBody } from "./http/validation.js";
+import { SellerService } from "./services/sellers.js";
 
 describe("API server base", () => {
   it("adds request IDs to responses", async () => {
@@ -169,6 +170,36 @@ describe("API server base", () => {
       paymentAttemptId: verified.paymentAttemptId,
       transactionHash: "tx_api_settle",
       status: "finalized"
+    });
+    await app.close();
+  });
+
+  it("creates and fetches sellers through API routes", async () => {
+    const sellerService = new SellerService();
+    const app = buildApiApp({ logger: false, sellerService });
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/sellers",
+      payload: {
+        displayName: "Weather Seller",
+        walletAddress: localIssuerPublicKey,
+        domain: "seller.example"
+      }
+    });
+
+    expect(created.statusCode).toBe(200);
+
+    const fetched = await app.inject({
+      method: "GET",
+      url: `/v1/sellers/${created.json().id}`
+    });
+
+    expect(fetched.statusCode).toBe(200);
+    expect(fetched.json()).toMatchObject({
+      displayName: "Weather Seller",
+      walletAddress: localIssuerPublicKey,
+      domain: "seller.example"
     });
     await app.close();
   });

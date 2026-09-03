@@ -12,13 +12,16 @@ import {
 import { registerErrorHandling } from "./http/errors.js";
 import { registerFacilitatorRoutes } from "./routes/facilitator.js";
 import { registerMetadataRoutes } from "./routes/metadata.js";
+import { registerSellerRoutes } from "./routes/sellers.js";
 import { createMetricsService } from "./services/metrics.js";
+import { type SellerService } from "./services/sellers.js";
 
 export type BuildApiAppOptions = {
   logger?: boolean;
   verificationService?: PaymentVerificationService;
   settlementService?: SettlementService;
   receiptService?: ReceiptService;
+  sellerService?: SellerService;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -47,6 +50,7 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
       receiptService: options.receiptService
     })
   );
+  registerSellerRoutes(app, compactSellerOptions({ sellerService: options.sellerService }));
 
   return app;
 }
@@ -66,5 +70,11 @@ function compactFacilitatorOptions(options: {
       ? {}
       : { settlementService: options.settlementService }),
     ...(options.receiptService === undefined ? {} : { receiptService: options.receiptService })
+  };
+}
+
+function compactSellerOptions(options: { sellerService?: SellerService | undefined }) {
+  return {
+    ...(options.sellerService === undefined ? {} : { sellerService: options.sellerService })
   };
 }
