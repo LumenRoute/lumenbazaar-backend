@@ -103,6 +103,18 @@ export type CatalogEvent = {
   createdAt: string;
 };
 
+export type SearchDocument = {
+  id: string;
+  resourceId: string;
+  sellerId: string;
+  body: string;
+  ranking: JsonObject;
+  indexedAt: string | null;
+  stale: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PaymentAttempt = {
   id: string;
   resourceId: string | null;
