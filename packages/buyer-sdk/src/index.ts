@@ -33,3 +33,20 @@ export {
   createPaymentHeaders
 } from "./payment.js";
 export type { PaymentPayload, PaymentPrepareInput } from "./payment.js";
+
+// Call exports
+export { callPaidResource, fetchReceipt } from "./call.js";
+export type { CallOptions, CallResult, RetryConfig } from "./call.js";
+
+// Budget exports
+export { BudgetManager, createBudgetManager, createDefaultBudget } from "./budget.js";
+export type { BudgetConstraint, BudgetState } from "./budget.js";
+
+// Error exports
+export {
+  mapHttpStatusToErrorCode,
+  mapResponseError,
+  mapCaughtError,
+  mapLumenError
+} from "./errors.js";
+export type { ErrorCode, MappedError } from "./errors.js";
