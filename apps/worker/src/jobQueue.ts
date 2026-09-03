@@ -6,6 +6,9 @@ import { createBullMqQueue, queueNames } from "./queues.js";
 import { type SettlementConfirmationJobData } from "./workers/settlementConfirmation.js";
 import { type ResourceIndexingJobData } from "./workers/resourceIndexing.js";
 import { type SearchSyncJobData } from "./workers/searchSync.js";
+import { type NetworkHealthJobData } from "./workers/networkHealth.js";
+import { type ReceiptFinalizerJobData } from "./workers/receiptFinalizer.js";
+import { type StalePaymentCleanupJobData } from "./workers/stalePaymentCleanup.js";
 
 export type JobQueues = {
   settlementConfirmation: Queue;
@@ -67,6 +70,54 @@ export async function enqueueSearchSync(
   { delayMs = 1000, maxAttempts = 3 } = {}
 ) {
   return queue.add("search-sync", data, {
+    attempts: maxAttempts,
+    backoff: {
+      type: "exponential",
+      delay: delayMs
+    },
+    removeOnComplete: true,
+    removeOnFail: false
+  });
+}
+
+export async function enqueueNetworkHealth(
+  queue: Queue,
+  data: NetworkHealthJobData,
+  { delayMs = 30000, maxAttempts = 3 } = {}
+) {
+  return queue.add("network-health", data, {
+    attempts: maxAttempts,
+    backoff: {
+      type: "exponential",
+      delay: delayMs
+    },
+    removeOnComplete: true,
+    removeOnFail: false
+  });
+}
+
+export async function enqueueReceiptFinalizer(
+  queue: Queue,
+  data: ReceiptFinalizerJobData,
+  { delayMs = 10000, maxAttempts = 3 } = {}
+) {
+  return queue.add("receipt-finalizer", data, {
+    attempts: maxAttempts,
+    backoff: {
+      type: "exponential",
+      delay: delayMs
+    },
+    removeOnComplete: true,
+    removeOnFail: false
+  });
+}
+
+export async function enqueueStalePaymentCleanup(
+  queue: Queue,
+  data: StalePaymentCleanupJobData,
+  { delayMs = 60000, maxAttempts = 2 } = {}
+) {
+  return queue.add("stale-payment-cleanup", data, {
     attempts: maxAttempts,
     backoff: {
       type: "exponential",
