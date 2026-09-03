@@ -8,6 +8,7 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
-    "@lumenbazaar/shared": "workspace:*"
+    "@lumenbazaar/shared": "workspace:*",
+    "@lumenbazaar/stellar-payments": "workspace:*"
   }
 }

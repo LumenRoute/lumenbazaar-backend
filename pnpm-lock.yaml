@@ -75,6 +75,9 @@ importers:
       '@lumenbazaar/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@lumenbazaar/stellar-payments':
+        specifier: workspace:*
+        version: link:../../packages/stellar-payments
 
   apps/examples/paid-mcp-tool:
     dependencies:
