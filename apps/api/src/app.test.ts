@@ -338,6 +338,28 @@ describe("API server base", () => {
       partialResults: false,
       nextCursor: null
     });
+
+    const search = await app.inject({
+      method: "GET",
+      url: "/v1/discovery/search?q=weather&network=stellar:testnet&asset=USDC&type=http"
+    });
+
+    expect(search.statusCode).toBe(200);
+    expect(search.json()).toMatchObject({
+      resources: [
+        {
+          id: response.json().resourceId,
+          ranking: {
+            matchedTerms: ["weather"]
+          }
+        }
+      ],
+      ranking: {
+        strategy: "postgres-full-text-v1"
+      },
+      partialResults: true,
+      nextCursor: null
+    });
     await app.close();
   });
 
