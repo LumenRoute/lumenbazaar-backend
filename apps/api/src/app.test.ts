@@ -268,6 +268,33 @@ describe("API server base", () => {
     await app.close();
   });
 
+  it("validates discovery metadata without cataloging it", async () => {
+    const sellerService = new SellerService();
+    const app = buildApiApp({ logger: false, sellerService });
+    const seller = await sellerService.createSeller({
+      displayName: "Weather Seller",
+      walletAddress: localIssuerPublicKey,
+      domain: "seller.example"
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/discovery/validate",
+      payload: {
+        sellerId: seller.id,
+        resource: resourcePayload(seller.id)
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: true,
+      warnings: [],
+      errors: []
+    });
+    await app.close();
+  });
+
   it("returns stable envelopes for application errors", async () => {
     const app = buildApiApp({ logger: false });
     app.get("/boom", async () => {

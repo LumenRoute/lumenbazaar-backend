@@ -10,10 +10,12 @@ import {
 } from "@lumenbazaar/stellar-payments";
 
 import { registerErrorHandling } from "./http/errors.js";
+import { registerDiscoveryRoutes } from "./routes/discovery.js";
 import { registerFacilitatorRoutes } from "./routes/facilitator.js";
 import { registerMetadataRoutes } from "./routes/metadata.js";
 import { registerResourceRoutes } from "./routes/resources.js";
 import { registerSellerRoutes } from "./routes/sellers.js";
+import { CatalogValidationService } from "./services/catalogValidation.js";
 import { createMetricsService } from "./services/metrics.js";
 import { ResourceService } from "./services/resources.js";
 import { SellerService } from "./services/sellers.js";
@@ -25,6 +27,7 @@ export type BuildApiAppOptions = {
   receiptService?: ReceiptService;
   sellerService?: SellerService;
   resourceService?: ResourceService;
+  catalogValidationService?: CatalogValidationService;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -55,9 +58,12 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   );
   const sellerService = options.sellerService ?? new SellerService();
   const resourceService = options.resourceService ?? new ResourceService(config, sellerService);
+  const catalogValidationService =
+    options.catalogValidationService ?? new CatalogValidationService(config, sellerService);
 
   registerSellerRoutes(app, { sellerService });
   registerResourceRoutes(app, { resourceService });
+  registerDiscoveryRoutes(app, { catalogValidationService });
 
   return app;
 }
