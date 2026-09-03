@@ -108,6 +108,12 @@ importers:
       '@lumenbazaar/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      bullmq:
+        specifier: 5.65.0
+        version: 5.65.0
+      ioredis:
+        specifier: 5.8.2
+        version: 5.8.2
 
   packages/buyer-sdk:
     dependencies:

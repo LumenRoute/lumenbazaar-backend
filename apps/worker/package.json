@@ -8,6 +8,8 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
-    "@lumenbazaar/shared": "workspace:*"
+    "@lumenbazaar/shared": "workspace:*",
+    "bullmq": "5.65.0",
+    "ioredis": "5.8.2"
   }
 }
