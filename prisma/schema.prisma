@@ -6,3 +6,97 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model Seller {
+  id               String         @id @default(cuid())
+  displayName      String
+  walletAddress    String         @unique
+  domain           String
+  domainVerifiedAt DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  domains          SellerDomain[]
+  resources        Resource[]
+
+  @@index([domain])
+}
+
+model SellerDomain {
+  id                 String    @id @default(cuid())
+  sellerId           String
+  domain             String
+  verificationMethod String
+  challengeToken     String
+  verifiedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  seller             Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerId, domain])
+  @@index([domain])
+}
+
+model Resource {
+  id                  String               @id @default(cuid())
+  sellerId            String
+  type                String
+  name                String
+  description         String
+  url                 String
+  routeTemplate       String
+  network             String
+  payTo               String
+  assetCode           String
+  assetIssuer         String
+  amount              Decimal              @db.Decimal(24, 7)
+  inputSchema         Json
+  outputSchema        Json
+  extensions          Json
+  status              String               @default("active")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  seller              Seller               @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  versions            ResourceVersion[]
+  schemas             ResourceSchema[]
+  paymentRequirements PaymentRequirement[]
+
+  @@index([sellerId])
+  @@index([network, assetCode])
+  @@index([type, status])
+}
+
+model ResourceVersion {
+  id         String   @id @default(cuid())
+  resourceId String
+  version    Int
+  metadata   Json
+  createdAt  DateTime @default(now())
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceId, version])
+}
+
+model ResourceSchema {
+  id           String   @id @default(cuid())
+  resourceId   String
+  inputSchema  Json
+  outputSchema Json
+  createdAt    DateTime @default(now())
+  resource     Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+}
+
+model PaymentRequirement {
+  id          String   @id @default(cuid())
+  resourceId  String
+  scheme      String
+  network     String
+  assetCode   String
+  assetIssuer String
+  amount      Decimal  @db.Decimal(24, 7)
+  payTo       String
+  createdAt   DateTime @default(now())
+  resource    Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([network, assetCode])
+  @@index([payTo])
+}
