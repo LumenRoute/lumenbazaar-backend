@@ -15,6 +15,7 @@ import { registerFacilitatorRoutes } from "./routes/facilitator.js";
 import { registerMetadataRoutes } from "./routes/metadata.js";
 import { registerResourceRoutes } from "./routes/resources.js";
 import { registerSellerRoutes } from "./routes/sellers.js";
+import { CatalogService } from "./services/cataloging.js";
 import { CatalogValidationService } from "./services/catalogValidation.js";
 import { createMetricsService } from "./services/metrics.js";
 import { ResourceService } from "./services/resources.js";
@@ -28,6 +29,7 @@ export type BuildApiAppOptions = {
   sellerService?: SellerService;
   resourceService?: ResourceService;
   catalogValidationService?: CatalogValidationService;
+  catalogService?: CatalogService;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -60,10 +62,12 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   const resourceService = options.resourceService ?? new ResourceService(config, sellerService);
   const catalogValidationService =
     options.catalogValidationService ?? new CatalogValidationService(config, sellerService);
+  const catalogService =
+    options.catalogService ?? new CatalogService(catalogValidationService, resourceService);
 
   registerSellerRoutes(app, { sellerService });
   registerResourceRoutes(app, { resourceService });
-  registerDiscoveryRoutes(app, { catalogValidationService });
+  registerDiscoveryRoutes(app, { catalogValidationService, catalogService });
 
   return app;
 }

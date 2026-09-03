@@ -92,6 +92,17 @@ export type ResourceVersion = {
   createdAt: string;
 };
 
+export type CatalogEvent = {
+  id: string;
+  resourceId: string | null;
+  sellerId: string | null;
+  type: CatalogEventType;
+  status: string;
+  reason: string | null;
+  metadata: JsonObject;
+  createdAt: string;
+};
+
 export type PaymentAttempt = {
   id: string;
   resourceId: string | null;

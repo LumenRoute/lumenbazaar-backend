@@ -295,6 +295,35 @@ describe("API server base", () => {
     await app.close();
   });
 
+  it("catalogs valid discovery metadata through the API route", async () => {
+    const sellerService = new SellerService();
+    const app = buildApiApp({ logger: false, sellerService });
+    const seller = await sellerService.createSeller({
+      displayName: "Weather Seller",
+      walletAddress: localIssuerPublicKey,
+      domain: "seller.example"
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/discovery/catalog",
+      payload: {
+        sellerId: seller.id,
+        resource: resourcePayload(seller.id)
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      ok: true,
+      resourceId: expect.stringMatching(/^resource_/),
+      versionId: expect.stringMatching(/^resource_version_/),
+      catalogEventId: expect.stringMatching(/^catalog_event_/),
+      indexingStatus: "queued"
+    });
+    await app.close();
+  });
+
   it("returns stable envelopes for application errors", async () => {
     const app = buildApiApp({ logger: false });
     app.get("/boom", async () => {
