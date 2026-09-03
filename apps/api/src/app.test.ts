@@ -12,6 +12,7 @@ import {
 
 import { buildApiApp } from "./app.js";
 import { parseBody } from "./http/validation.js";
+import { ResourceService } from "./services/resources.js";
 import { SellerService } from "./services/sellers.js";
 
 describe("API server base", () => {
@@ -228,6 +229,45 @@ describe("API server base", () => {
     await app.close();
   });
 
+  it("manages resources through API routes with seller ownership", async () => {
+    const sellerService = new SellerService();
+    const resourceService = new ResourceService(loadConfig({}), sellerService);
+    const app = buildApiApp({ logger: false, sellerService, resourceService });
+    const seller = await sellerService.createSeller({
+      displayName: "Weather Seller",
+      walletAddress: localIssuerPublicKey,
+      domain: "seller.example"
+    });
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/resources",
+      payload: resourcePayload(seller.id)
+    });
+
+    expect(created.statusCode).toBe(200);
+
+    const listed = await app.inject({
+      method: "GET",
+      url: `/v1/resources?sellerId=${seller.id}`
+    });
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/v1/resources/${created.json().id}`,
+      payload: {
+        name: "Paid Forecast API"
+      }
+    });
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/v1/resources/${created.json().id}`
+    });
+
+    expect(listed.json().resources).toHaveLength(1);
+    expect(updated.json().name).toBe("Paid Forecast API");
+    expect(deleted.json().status).toBe("inactive");
+    await app.close();
+  });
+
   it("returns stable envelopes for application errors", async () => {
     const app = buildApiApp({ logger: false });
     app.get("/boom", async () => {
@@ -318,5 +358,30 @@ function exactPaymentRequest() {
       payTo: localIssuerPublicKey
     },
     currentLedger: 9
+  };
+}
+
+function resourcePayload(sellerId: string) {
+  return {
+    sellerId,
+    type: "http",
+    name: "Paid Weather API",
+    description: "Returns current weather for a city.",
+    url: "https://seller.example/weather/Lagos",
+    routeTemplate: "/weather/{city}",
+    network: "stellar:testnet",
+    payTo: localIssuerPublicKey,
+    assetCode: "USDC",
+    assetIssuer: localIssuerPublicKey,
+    amount: "0.05",
+    inputSchema: {
+      type: "object"
+    },
+    outputSchema: {
+      type: "object"
+    },
+    extensions: {
+      bazaar: true
+    }
   };
 }

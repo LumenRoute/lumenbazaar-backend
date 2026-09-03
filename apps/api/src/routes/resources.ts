@@ -1,0 +1,38 @@
+import { type FastifyInstance } from "fastify";
+import { z } from "zod";
+
+import { parseBody, parseParams, parseQuery } from "../http/validation.js";
+import { type ResourceService } from "../services/resources.js";
+
+export type ResourceRouteOptions = {
+  resourceService: ResourceService;
+};
+
+export function registerResourceRoutes(app: FastifyInstance, options: ResourceRouteOptions) {
+  app.get("/v1/resources", async (request) => options.resourceService.listResources(request.query));
+
+  app.post("/v1/resources", async (request) =>
+    options.resourceService.createResource(parseBody(request, z.unknown()))
+  );
+
+  app.get("/v1/resources/:id", async (request) => {
+    const params = parseParams(request, z.object({ id: z.string().min(1) }));
+    return options.resourceService.getResource(params.id);
+  });
+
+  app.patch("/v1/resources/:id", async (request) => {
+    const params = parseParams(request, z.object({ id: z.string().min(1) }));
+    return options.resourceService.updateResource(params.id, parseBody(request, z.unknown()));
+  });
+
+  app.delete("/v1/resources/:id", async (request) => {
+    const params = parseParams(request, z.object({ id: z.string().min(1) }));
+    return options.resourceService.deleteResource(params.id);
+  });
+
+  app.get("/v1/sellers/:sellerId/resources", async (request) => {
+    const params = parseParams(request, z.object({ sellerId: z.string().min(1) }));
+    const query = parseQuery(request, z.record(z.string(), z.unknown()));
+    return options.resourceService.listResources({ ...query, sellerId: params.sellerId });
+  });
+}
