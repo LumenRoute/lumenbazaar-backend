@@ -1,3 +1,4 @@
+import { type Queue } from "bullmq";
 import { z } from "zod";
 
 import { LumenError, type AppConfig } from "@lumenbazaar/shared";
@@ -30,6 +31,7 @@ export type SettlementServiceOptions = {
   attemptStore?: PaymentAttemptStore;
   settlementStore?: SettlementStore;
   receiptService?: ReceiptService;
+  confirmationQueue?: Queue;
 };
 
 export type SettlementServiceResult = {
@@ -46,6 +48,7 @@ export class SettlementService {
   private readonly attemptStore: PaymentAttemptStore;
   private readonly settlementStore: SettlementStore;
   private readonly receiptService: ReceiptService;
+  private readonly confirmationQueue: Queue | undefined;
 
   constructor(
     private readonly config: AppConfig,
@@ -55,6 +58,7 @@ export class SettlementService {
     this.attemptStore = options.attemptStore ?? new InMemoryPaymentAttemptStore();
     this.settlementStore = options.settlementStore ?? new InMemorySettlementStore();
     this.receiptService = options.receiptService ?? new ReceiptService();
+    this.confirmationQueue = options.confirmationQueue;
   }
 
   async settle(input: unknown): Promise<SettlementServiceResult> {
@@ -102,6 +106,29 @@ export class SettlementService {
 
     await this.attemptStore.updatePaymentAttempt(attempt.id, { status: "settled" });
     const receipt = await this.receiptService.finalizeSettlementReceipt(attempt, settlement);
+
+    // Enqueue settlement confirmation job if queue is available
+    if (this.confirmationQueue) {
+      await this.confirmationQueue.add(
+        "settlement-confirmation",
+        {
+          settlementId: settlement.id,
+          transactionHash: adapterResult.transactionHash,
+          network: normalized.paymentPayload.network,
+          paymentAttemptId: attempt.id
+        },
+        {
+          delay: 5000, // Wait 5 seconds before first check
+          attempts: 30,
+          backoff: {
+            type: "exponential",
+            delay: 5000
+          },
+          removeOnComplete: true,
+          removeOnFail: false
+        }
+      );
+    }
 
     return {
       settlementId: settlement.id,

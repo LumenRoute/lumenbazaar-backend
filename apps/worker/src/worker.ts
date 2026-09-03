@@ -3,6 +3,7 @@ import { type Job, Worker } from "bullmq";
 import { type AppConfig, loadConfig } from "@lumenbazaar/shared";
 
 import { createBullMqConnection, queueNames, type QueueName } from "./queues.js";
+import { handleSettlementConfirmation } from "./workers/settlementConfirmation.js";
 
 export type WorkerJob = {
   id: string;
@@ -74,6 +75,25 @@ export class BullMqWorkerBackend implements WorkerBackend {
             id: String(job.id),
             name: job.name,
             queueName: queueNames.resourceIndexing,
+            data: job.data
+          });
+        },
+        {
+          connection: this.connection
+        }
+      )
+    );
+
+    // Add settlement confirmation worker
+    this.workers.push(
+      new Worker(
+        queueNames.settlementConfirmation,
+        async (job: Job<Record<string, unknown>>) => {
+          // Handler will be injected with config
+          this.processed.push({
+            id: String(job.id),
+            name: job.name,
+            queueName: queueNames.settlementConfirmation,
             data: job.data
           });
         },
