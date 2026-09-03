@@ -5,7 +5,7 @@ export type RequestId = string;
 export type ApiErrorBody = {
   code: ErrorCode;
   message: string;
-  details?: Record<string, unknown>;
+  details?: Record<string, unknown> | undefined;
 };
 
 export type ApiSuccess<T> = {

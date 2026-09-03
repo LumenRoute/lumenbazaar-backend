@@ -1,8 +1,8 @@
 import { buildApiApp } from "./app.js";
+import { loadConfig } from "@lumenbazaar/shared";
 
-const host = process.env.API_HOST ?? "0.0.0.0";
-const port = Number.parseInt(process.env.API_PORT ?? "3000", 10);
+const config = loadConfig();
 
 const app = buildApiApp();
 
-await app.listen({ host, port });
+await app.listen({ host: config.api.host, port: config.api.port });
