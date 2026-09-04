@@ -34,7 +34,7 @@ export type PaymentPrepareInput = {
 export function preparePaymentPayload(input: PaymentPrepareInput): PaymentPayload {
   const expires = input.expiresInSeconds ? Date.now() + input.expiresInSeconds * 1000 : undefined;
 
-  return {
+  const result: PaymentPayload = {
     scheme: "exact",
     network: input.network,
     asset: {
@@ -42,10 +42,18 @@ export function preparePaymentPayload(input: PaymentPrepareInput): PaymentPayloa
       issuer: input.assetIssuer
     },
     amount: input.amount,
-    recipient: input.recipient,
-    memo: input.memo,
-    expires
+    recipient: input.recipient
   };
+
+  // Add optional fields only if defined
+  if (input.memo !== undefined) {
+    result.memo = input.memo;
+  }
+  if (expires !== undefined) {
+    result.expires = expires;
+  }
+
+  return result;
 }
 
 /**
@@ -60,14 +68,20 @@ export function createPaymentPayloadFromResource(
   },
   expiresInSeconds?: number
 ): PaymentPayload {
-  return preparePaymentPayload({
+  const input: PaymentPrepareInput = {
     network: resourcePaymentTerms.network,
     assetCode: resourcePaymentTerms.asset.code,
     assetIssuer: resourcePaymentTerms.asset.issuer,
     amount: resourcePaymentTerms.amount,
-    recipient: resourcePaymentTerms.payTo,
-    expiresInSeconds
-  });
+    recipient: resourcePaymentTerms.payTo
+  };
+
+  // Only add expiresInSeconds if defined
+  if (expiresInSeconds !== undefined) {
+    input.expiresInSeconds = expiresInSeconds;
+  }
+
+  return preparePaymentPayload(input);
 }
 
 /**

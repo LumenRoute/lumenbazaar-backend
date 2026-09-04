@@ -120,12 +120,18 @@ importers:
       '@lumenbazaar/shared':
         specifier: workspace:*
         version: link:../shared
+      '@lumenbazaar/stellar-payments':
+        specifier: workspace:*
+        version: link:../stellar-payments
 
   packages/seller-sdk:
     dependencies:
       '@lumenbazaar/shared':
         specifier: workspace:*
         version: link:../shared
+      '@lumenbazaar/stellar-payments':
+        specifier: workspace:*
+        version: link:../stellar-payments
 
   packages/shared: {}
 
@@ -137,9 +143,18 @@ importers:
 
   packages/testkit:
     dependencies:
+      '@lumenbazaar/buyer-sdk':
+        specifier: workspace:*
+        version: link:../buyer-sdk
+      '@lumenbazaar/seller-sdk':
+        specifier: workspace:*
+        version: link:../seller-sdk
       '@lumenbazaar/shared':
         specifier: workspace:*
         version: link:../shared
+      '@lumenbazaar/stellar-payments':
+        specifier: workspace:*
+        version: link:../stellar-payments
 
 packages:
 

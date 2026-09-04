@@ -45,13 +45,12 @@ export async function inspectResource(
 
   const resource = (await response.json()) as Record<string, unknown>;
 
-  return {
+  const result: ResourceMetadata = {
     id: resource.id as string,
     name: resource.name as string,
     description: resource.description as string,
     type: resource.type as "http" | "mcp",
     url: resource.url as string,
-    routeTemplate: (resource.routeTemplate as string | undefined) ?? undefined,
     inputSchema: (resource.inputSchema as JsonObject) ?? {},
     outputSchema: (resource.outputSchema as JsonObject) ?? {},
     paymentTerms: {
@@ -65,6 +64,13 @@ export async function inspectResource(
       payTo: resource.payTo as string
     }
   };
+
+  // Add optional routeTemplate only if defined
+  if (resource.routeTemplate !== undefined) {
+    result.routeTemplate = resource.routeTemplate as string;
+  }
+
+  return result;
 }
 
 /**

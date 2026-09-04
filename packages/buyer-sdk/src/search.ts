@@ -89,19 +89,31 @@ export async function searchByAsset(
   assetCode: string,
   network?: "stellar:testnet" | "stellar:pubnet"
 ): Promise<SearchResponse> {
-  return searchResources(apiUrl, { asset: assetCode, network, limit: 50 });
+  const filters: SearchFilters = { asset: assetCode, limit: 50 };
+  if (network !== undefined) {
+    filters.network = network;
+  }
+  return searchResources(apiUrl, filters);
 }
 
 /**
  * Search for MCP tools
  */
 export async function searchMcpTools(apiUrl: string, query?: string): Promise<SearchResponse> {
-  return searchResources(apiUrl, { type: "mcp", q: query, limit: 30 });
+  const filters: SearchFilters = { type: "mcp", limit: 30 };
+  if (query !== undefined) {
+    filters.q = query;
+  }
+  return searchResources(apiUrl, filters);
 }
 
 /**
  * Search for HTTP endpoints
  */
 export async function searchHttpEndpoints(apiUrl: string, query?: string): Promise<SearchResponse> {
-  return searchResources(apiUrl, { type: "http", q: query, limit: 30 });
+  const filters: SearchFilters = { type: "http", limit: 30 };
+  if (query !== undefined) {
+    filters.q = query;
+  }
+  return searchResources(apiUrl, filters);
 }

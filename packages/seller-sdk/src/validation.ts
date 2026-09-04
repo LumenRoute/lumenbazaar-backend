@@ -264,7 +264,7 @@ export function matchRouteParamsToSchema(
 
   // Check each route parameter has a matching schema property
   for (const param of routeParams) {
-    if (!schemaProps.includes(param)) {
+    if (param && !schemaProps.includes(param)) {
       errors.push(`Route parameter '{${param}}' not found in schema properties`);
     }
   }

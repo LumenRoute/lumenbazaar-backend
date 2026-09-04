@@ -1,5 +1,3 @@
-import { type Decimal } from "@lumenbazaar/shared";
-
 export type BudgetConstraint = {
   maxAmountPerCall: string;
   maxTotalSpent: string;
