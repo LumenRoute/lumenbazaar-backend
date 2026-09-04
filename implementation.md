@@ -562,31 +562,31 @@ Completion check:
 
 - SDKs, frontend, examples, and backend tests can share deterministic fixtures. ✓
 
-## Phase 39: MCP Server Foundation
+## Phase 39: MCP Server Foundation ✓
 
 Parts:
 
-- Scaffold `apps/mcp-server`.
-- Add shared backend client.
-- Add deterministic tool registration.
-- Add structured MCP errors.
+- Scaffold `apps/mcp-server`. ✓
+- Add shared backend client. ✓
+- Add deterministic tool registration. ✓
+- Add structured MCP errors. ✓
 
 Completion check:
 
-- MCP server starts locally and lists available tools.
+- MCP server starts locally and lists available tools. ✓
 
-## Phase 40: MCP Discovery Tools
+## Phase 40: MCP Discovery Tools ✓
 
 Parts:
 
-- Implement `search_paid_resources`.
-- Implement `inspect_resource`.
-- Implement `list_supported_networks`.
-- Return schemas and payment requirements.
+- Implement `search_paid_resources`. ✓
+- Implement `inspect_resource`. ✓
+- Implement `list_supported_networks`. ✓
+- Return schemas and payment requirements. ✓
 
 Completion check:
 
-- Agent can search and inspect paid resources through MCP.
+- Agent can search and inspect paid resources through MCP. ✓
 
 ## Phase 41: MCP Payment Tools
 
