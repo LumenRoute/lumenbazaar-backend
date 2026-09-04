@@ -1,5 +1,3 @@
-import { type JsonObject } from "@lumenbazaar/shared";
-
 export type ConformanceTest = {
   name: string;
   description: string;
@@ -83,7 +81,9 @@ export class ConformanceTestSuite {
     const passedCount = results.filter((r) => r.passed).length;
     const failedCount = results.length - passedCount;
 
-    const network = (this.tests[0]?.network || "stellar:testnet") as "stellar:testnet" | "stellar:pubnet";
+    const network = (this.tests[0]?.network || "stellar:testnet") as
+      | "stellar:testnet"
+      | "stellar:pubnet";
     const scheme = (this.tests[0]?.scheme || "exact") as "exact" | "upto";
 
     return {

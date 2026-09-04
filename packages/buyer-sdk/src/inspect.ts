@@ -55,7 +55,7 @@ export async function inspectResource(
     outputSchema: (resource.outputSchema as JsonObject) ?? {},
     paymentTerms: {
       scheme: "exact",
-      network: (resource.network as string) as "stellar:testnet" | "stellar:pubnet",
+      network: resource.network as string as "stellar:testnet" | "stellar:pubnet",
       asset: {
         code: resource.assetCode as string,
         issuer: resource.assetIssuer as string

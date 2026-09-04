@@ -19,9 +19,13 @@ export async function handleNetworkHealth(job: Job<NetworkHealthJobData>) {
 
     // Determine network config based on network ID
     const horizonUrl =
-      network === "stellar:testnet" ? "https://horizon-testnet.stellar.org" : "https://horizon.stellar.org";
+      network === "stellar:testnet"
+        ? "https://horizon-testnet.stellar.org"
+        : "https://horizon.stellar.org";
     const rpcUrl =
-      network === "stellar:testnet" ? "https://soroban-testnet.stellar.org" : "https://mainnet.sorobanrpc.com";
+      network === "stellar:testnet"
+        ? "https://soroban-testnet.stellar.org"
+        : "https://mainnet.sorobanrpc.com";
 
     let rpcHealthy = false;
     let horizonHealthy = false;

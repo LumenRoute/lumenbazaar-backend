@@ -71,8 +71,10 @@ export class MockFacilitator {
       };
     }
 
-    const payloadObj = payload as Record<string, unknown>;
-    const paymentHash = JSON.stringify(payload).split("").reduce((acc, c) => acc + c.charCodeAt(0), 0).toString(16);
+    const paymentHash = JSON.stringify(payload)
+      .split("")
+      .reduce((acc, c) => acc + c.charCodeAt(0), 0)
+      .toString(16);
 
     this.verifications.set(paymentHash, payload);
 

@@ -29,9 +29,7 @@ export type MiddlewareResponse = {
 /**
  * Create a 402 Payment Required response
  */
-export function createPaymentRequired(
-  requirement: PaymentRequirement
-): MiddlewareResponse {
+export function createPaymentRequired(requirement: PaymentRequirement): MiddlewareResponse {
   const paymentHeaderValue = JSON.stringify({
     scheme: requirement.scheme,
     network: requirement.network,
@@ -58,7 +56,7 @@ export function createPaymentRequired(
  * Fastify Plugin for 402 Payment Required responses
  */
 export async function createFastifyPaymentMiddleware() {
-  return async (fastify: Record<string, unknown>) => {
+  return async (_fastify: Record<string, unknown>) => {
     // Fastify plugin initialization
     // This can be used as: app.register(createFastifyPaymentMiddleware())
   };
@@ -78,7 +76,7 @@ export function createExpressPaymentMiddleware(requirement: PaymentRequirement) 
         };
       };
     },
-    next: () => void
+    _next: () => void
   ) => {
     const paymentResponse = createPaymentRequired(requirement);
 

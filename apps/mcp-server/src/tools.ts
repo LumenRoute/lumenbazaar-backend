@@ -7,7 +7,8 @@ import { z } from "zod";
 export const toolDefinitions = [
   {
     name: "list_supported_networks",
-    description: "List all supported Stellar networks (testnet and pubnet) with asset configurations",
+    description:
+      "List all supported Stellar networks (testnet and pubnet) with asset configurations",
     inputSchema: z.object({}).strict(),
     outputSchema: z.object({
       networks: z.array(
@@ -35,10 +36,7 @@ export const toolDefinitions = [
         .enum(["stellar:testnet", "stellar:pubnet"])
         .optional()
         .describe("Filter by payment network"),
-      asset: z
-        .string()
-        .optional()
-        .describe("Filter by asset code (e.g., USDC)"),
+      asset: z.string().optional().describe("Filter by asset code (e.g., USDC)"),
       limit: z
         .number()
         .int()
@@ -47,10 +45,7 @@ export const toolDefinitions = [
         .optional()
         .default(20)
         .describe("Number of results to return"),
-      cursor: z
-        .string()
-        .optional()
-        .describe("Pagination cursor for next batch of results")
+      cursor: z.string().optional().describe("Pagination cursor for next batch of results")
     }),
     outputSchema: z.object({
       resources: z.array(
@@ -72,16 +67,14 @@ export const toolDefinitions = [
           })
         })
       ),
-      cursor: z
-        .string()
-        .optional()
-        .describe("Pagination cursor for next batch"),
+      cursor: z.string().optional().describe("Pagination cursor for next batch"),
       total: z.number().optional().describe("Total number of matching resources")
     })
   },
   {
     name: "inspect_resource",
-    description: "Get detailed information about a specific resource including input/output schemas and payment terms",
+    description:
+      "Get detailed information about a specific resource including input/output schemas and payment terms",
     inputSchema: z.object({
       resourceId: z.string().describe("The resource ID to inspect")
     }),

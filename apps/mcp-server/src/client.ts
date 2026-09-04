@@ -1,5 +1,3 @@
-import type { z } from "zod";
-
 /**
  * Backend client for MCP server.
  * Wraps API calls to the facilitator and discovery endpoints.
@@ -69,11 +67,14 @@ export class BackendClient {
       throw new Error(`Failed to search resources: ${response.statusText}`);
     }
     const data = (await response.json()) as Record<string, unknown>;
-    const resources = ((data.data as Record<string, unknown>)?.resources as Array<Record<string, unknown>>) || [];
-    const cursor = ((data.data as Record<string, unknown>)?.cursor as string | undefined);
-    const total = ((data.data as Record<string, unknown>)?.total as number | undefined);
+    const resources =
+      ((data.data as Record<string, unknown>)?.resources as Array<Record<string, unknown>>) || [];
+    const cursor = (data.data as Record<string, unknown>)?.cursor as string | undefined;
+    const total = (data.data as Record<string, unknown>)?.total as number | undefined;
 
-    const result: { resources: Array<Record<string, unknown>>; cursor?: string; total?: number } = { resources };
+    const result: { resources: Array<Record<string, unknown>>; cursor?: string; total?: number } = {
+      resources
+    };
     if (cursor !== undefined) {
       result.cursor = cursor;
     }

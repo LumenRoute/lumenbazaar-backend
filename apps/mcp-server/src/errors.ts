@@ -52,7 +52,11 @@ export class PermissionError extends McpError {
 /**
  * Map errors to structured MCP responses
  */
-export function handleToolError(error: unknown): { code: string; message: string; details?: Record<string, unknown> } {
+export function handleToolError(error: unknown): {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+} {
   if (error instanceof McpError) {
     const result: { code: string; message: string; details?: Record<string, unknown> } = {
       code: error.code,

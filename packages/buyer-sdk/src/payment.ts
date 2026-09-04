@@ -1,5 +1,3 @@
-import { type JsonObject } from "@lumenbazaar/shared";
-
 export type PaymentPayload = {
   scheme: "exact";
   network: "stellar:testnet" | "stellar:pubnet";
@@ -182,9 +180,7 @@ export function deserializePaymentPayload(json: string): PaymentPayload {
 /**
  * Create payment requirements for API headers
  */
-export function createPaymentHeaders(
-  payload: PaymentPayload
-): Record<string, string> {
+export function createPaymentHeaders(payload: PaymentPayload): Record<string, string> {
   return {
     "x-payment-required": serializePaymentPayload(payload),
     "x-payment-scheme": payload.scheme

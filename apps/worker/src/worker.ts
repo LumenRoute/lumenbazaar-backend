@@ -3,12 +3,6 @@ import { type Job, Worker } from "bullmq";
 import { type AppConfig, loadConfig } from "@lumenbazaar/shared";
 
 import { createBullMqConnection, queueNames, type QueueName } from "./queues.js";
-import { handleSettlementConfirmation } from "./workers/settlementConfirmation.js";
-import { handleResourceIndexing } from "./workers/resourceIndexing.js";
-import { handleSearchSync } from "./workers/searchSync.js";
-import { handleNetworkHealth } from "./workers/networkHealth.js";
-import { handleReceiptFinalizer } from "./workers/receiptFinalizer.js";
-import { handleStalePaymentCleanup } from "./workers/stalePaymentCleanup.js";
 
 export type WorkerJob = {
   id: string;

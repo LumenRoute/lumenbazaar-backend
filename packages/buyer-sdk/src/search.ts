@@ -1,5 +1,3 @@
-import { type JsonObject } from "@lumenbazaar/shared";
-
 export type SearchFilters = {
   q?: string;
   network?: "stellar:testnet" | "stellar:pubnet";

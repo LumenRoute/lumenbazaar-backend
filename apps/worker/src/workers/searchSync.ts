@@ -190,7 +190,10 @@ function buildRankingFields(resource: {
   };
 }
 
-function schemaQuality(inputSchema: Record<string, unknown>, outputSchema: Record<string, unknown>) {
+function schemaQuality(
+  inputSchema: Record<string, unknown>,
+  outputSchema: Record<string, unknown>
+) {
   const inputProperties = countProperties(inputSchema);
   const outputProperties = countProperties(outputSchema);
 

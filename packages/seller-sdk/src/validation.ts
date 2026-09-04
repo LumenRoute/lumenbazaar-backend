@@ -29,7 +29,8 @@ export function validateRouteTemplate(template: string): ValidationResult {
   }
 
   // Check for invalid characters
-  const invalidChars = /[<>:|?*\x00-\x1f]/;
+  // eslint-disable-next-line no-control-regex
+  const invalidChars = /[<>:|?*\u0000-\u001f]/u;
   if (invalidChars.test(template)) {
     errors.push("Route template contains invalid characters");
   }
@@ -75,7 +76,10 @@ export function validateJsonSchema(schema: JsonObject): ValidationResult {
 
   // If type is specified, check it
   const type = schema.type;
-  if (type !== undefined && !["object", "array", "string", "number", "integer", "boolean", "null"].includes(String(type))) {
+  if (
+    type !== undefined &&
+    !["object", "array", "string", "number", "integer", "boolean", "null"].includes(String(type))
+  ) {
     errors.push(`Invalid schema type: ${type}`);
   }
 
