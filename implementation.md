@@ -547,20 +547,20 @@ Completion check:
 
 - Buyer SDK can run search, pay, retry, settle, and receipt flow on testnet.
 
-## Phase 38: Testkit Package
+## Phase 38: Testkit Package ✓
 
 Parts:
 
-- Create `@lumenbazaar/testkit`.
-- Add mock facilitator.
-- Add fake 402 response generator.
-- Add payment payload fixtures.
-- Add discovery metadata fixtures.
-- Add conformance fixtures.
+- Create `@lumenbazaar/testkit`. ✓
+- Add mock facilitator. ✓
+- Add fake 402 response generator. ✓
+- Add payment payload fixtures. ✓
+- Add discovery metadata fixtures. ✓
+- Add conformance fixtures. ✓
 
 Completion check:
 
-- SDKs, frontend, examples, and backend tests can share deterministic fixtures.
+- SDKs, frontend, examples, and backend tests can share deterministic fixtures. ✓
 
 ## Phase 39: MCP Server Foundation
 
