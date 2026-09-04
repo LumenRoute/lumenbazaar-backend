@@ -46,13 +46,13 @@ export async function handleSearchSync(job: Job<SearchSyncJobData>) {
               resourceId: resource.id,
               sellerId: resource.sellerId,
               body,
-              ranking,
+              ranking: ranking as never,
               indexedAt: new Date(),
               stale: false
             },
             update: {
               body,
-              ranking,
+              ranking: ranking as never,
               indexedAt: new Date(),
               stale: false
             }
@@ -101,17 +101,28 @@ export async function handleSearchSync(job: Job<SearchSyncJobData>) {
       }
 
       // Record the stale marking event
-      await db.catalogEvent.create({
-        data: {
-          resourceId,
-          type: "search_sync",
-          status: "success",
-          reason: null,
-          metadata: {
-            action: "mark_stale",
-            resourceId: resourceId ?? "all"
-          }
+      const eventData: {
+        resourceId?: string;
+        type: string;
+        status: string;
+        reason: null;
+        metadata: Record<string, unknown>;
+      } = {
+        type: "search_sync",
+        status: "success",
+        reason: null,
+        metadata: {
+          action: "mark_stale",
+          resourceId: resourceId ?? "all"
         }
+      };
+
+      if (resourceId) {
+        eventData.resourceId = resourceId;
+      }
+
+      await db.catalogEvent.create({
+        data: eventData as Parameters<typeof db.catalogEvent.create>[0]["data"]
       });
     }
   } catch (err) {
@@ -121,17 +132,28 @@ export async function handleSearchSync(job: Job<SearchSyncJobData>) {
     // Record failure
     try {
       const db = getPrismaClient();
-      await db.catalogEvent.create({
-        data: {
-          type: "search_sync",
-          status: "failed",
-          reason: errorMsg,
-          metadata: {
-            action,
-            resourceId: resourceId ?? null,
-            error: errorMsg
-          }
+      const failureData: {
+        resourceId?: string;
+        type: string;
+        status: string;
+        reason: string;
+        metadata: Record<string, unknown>;
+      } = {
+        type: "search_sync",
+        status: "failed",
+        reason: errorMsg,
+        metadata: {
+          action,
+          error: errorMsg
         }
+      };
+
+      if (resourceId) {
+        failureData.resourceId = resourceId;
+      }
+
+      await db.catalogEvent.create({
+        data: failureData as Parameters<typeof db.catalogEvent.create>[0]["data"]
       });
     } catch {
       job.log("Failed to record search sync failure event");
@@ -149,9 +171,9 @@ function buildSearchBody(resource: {
   network: string;
   assetCode: string;
   routeTemplate: string;
-  inputSchema: Record<string, unknown>;
-  outputSchema: Record<string, unknown>;
-  extensions: Record<string, unknown>;
+  inputSchema: unknown;
+  outputSchema: unknown;
+  extensions: unknown;
 }): string {
   return [
     resource.name,
@@ -160,31 +182,32 @@ function buildSearchBody(resource: {
     resource.network,
     resource.assetCode,
     resource.routeTemplate,
-    JSON.stringify(resource.inputSchema),
-    JSON.stringify(resource.outputSchema),
-    JSON.stringify(resource.extensions)
+    JSON.stringify(resource.inputSchema || {}),
+    JSON.stringify(resource.outputSchema || {}),
+    JSON.stringify(resource.extensions || {})
   ]
     .join(" ")
     .toLowerCase();
 }
 
 function buildRankingFields(resource: {
-  inputSchema: Record<string, unknown>;
-  outputSchema: Record<string, unknown>;
+  inputSchema: unknown;
+  outputSchema: unknown;
   type: string;
   network: string;
   assetCode: string;
-  extensions: Record<string, unknown>;
+  extensions: unknown;
 }): Record<string, unknown> {
+  const inputSchema = (resource.inputSchema as Record<string, unknown>) || {};
+  const outputSchema = (resource.outputSchema as Record<string, unknown>) || {};
+  const extensions = (resource.extensions as Record<string, unknown>) || {};
+
   return {
-    metadataQuality: schemaQuality(
-      resource.inputSchema as Record<string, unknown>,
-      resource.outputSchema as Record<string, unknown>
-    ),
+    metadataQuality: schemaQuality(inputSchema, outputSchema),
     resourceType: resource.type,
     network: resource.network,
     asset: resource.assetCode,
-    sellerVerified: resource.extensions.trusted === true,
+    sellerVerified: extensions.trusted === true,
     historicalUptime: 1,
     recentSettlementSuccess: 1
   };

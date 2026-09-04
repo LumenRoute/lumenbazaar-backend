@@ -74,7 +74,22 @@ export async function handleNetworkHealth(job: Job<NetworkHealthJobData>) {
     // Determine overall status
     const status = rpcHealthy && horizonHealthy ? "healthy" : "degraded";
 
-    // Update or create NetworkStatus record
+    const updateDataInput: Record<string, unknown> = {
+      status,
+      rpcHealthy,
+      horizonHealthy,
+      checkedAt: new Date(),
+      metadata: {
+        checkedAt: new Date().toISOString(),
+        rpcUrl,
+        horizonUrl
+      }
+    };
+
+    if (latestLedger !== null) {
+      updateDataInput.latestLedger = latestLedger;
+    }
+
     await db.networkStatus.upsert({
       where: { network },
       create: {
@@ -90,19 +105,7 @@ export async function handleNetworkHealth(job: Job<NetworkHealthJobData>) {
           horizonUrl
         }
       },
-      update: {
-        status,
-        latestLedger: latestLedger ?? undefined,
-        rpcHealthy,
-        horizonHealthy,
-        checkedAt: new Date(),
-        metadata: {
-          checkedAt: new Date().toISOString(),
-          rpcUrl,
-          horizonUrl,
-          previousStatus: undefined
-        }
-      }
+      update: updateDataInput as Parameters<typeof db.networkStatus.upsert>[0]["update"]
     });
 
     job.log(`Network status recorded: ${network} = ${status}`);
