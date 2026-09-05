@@ -35,12 +35,19 @@ describe("API server base", () => {
     const app = buildApiApp({ logger: false });
 
     const version = await app.inject({ method: "GET", url: "/version" });
+    const openapi = await app.inject({ method: "GET", url: "/openapi.json" });
     const metrics = await app.inject({ method: "GET", url: "/metrics" });
     const networks = await app.inject({ method: "GET", url: "/v1/networks" });
 
     expect(version.json()).toMatchObject({
       service: "lumenbazaar-backend",
       version: "0.1.0"
+    });
+    expect(openapi.json()).toMatchObject({
+      openapi: "3.1.0",
+      paths: {
+        "/v1/conformance/runs": expect.any(Object)
+      }
     });
     expect(metrics.body).toContain("lumenbazaar_api_uptime_seconds");
     expect(networks.json().networks.map((network: { id: string }) => network.id)).toEqual([
