@@ -202,6 +202,14 @@ export const toolDefinitions = [
           type: "object",
           description: "Optional prepared payment payload"
         },
+        body: {
+          type: "object",
+          description: "Optional JSON body sent to the paid resource"
+        },
+        method: {
+          enum: ["GET", "POST"],
+          description: "HTTP method used for the paid resource call"
+        },
         authorization: {
           type: "object",
           description: "Optional wallet authorization payload"
@@ -234,6 +242,8 @@ export const toolDefinitions = [
       resourceId: z.string().min(1),
       resourceUrl: z.string().url().optional(),
       paymentPayload: z.record(z.string(), z.unknown()).optional(),
+      body: z.record(z.string(), z.unknown()).optional(),
+      method: z.enum(["GET", "POST"]).optional(),
       authorization: z.record(z.string(), z.unknown()).optional(),
       currentLedger: z.number().int().nonnegative().optional(),
       expiresAtLedger: z.number().int().positive().optional(),

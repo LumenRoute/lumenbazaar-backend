@@ -158,12 +158,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request: unknown) => {
           ...(toolInput.currentLedger === undefined
             ? {}
             : { currentLedger: toolInput.currentLedger as number }),
+          ...(toolInput.body === undefined
+            ? {}
+            : { body: toolInput.body as Record<string, unknown> }),
           ...(toolInput.expiresAtLedger === undefined
             ? {}
             : { expiresAtLedger: toolInput.expiresAtLedger as number }),
           ...(toolInput.maxRetries === undefined
             ? {}
             : { maxRetries: toolInput.maxRetries as number }),
+          ...(toolInput.method === undefined ? {} : { method: toolInput.method as "GET" | "POST" }),
           ...(toolInput.paymentPayload === undefined
             ? {}
             : { paymentPayload: toolInput.paymentPayload as PaymentPayload }),

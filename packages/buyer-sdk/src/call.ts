@@ -15,6 +15,8 @@ export type CallOptions = {
   retryDelayMs?: number;
   timeoutMs?: number;
   headers?: Record<string, string>;
+  method?: "GET" | "POST";
+  body?: Record<string, unknown>;
 };
 
 export type CallResult = {
@@ -199,11 +201,17 @@ async function makePaymentRequest(
     headers["x-payment-required"] = JSON.stringify(paymentPayload);
     headers["x-payment-scheme"] = paymentPayload.scheme;
 
-    const response = await fetch(url, {
-      method: "POST",
+    const requestInit: RequestInit = {
+      method: options.method ?? "POST",
       headers,
       signal: controller.signal
-    });
+    };
+
+    if (options.body !== undefined) {
+      requestInit.body = JSON.stringify(options.body);
+    }
+
+    const response = await fetch(url, requestInit);
 
     if (!response.ok) {
       if (response.status === 402) {

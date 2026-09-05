@@ -8,6 +8,10 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
-    "@lumenbazaar/shared": "workspace:*"
+    "@lumenbazaar/mcp-server": "workspace:*",
+    "@lumenbazaar/seller-sdk": "workspace:*",
+    "@lumenbazaar/shared": "workspace:*",
+    "fastify": "5.12.1",
+    "zod": "4.1.12"
   }
 }
