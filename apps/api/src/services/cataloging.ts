@@ -5,6 +5,7 @@ import { LumenError, type CatalogEvent, type JsonObject } from "@lumenbazaar/sha
 import { type CatalogValidationService } from "./catalogValidation.js";
 import { parseDiscoveryMetadata, toResourceCreateInput } from "./discoveryMetadata.js";
 import { type ResourceService } from "./resources.js";
+import { type AuditLogService } from "./audit.js";
 
 export type ResourceIndexingJob = {
   name: "resource.index";
@@ -44,11 +45,13 @@ export class InMemoryCatalogEventStore implements CatalogEventStore {
 }
 
 export type CatalogServiceOptions = {
+  auditLogService?: AuditLogService;
   eventStore?: CatalogEventStore;
   indexingQueue?: ResourceIndexingQueue;
 };
 
 export class CatalogService {
+  private readonly auditLogService: AuditLogService | undefined;
   private readonly eventStore: CatalogEventStore;
   private readonly indexingQueue: ResourceIndexingQueue;
 
@@ -57,6 +60,7 @@ export class CatalogService {
     private readonly resourceService: ResourceService,
     options: CatalogServiceOptions = {}
   ) {
+    this.auditLogService = options.auditLogService;
     this.eventStore = options.eventStore ?? new InMemoryCatalogEventStore();
     this.indexingQueue = options.indexingQueue ?? new InMemoryResourceIndexingQueue();
   }
@@ -96,6 +100,23 @@ export class CatalogService {
       name: "resource.index",
       resourceId: resource.id,
       versionId: version.id
+    });
+
+    await this.auditLogService?.record({
+      action: "resource.catalog",
+      actorId: resource.sellerId,
+      actorType: "seller",
+      targetId: resource.id,
+      targetType: "resource",
+      metadata: {
+        assetCode: resource.assetCode,
+        catalogEventId: event.id,
+        network: resource.network,
+        routeTemplate: resource.routeTemplate,
+        status: resource.status,
+        type: resource.type,
+        versionId: version.id
+      }
     });
 
     return {

@@ -5,6 +5,8 @@ import { z } from "zod";
 import { LumenError, type Seller, type SellerDomain } from "@lumenbazaar/shared";
 import { assertStellarPublicKey } from "@lumenbazaar/stellar-payments";
 
+import { type AuditLogService } from "./audit.js";
+
 const domainPattern =
   /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])$/i;
 
@@ -136,7 +138,10 @@ export type VerifyDomainResult = {
 };
 
 export class SellerService {
-  constructor(private readonly store: SellerStore = new InMemorySellerStore()) {}
+  constructor(
+    private readonly store: SellerStore = new InMemorySellerStore(),
+    private readonly auditLogService?: AuditLogService
+  ) {}
 
   async createSeller(input: unknown) {
     const seller = createSellerSchema.parse(input);
@@ -167,6 +172,19 @@ export class SellerService {
     if (request.evidence !== undefined && request.evidence.includes(expectedEvidence)) {
       const verifiedSeller = await this.store.markDomainVerified(seller.id, seller.domain);
 
+      await this.auditLogService?.record({
+        action: "seller.domain.verified",
+        actorId: seller.id,
+        actorType: "seller",
+        targetId: challenge.id,
+        targetType: "seller_domain",
+        metadata: {
+          domain: seller.domain,
+          method: challenge.verificationMethod,
+          verified: true
+        }
+      });
+
       return {
         sellerId: seller.id,
         domain: seller.domain,
@@ -177,6 +195,19 @@ export class SellerService {
         domainVerifiedAt: verifiedSeller.domainVerifiedAt
       };
     }
+
+    await this.auditLogService?.record({
+      action: "seller.domain.challenge_created",
+      actorId: seller.id,
+      actorType: "seller",
+      targetId: challenge.id,
+      targetType: "seller_domain",
+      metadata: {
+        domain: seller.domain,
+        method: challenge.verificationMethod,
+        verified: seller.domainVerifiedAt !== null
+      }
+    });
 
     return {
       sellerId: seller.id,

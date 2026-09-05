@@ -11,6 +11,7 @@ import {
 import { InMemoryPaymentAttemptStore, type PaymentAttemptStore } from "./paymentAttemptStore.js";
 import { ReceiptService } from "./receipt.js";
 import { InMemorySettlementStore, type SettlementStore } from "./settlementStore.js";
+import { type PaymentAuditLogger } from "./verification.js";
 import {
   type X402SettlementResult,
   type X402StellarAdapter,
@@ -27,6 +28,7 @@ export const settlePaymentRequestSchema = z.object({
 });
 
 export type SettlementServiceOptions = {
+  auditLogService?: PaymentAuditLogger;
   adapter?: X402StellarAdapter;
   attemptStore?: PaymentAttemptStore;
   settlementStore?: SettlementStore;
@@ -44,6 +46,7 @@ export type SettlementServiceResult = {
 };
 
 export class SettlementService {
+  private readonly auditLogService: PaymentAuditLogger | undefined;
   private readonly adapter: X402StellarAdapter;
   private readonly attemptStore: PaymentAttemptStore;
   private readonly settlementStore: SettlementStore;
@@ -55,6 +58,7 @@ export class SettlementService {
     options: SettlementServiceOptions = {}
   ) {
     this.adapter = options.adapter ?? createX402StellarAdapter();
+    this.auditLogService = options.auditLogService;
     this.attemptStore = options.attemptStore ?? new InMemoryPaymentAttemptStore();
     this.settlementStore = options.settlementStore ?? new InMemorySettlementStore();
     this.receiptService = options.receiptService ?? new ReceiptService();
@@ -106,6 +110,25 @@ export class SettlementService {
 
     await this.attemptStore.updatePaymentAttempt(attempt.id, { status: "settled" });
     const receipt = await this.receiptService.finalizeSettlementReceipt(attempt, settlement);
+
+    await this.auditLogService?.record({
+      action: "payment.settle",
+      actorId: attempt.sellerId,
+      actorType: "facilitator",
+      targetId: settlement.id,
+      targetType: "settlement",
+      metadata: {
+        amount: settlement.amount,
+        assetCode: settlement.assetCode,
+        ledger: settlement.ledger,
+        network: settlement.network,
+        paymentAttemptId: attempt.id,
+        receiptId: receipt.id,
+        resourceId: attempt.resourceId,
+        status: settlement.status,
+        transactionHash: settlement.transactionHash
+      }
+    });
 
     // Enqueue settlement confirmation job if queue is available
     if (this.confirmationQueue) {

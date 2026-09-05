@@ -10,17 +10,20 @@ import {
 } from "@lumenbazaar/stellar-payments";
 
 import { registerErrorHandling } from "./http/errors.js";
+import { registerRateLimitHook } from "./http/rateLimit.js";
 import { registerConformanceRoutes } from "./routes/conformance.js";
 import { registerDiscoveryRoutes } from "./routes/discovery.js";
 import { registerFacilitatorRoutes } from "./routes/facilitator.js";
 import { registerMetadataRoutes } from "./routes/metadata.js";
 import { registerResourceRoutes } from "./routes/resources.js";
 import { registerSellerRoutes } from "./routes/sellers.js";
+import { AuditLogService } from "./services/audit.js";
 import { CatalogService } from "./services/cataloging.js";
 import { CatalogValidationService } from "./services/catalogValidation.js";
 import { ConformanceRunService, createServiceConformanceRunner } from "./services/conformance.js";
 import { DiscoveryService } from "./services/discovery.js";
 import { createMetricsService } from "./services/metrics.js";
+import { RateLimitService } from "./services/rateLimit.js";
 import { ResourceService } from "./services/resources.js";
 import { SearchService } from "./services/search.js";
 import { SellerService } from "./services/sellers.js";
@@ -37,6 +40,8 @@ export type BuildApiAppOptions = {
   discoveryService?: DiscoveryService;
   searchService?: SearchService;
   conformanceService?: ConformanceRunService;
+  auditLogService?: AuditLogService;
+  rateLimitService?: RateLimitService;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -52,23 +57,30 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     reply.header("x-request-id", request.id);
   });
 
+  const auditLogService = options.auditLogService ?? new AuditLogService();
+  const rateLimitService = options.rateLimitService ?? new RateLimitService();
+
+  registerRateLimitHook(app, { rateLimitService });
   registerMetadataRoutes(app, {
     config,
     metrics: createMetricsService()
   });
-  const verificationService = options.verificationService ?? new PaymentVerificationService(config);
+  const verificationService =
+    options.verificationService ?? new PaymentVerificationService(config, { auditLogService });
   const settlementService =
     options.settlementService ??
     new SettlementService(config, {
+      auditLogService,
       attemptStore: verificationService.getAttemptStore()
     });
   const receiptService = options.receiptService ?? settlementService.getReceiptService();
-  const sellerService = options.sellerService ?? new SellerService();
+  const sellerService = options.sellerService ?? new SellerService(undefined, auditLogService);
   const resourceService = options.resourceService ?? new ResourceService(config, sellerService);
   const catalogValidationService =
     options.catalogValidationService ?? new CatalogValidationService(config, sellerService);
   const catalogService =
-    options.catalogService ?? new CatalogService(catalogValidationService, resourceService);
+    options.catalogService ??
+    new CatalogService(catalogValidationService, resourceService, { auditLogService });
   const discoveryService = options.discoveryService ?? new DiscoveryService(resourceService);
   const searchService = options.searchService ?? new SearchService(resourceService);
   const conformanceService =

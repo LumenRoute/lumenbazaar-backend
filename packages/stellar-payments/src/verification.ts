@@ -20,12 +20,25 @@ export type PaymentVerificationResult = {
   adapter: "@x402/stellar";
 };
 
+export type PaymentAuditLogger = {
+  record: (input: {
+    action: string;
+    actorId?: string | null;
+    actorType: "buyer" | "facilitator" | "seller" | "system";
+    metadata?: Record<string, unknown>;
+    targetId?: string | null;
+    targetType: string;
+  }) => Promise<unknown>;
+};
+
 export type PaymentVerificationServiceOptions = {
+  auditLogService?: PaymentAuditLogger;
   adapter?: X402StellarAdapter;
   attemptStore?: PaymentAttemptStore;
 };
 
 export class PaymentVerificationService {
+  private readonly auditLogService: PaymentAuditLogger | undefined;
   private readonly adapter: X402StellarAdapter;
   private readonly attemptStore: PaymentAttemptStore;
 
@@ -35,6 +48,7 @@ export class PaymentVerificationService {
   ) {
     this.adapter = options.adapter ?? createX402StellarAdapter();
     this.attemptStore = options.attemptStore ?? new InMemoryPaymentAttemptStore();
+    this.auditLogService = options.auditLogService;
   }
 
   async verify(input: unknown): Promise<PaymentVerificationResult> {
@@ -66,6 +80,22 @@ export class PaymentVerificationService {
       ...(normalized.paymentPayload.expiresAtLedger === undefined
         ? {}
         : { expiresAtLedger: normalized.paymentPayload.expiresAtLedger })
+    });
+
+    await this.auditLogService?.record({
+      action: "payment.verify",
+      actorId: normalized.sellerId ?? null,
+      actorType: "facilitator",
+      targetId: attempt.id,
+      targetType: "payment_attempt",
+      metadata: {
+        amount: attempt.amount,
+        assetCode: attempt.assetCode,
+        network: attempt.network,
+        resourceId: attempt.resourceId,
+        sellerId: attempt.sellerId,
+        status: attempt.status
+      }
     });
 
     return {
