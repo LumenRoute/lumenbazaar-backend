@@ -5,9 +5,16 @@ export {
   createPaymentRequired,
   createExpressPaymentMiddleware,
   createNextPaymentResponse,
-  createFastifyPaymentMiddleware
+  createFastifyPaymentMiddleware,
+  sendFastifyPaymentRequired
 } from "./middleware.js";
-export type { PaymentRequirement, MiddlewareResponse, X402PaymentHeader } from "./middleware.js";
+export type {
+  FastifyPaymentPluginHost,
+  FastifyPaymentReply,
+  MiddlewareResponse,
+  PaymentRequirement,
+  X402PaymentHeader
+} from "./middleware.js";
 
 // Payment builder exports
 export {
@@ -17,7 +24,13 @@ export {
 } from "./paymentBuilder.js";
 
 // Metadata builder exports
-export { createMetadata, httpResource, mcpResource, MetadataBuilder } from "./metadataBuilder.js";
+export {
+  createMetadata,
+  httpResource,
+  mcpResource,
+  parseMetadata,
+  MetadataBuilder
+} from "./metadataBuilder.js";
 export type {
   ResourceMetadata,
   HttpResourceMetadata,

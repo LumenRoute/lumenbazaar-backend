@@ -1,5 +1,14 @@
 import { type JsonObject } from "@lumenbazaar/shared";
-import { type PaymentPayload } from "./payment.js";
+import { type BudgetManager } from "./budget.js";
+import { inspectResource, type ResourceMetadata } from "./inspect.js";
+import {
+  createPaymentPayloadFromResource,
+  settlePayment,
+  type PaymentPayload,
+  type SettlePaymentResult,
+  verifyPayment,
+  type VerifyPaymentResult
+} from "./payment.js";
 
 export type CallOptions = {
   maxRetries?: number;
@@ -24,6 +33,34 @@ export type RetryConfig = {
   maxRetries: number;
   delayMs: number;
   backoffMultiplier: number;
+};
+
+export type ReceiptResult = {
+  id: string;
+  transactionHash: string;
+  ledger: number;
+  status: string;
+  settledAt: string;
+};
+
+export type PaidResourceFlowOptions = CallOptions & {
+  apiUrl: string;
+  authorization?: Record<string, unknown>;
+  budgetManager?: BudgetManager;
+  currentLedger?: number;
+  expiresAtLedger?: number;
+  paymentPayload?: PaymentPayload;
+  resourceId: string;
+  resourceUrl?: string;
+};
+
+export type PaidResourceFlowResult = {
+  call: CallResult;
+  paymentPayload: PaymentPayload;
+  receipt?: ReceiptResult;
+  resource: ResourceMetadata;
+  settlement?: SettlePaymentResult;
+  verification: VerifyPaymentResult;
 };
 
 /**
@@ -79,6 +116,64 @@ export async function callPaidResource(
   }
 
   throw lastError || new Error("Failed to call paid resource");
+}
+
+export async function runPaidResourceFlow(
+  options: PaidResourceFlowOptions
+): Promise<PaidResourceFlowResult> {
+  const resource = await inspectResource(options.apiUrl, options.resourceId);
+  const paymentOptions = {
+    ...(options.authorization === undefined ? {} : { authorization: options.authorization }),
+    ...(options.expiresAtLedger === undefined ? {} : { expiresAtLedger: options.expiresAtLedger })
+  };
+  const paymentPayload =
+    options.paymentPayload ??
+    createPaymentPayloadFromResource(resource.paymentTerms, paymentOptions);
+
+  if (
+    options.budgetManager !== undefined &&
+    !options.budgetManager.canAfford(resource.paymentTerms.amount)
+  ) {
+    throw new Error(`Amount exceeds budget: ${resource.paymentTerms.amount}`);
+  }
+
+  const verification = await verifyPayment(options.apiUrl, {
+    paymentPayload,
+    paymentRequirements: resource.paymentTerms,
+    ...(options.currentLedger === undefined ? {} : { currentLedger: options.currentLedger }),
+    resourceId: resource.id
+  });
+
+  const call = await callPaidResource(options.resourceUrl ?? resource.url, paymentPayload, options);
+
+  if (!call.success) {
+    return {
+      call,
+      paymentPayload,
+      resource,
+      verification
+    };
+  }
+
+  const settlement = await settlePayment(options.apiUrl, {
+    paymentAttemptId: verification.paymentAttemptId,
+    paymentPayload,
+    paymentRequirements: resource.paymentTerms,
+    ...(options.currentLedger === undefined ? {} : { currentLedger: options.currentLedger }),
+    resourceId: resource.id
+  });
+  const receipt = await fetchReceipt(options.apiUrl, settlement.receiptId);
+
+  options.budgetManager?.recordSpending(resource.paymentTerms.amount);
+
+  return {
+    call,
+    paymentPayload,
+    receipt,
+    resource,
+    settlement,
+    verification
+  };
 }
 
 /**
@@ -159,16 +254,7 @@ function isNonRetryable(statusCode: number): boolean {
 /**
  * Fetch a receipt from the Bazaar API
  */
-export async function fetchReceipt(
-  apiUrl: string,
-  receiptId: string
-): Promise<{
-  id: string;
-  transactionHash: string;
-  ledger: number;
-  status: string;
-  settledAt: string;
-}> {
+export async function fetchReceipt(apiUrl: string, receiptId: string): Promise<ReceiptResult> {
   const response = await fetch(`${apiUrl}/v1/receipts/${receiptId}`, {
     method: "GET"
   });

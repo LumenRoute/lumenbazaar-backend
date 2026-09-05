@@ -6,7 +6,7 @@ import { serviceName } from "@lumenbazaar/shared";
 
 import { BackendClient } from "./client.js";
 import { handleToolError } from "./errors.js";
-import { listToolDefinitions } from "./tools.js";
+import { getToolDefinition, listToolDefinitions } from "./tools.js";
 
 const client = new BackendClient();
 
@@ -26,18 +26,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   const tools = listToolDefinitions().map((def) => ({
     name: def.name,
     description: def.description,
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: { type: "string", description: "Search query" },
-        type: { enum: ["http", "mcp"], description: "Resource type" },
-        network: { enum: ["stellar:testnet", "stellar:pubnet"], description: "Network" },
-        asset: { type: "string", description: "Asset code" },
-        limit: { type: "number", description: "Result limit" },
-        cursor: { type: "string", description: "Pagination cursor" },
-        resourceId: { type: "string", description: "Resource ID" }
-      }
-    }
+    inputSchema: def.jsonInputSchema
   }));
 
   return { tools };
@@ -49,9 +38,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request: unknown) => {
   const req = request as { params: { name: string; arguments?: Record<string, unknown> } };
   const toolName = req.params.name;
-  const toolInput = (req.params.arguments as Record<string, unknown>) || {};
 
   try {
+    const toolDefinition = getToolDefinition(toolName);
+
+    if (toolDefinition === undefined) {
+      throw new Error(`Unknown tool: ${toolName}`);
+    }
+
+    const toolInput = toolDefinition.inputSchema.parse(req.params.arguments ?? {}) as Record<
+      string,
+      unknown
+    >;
     let result: Record<string, unknown>;
 
     switch (toolName) {

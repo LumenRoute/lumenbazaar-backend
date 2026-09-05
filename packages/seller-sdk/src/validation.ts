@@ -9,13 +9,27 @@ export type ValidationResult = {
  * Validate a route template for security and correctness
  * Prevents path traversal and malformed templates
  */
-export function validateRouteTemplate(template: string): ValidationResult {
+export function validateRouteTemplate(
+  template: string,
+  type: "http" | "mcp" = "http"
+): ValidationResult {
   const errors: string[] = [];
 
   // Check if template is empty
   if (!template || template.trim().length === 0) {
     errors.push("Route template cannot be empty");
     return { valid: false, errors };
+  }
+
+  if (type === "mcp") {
+    if (!/^mcp:\/\/[a-zA-Z0-9\-_.]+\/[a-zA-Z0-9\-_]+$/.test(template)) {
+      errors.push("MCP route template must use mcp://server/tool format");
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
   }
 
   // Must start with /
@@ -38,6 +52,11 @@ export function validateRouteTemplate(template: string): ValidationResult {
   // Check for valid parameter syntax
   const paramRegex = /\{[a-zA-Z_][a-zA-Z0-9_]*\}/g;
   const params = template.match(paramRegex) || [];
+  const malformedParams = template.match(/\{[^}]*\}|\{|\}/g) || [];
+
+  if (malformedParams.length !== params.length) {
+    errors.push("Route template contains malformed parameters");
+  }
 
   // Extract parameter names
   const paramNames = params.map((p) => p.slice(1, -1));

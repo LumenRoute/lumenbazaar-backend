@@ -24,17 +24,19 @@ export class BudgetManager {
    * Check if a call with this amount is within budget
    */
   canAfford(amount: string): boolean {
-    const amountBig = stringToBigInt(amount);
-    const maxPerCall = stringToBigInt(this.constraint.maxAmountPerCall);
-    const maxTotal = stringToBigInt(this.constraint.maxTotalSpent);
+    const parsed = parseBudgetAmounts(amount, this.constraint);
+
+    if (parsed === null) {
+      return false;
+    }
 
     // Check per-call limit
-    if (amountBig > maxPerCall) {
+    if (parsed.amount > parsed.maxPerCall) {
       return false;
     }
 
     // Check total budget
-    if (this.totalSpent + amountBig > maxTotal) {
+    if (this.totalSpent + parsed.amount > parsed.maxTotal) {
       return false;
     }
 
@@ -45,11 +47,17 @@ export class BudgetManager {
    * Record a spending and update budget
    */
   recordSpending(amount: string): void {
-    if (!this.canAfford(amount)) {
+    const parsed = parseBudgetAmounts(amount, this.constraint);
+
+    if (parsed === null || this.totalSpent + parsed.amount > parsed.maxTotal) {
       throw new Error(`Amount exceeds budget: ${amount}`);
     }
 
-    this.totalSpent += stringToBigInt(amount);
+    if (parsed.amount > parsed.maxPerCall) {
+      throw new Error(`Amount exceeds budget: ${amount}`);
+    }
+
+    this.totalSpent += parsed.amount;
     this.callCount++;
   }
 
@@ -88,11 +96,15 @@ export class BudgetManager {
  * Convert string amount to BigInt (assuming stroops/smallest unit)
  */
 function stringToBigInt(amount: string): bigint {
-  try {
-    return BigInt(amount.replace(/\D/g, "") || "0");
-  } catch {
-    return 0n;
+  const exactAmountPattern = /^(?:0|[1-9]\d*)(?:\.\d{1,7})?$/;
+  const trimmed = amount.trim();
+
+  if (!exactAmountPattern.test(trimmed)) {
+    throw new Error("Amount must be a positive decimal string");
   }
+
+  const [wholePart = "0", decimalPart = ""] = trimmed.split(".");
+  return BigInt(wholePart) * 10_000_000n + BigInt(decimalPart.padEnd(7, "0"));
 }
 
 /**
@@ -121,4 +133,16 @@ export function createDefaultBudget(
     network,
     assetCode: "USDC"
   };
+}
+
+function parseBudgetAmounts(amount: string, constraint: BudgetConstraint) {
+  try {
+    return {
+      amount: stringToBigInt(amount),
+      maxPerCall: stringToBigInt(constraint.maxAmountPerCall),
+      maxTotal: stringToBigInt(constraint.maxTotalSpent)
+    };
+  } catch {
+    return null;
+  }
 }

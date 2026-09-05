@@ -9,6 +9,11 @@ export const toolDefinitions = [
     name: "list_supported_networks",
     description:
       "List all supported Stellar networks (testnet and pubnet) with asset configurations",
+    jsonInputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false
+    },
     inputSchema: z.object({}).strict(),
     outputSchema: z.object({
       networks: z.array(
@@ -23,6 +28,38 @@ export const toolDefinitions = [
   {
     name: "search_paid_resources",
     description: "Search for paid HTTP endpoints and MCP tools across the Bazaar",
+    jsonInputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Natural language search query"
+        },
+        type: {
+          enum: ["http", "mcp"],
+          description: "Resource type"
+        },
+        network: {
+          enum: ["stellar:testnet", "stellar:pubnet"],
+          description: "Payment network"
+        },
+        asset: {
+          type: "string",
+          description: "Asset code"
+        },
+        limit: {
+          type: "number",
+          minimum: 1,
+          maximum: 100,
+          description: "Result limit"
+        },
+        cursor: {
+          type: "string",
+          description: "Pagination cursor"
+        }
+      },
+      additionalProperties: false
+    },
     inputSchema: z.object({
       query: z
         .string()
@@ -75,6 +112,17 @@ export const toolDefinitions = [
     name: "inspect_resource",
     description:
       "Get detailed information about a specific resource including input/output schemas and payment terms",
+    jsonInputSchema: {
+      type: "object",
+      properties: {
+        resourceId: {
+          type: "string",
+          description: "The resource ID to inspect"
+        }
+      },
+      required: ["resourceId"],
+      additionalProperties: false
+    },
     inputSchema: z.object({
       resourceId: z.string().describe("The resource ID to inspect")
     }),

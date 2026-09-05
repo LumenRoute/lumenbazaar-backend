@@ -30,13 +30,31 @@ export {
   validatePaymentPayload,
   serializePaymentPayload,
   deserializePaymentPayload,
-  createPaymentHeaders
+  createPaymentHeaders,
+  verifyPayment,
+  settlePayment,
+  isPaymentExpiredAtLedger,
+  getPaymentLedgerTimeRemaining
 } from "./payment.js";
-export type { PaymentPayload, PaymentPrepareInput } from "./payment.js";
+export type {
+  PaymentPayload,
+  PaymentPrepareInput,
+  PaymentRequirements,
+  SettlePaymentInput,
+  SettlePaymentResult,
+  VerifyPaymentInput,
+  VerifyPaymentResult
+} from "./payment.js";
 
 // Call exports
-export { callPaidResource, fetchReceipt } from "./call.js";
-export type { CallOptions, CallResult, RetryConfig } from "./call.js";
+export { callPaidResource, fetchReceipt, runPaidResourceFlow } from "./call.js";
+export type {
+  CallOptions,
+  CallResult,
+  PaidResourceFlowOptions,
+  PaidResourceFlowResult,
+  RetryConfig
+} from "./call.js";
 
 // Budget exports
 export { BudgetManager, createBudgetManager, createDefaultBudget } from "./budget.js";

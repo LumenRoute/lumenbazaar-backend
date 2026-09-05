@@ -26,6 +26,27 @@ export type MiddlewareResponse = {
   body?: JsonObject;
 };
 
+export type FastifyPaymentReply = {
+  code?: (statusCode: number) => FastifyPaymentReply;
+  header?: (name: string, value: string) => FastifyPaymentReply;
+  headers?: (headers: Record<string, string>) => FastifyPaymentReply;
+  send: (body: JsonObject) => unknown;
+  status?: (statusCode: number) => FastifyPaymentReply;
+};
+
+export type FastifyPaymentPluginHost = {
+  decorate: (
+    name: "lumenBazaar",
+    value: {
+      requirePayment: (
+        request: Record<string, unknown>,
+        reply: FastifyPaymentReply,
+        overrideRequirement?: PaymentRequirement
+      ) => unknown;
+    }
+  ) => void;
+};
+
 /**
  * Create a 402 Payment Required response
  */
@@ -53,13 +74,45 @@ export function createPaymentRequired(requirement: PaymentRequirement): Middlewa
 }
 
 /**
- * Fastify Plugin for 402 Payment Required responses
+ * Fastify plugin for 402 Payment Required responses.
  */
-export async function createFastifyPaymentMiddleware() {
-  return async (_fastify: Record<string, unknown>) => {
-    // Fastify plugin initialization
-    // This can be used as: app.register(createFastifyPaymentMiddleware())
+export function createFastifyPaymentMiddleware(requirement: PaymentRequirement) {
+  return async (fastify: FastifyPaymentPluginHost) => {
+    fastify.decorate("lumenBazaar", {
+      requirePayment: (
+        _request: Record<string, unknown>,
+        reply: FastifyPaymentReply,
+        overrideRequirement: PaymentRequirement = requirement
+      ) => sendFastifyPaymentRequired(reply, overrideRequirement)
+    });
   };
+}
+
+export function sendFastifyPaymentRequired(
+  reply: FastifyPaymentReply,
+  requirement: PaymentRequirement
+) {
+  const paymentResponse = createPaymentRequired(requirement);
+  const headers = {
+    "x-payment-required": paymentResponse.headers["x-payment-required"] ?? "",
+    "x-payment-scheme": paymentResponse.headers["x-payment-scheme"] ?? ""
+  };
+
+  if (reply.code !== undefined) {
+    reply.code(paymentResponse.status);
+  } else if (reply.status !== undefined) {
+    reply.status(paymentResponse.status);
+  }
+
+  if (reply.headers !== undefined) {
+    reply.headers(headers);
+  } else if (reply.header !== undefined) {
+    for (const [name, value] of Object.entries(headers)) {
+      reply.header(name, value);
+    }
+  }
+
+  return reply.send(paymentResponse.body ?? {});
 }
 
 /**

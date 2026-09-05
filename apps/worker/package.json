@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@lumenbazaar/shared": "workspace:*",
+    "@lumenbazaar/stellar-payments": "workspace:*",
     "bullmq": "5.65.0",
     "ioredis": "5.8.2"
   }

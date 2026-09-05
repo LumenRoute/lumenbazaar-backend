@@ -18,8 +18,7 @@ export class BackendClient {
     if (!response.ok) {
       throw new Error(`Failed to fetch /v1/supported: ${response.statusText}`);
     }
-    const data = (await response.json()) as Record<string, unknown>;
-    return data.data as Record<string, unknown>;
+    return unwrapApiData<Record<string, unknown>>(await response.json());
   }
 
   /**
@@ -30,12 +29,13 @@ export class BackendClient {
     if (!response.ok) {
       throw new Error(`Failed to fetch /v1/networks: ${response.statusText}`);
     }
-    const data = (await response.json()) as Record<string, unknown>;
-    const networks = (data.data as Array<Record<string, unknown>>) || [];
+    const data = unwrapApiData<Record<string, unknown>>(await response.json());
+    const networks = asRecordArray(data.networks);
+
     return networks.map((n) => ({
       id: (n.id as string) || "",
-      name: (n.name as string) || "",
-      chain: (n.chain as string) || ""
+      name: (n.displayName as string) || (n.name as string) || "",
+      chain: (n.chain as string) || "stellar"
     }));
   }
 
@@ -66,11 +66,10 @@ export class BackendClient {
     if (!response.ok) {
       throw new Error(`Failed to search resources: ${response.statusText}`);
     }
-    const data = (await response.json()) as Record<string, unknown>;
-    const resources =
-      ((data.data as Record<string, unknown>)?.resources as Array<Record<string, unknown>>) || [];
-    const cursor = (data.data as Record<string, unknown>)?.cursor as string | undefined;
-    const total = (data.data as Record<string, unknown>)?.total as number | undefined;
+    const data = unwrapApiData<Record<string, unknown>>(await response.json());
+    const resources = asRecordArray(data.resources).map(withPaymentTerms);
+    const cursor = (data.cursor ?? data.nextCursor) as string | undefined;
+    const total = data.total as number | undefined;
 
     const result: { resources: Array<Record<string, unknown>>; cursor?: string; total?: number } = {
       resources
@@ -89,12 +88,11 @@ export class BackendClient {
    * Get a specific resource by ID
    */
   async getResource(resourceId: string): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/v1/discovery/resources/${resourceId}`);
+    const response = await fetch(`${this.baseUrl}/v1/resources/${resourceId}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch resource ${resourceId}: ${response.statusText}`);
     }
-    const data = (await response.json()) as Record<string, unknown>;
-    return data.data as Record<string, unknown>;
+    return withPaymentTerms(unwrapApiData<Record<string, unknown>>(await response.json()));
   }
 
   /**
@@ -105,11 +103,42 @@ export class BackendClient {
     if (!response.ok) {
       throw new Error(`Failed to fetch receipt ${receiptId}: ${response.statusText}`);
     }
-    const data = (await response.json()) as Record<string, unknown>;
-    return data.data as Record<string, unknown>;
+    return unwrapApiData<Record<string, unknown>>(await response.json());
   }
 }
 
 export function createBackendClient(baseUrl?: string): BackendClient {
   return new BackendClient(baseUrl);
+}
+
+function unwrapApiData<T>(input: unknown): T {
+  if (typeof input === "object" && input !== null && "ok" in input && "data" in input) {
+    return (input as { data: T }).data;
+  }
+
+  return input as T;
+}
+
+function asRecordArray(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
+}
+
+function withPaymentTerms(resource: Record<string, unknown>) {
+  if (resource.paymentTerms !== undefined) {
+    return resource;
+  }
+
+  return {
+    ...resource,
+    paymentTerms: {
+      scheme: "exact",
+      network: resource.network,
+      asset: {
+        code: resource.assetCode,
+        issuer: resource.assetIssuer
+      },
+      amount: resource.amount,
+      payTo: resource.payTo
+    }
+  };
 }

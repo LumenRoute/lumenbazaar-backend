@@ -3,6 +3,24 @@ import { type Job, Worker } from "bullmq";
 import { type AppConfig, loadConfig } from "@lumenbazaar/shared";
 
 import { createBullMqConnection, queueNames, type QueueName } from "./queues.js";
+import { handleNetworkHealth, type NetworkHealthJobData } from "./workers/networkHealth.js";
+import {
+  handleReceiptFinalizer,
+  type ReceiptFinalizerJobData
+} from "./workers/receiptFinalizer.js";
+import {
+  handleResourceIndexing,
+  type ResourceIndexingJobData
+} from "./workers/resourceIndexing.js";
+import { handleSearchSync, type SearchSyncJobData } from "./workers/searchSync.js";
+import {
+  handleSettlementConfirmation,
+  type SettlementConfirmationJobData
+} from "./workers/settlementConfirmation.js";
+import {
+  handleStalePaymentCleanup,
+  type StalePaymentCleanupJobData
+} from "./workers/stalePaymentCleanup.js";
 
 export type WorkerJob = {
   id: string;
@@ -70,12 +88,8 @@ export class BullMqWorkerBackend implements WorkerBackend {
       new Worker(
         queueNames.resourceIndexing,
         async (job: Job<Record<string, unknown>>) => {
-          this.processed.push({
-            id: String(job.id),
-            name: job.name,
-            queueName: queueNames.resourceIndexing,
-            data: job.data
-          });
+          await handleResourceIndexing(job as Job<ResourceIndexingJobData>);
+          this.recordProcessedJob(job, queueNames.resourceIndexing);
         },
         {
           connection: this.connection
@@ -88,13 +102,11 @@ export class BullMqWorkerBackend implements WorkerBackend {
       new Worker(
         queueNames.settlementConfirmation,
         async (job: Job<Record<string, unknown>>) => {
-          // Handler will be injected with config
-          this.processed.push({
-            id: String(job.id),
-            name: job.name,
-            queueName: queueNames.settlementConfirmation,
-            data: job.data
-          });
+          await handleSettlementConfirmation(
+            job as Job<SettlementConfirmationJobData>,
+            this.config
+          );
+          this.recordProcessedJob(job, queueNames.settlementConfirmation);
         },
         {
           connection: this.connection
@@ -107,12 +119,8 @@ export class BullMqWorkerBackend implements WorkerBackend {
       new Worker(
         queueNames.searchSync,
         async (job: Job<Record<string, unknown>>) => {
-          this.processed.push({
-            id: String(job.id),
-            name: job.name,
-            queueName: queueNames.searchSync,
-            data: job.data
-          });
+          await handleSearchSync(job as Job<SearchSyncJobData>);
+          this.recordProcessedJob(job, queueNames.searchSync);
         },
         {
           connection: this.connection
@@ -125,12 +133,8 @@ export class BullMqWorkerBackend implements WorkerBackend {
       new Worker(
         queueNames.networkHealth,
         async (job: Job<Record<string, unknown>>) => {
-          this.processed.push({
-            id: String(job.id),
-            name: job.name,
-            queueName: queueNames.networkHealth,
-            data: job.data
-          });
+          await handleNetworkHealth(job as Job<NetworkHealthJobData>);
+          this.recordProcessedJob(job, queueNames.networkHealth);
         },
         {
           connection: this.connection
@@ -143,12 +147,8 @@ export class BullMqWorkerBackend implements WorkerBackend {
       new Worker(
         queueNames.receiptFinalizer,
         async (job: Job<Record<string, unknown>>) => {
-          this.processed.push({
-            id: String(job.id),
-            name: job.name,
-            queueName: queueNames.receiptFinalizer,
-            data: job.data
-          });
+          await handleReceiptFinalizer(job as Job<ReceiptFinalizerJobData>);
+          this.recordProcessedJob(job, queueNames.receiptFinalizer);
         },
         {
           connection: this.connection
@@ -161,12 +161,8 @@ export class BullMqWorkerBackend implements WorkerBackend {
       new Worker(
         queueNames.stalePaymentCleanup,
         async (job: Job<Record<string, unknown>>) => {
-          this.processed.push({
-            id: String(job.id),
-            name: job.name,
-            queueName: queueNames.stalePaymentCleanup,
-            data: job.data
-          });
+          await handleStalePaymentCleanup(job as Job<StalePaymentCleanupJobData>);
+          this.recordProcessedJob(job, queueNames.stalePaymentCleanup);
         },
         {
           connection: this.connection
@@ -186,6 +182,15 @@ export class BullMqWorkerBackend implements WorkerBackend {
 
   processedJobs() {
     return [...this.processed];
+  }
+
+  private recordProcessedJob(job: Job<Record<string, unknown>>, queueName: QueueName) {
+    this.processed.push({
+      id: String(job.id),
+      name: job.name,
+      queueName,
+      data: job.data
+    });
   }
 }
 

@@ -117,6 +117,9 @@ importers:
       '@lumenbazaar/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@lumenbazaar/stellar-payments':
+        specifier: workspace:*
+        version: link:../../packages/stellar-payments
       bullmq:
         specifier: 5.65.0
         version: 5.65.0
