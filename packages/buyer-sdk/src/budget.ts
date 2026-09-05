@@ -76,6 +76,13 @@ export class BudgetManager {
   }
 
   /**
+   * Get immutable budget limits for display and agent inspection.
+   */
+  getConstraint(): BudgetConstraint {
+    return { ...this.constraint };
+  }
+
+  /**
    * Reset budget state
    */
   reset(): void {

@@ -149,6 +149,129 @@ export const toolDefinitions = [
         payTo: z.string()
       })
     })
+  },
+  {
+    name: "prepare_payment",
+    description: "Prepare an exact Stellar x402 payment payload for a paid resource",
+    jsonInputSchema: {
+      type: "object",
+      properties: {
+        resourceId: {
+          type: "string",
+          description: "Resource ID to pay for"
+        },
+        expiresAtLedger: {
+          type: "number",
+          description: "Optional ledger sequence where the authorization expires"
+        },
+        authorization: {
+          type: "object",
+          description: "Optional wallet authorization payload"
+        }
+      },
+      required: ["resourceId"],
+      additionalProperties: false
+    },
+    inputSchema: z.object({
+      resourceId: z.string().min(1),
+      expiresAtLedger: z.number().int().positive().optional(),
+      authorization: z.record(z.string(), z.unknown()).optional()
+    }),
+    outputSchema: z.object({
+      resourceId: z.string(),
+      paymentPayload: z.record(z.string(), z.unknown()),
+      paymentRequirements: z.record(z.string(), z.unknown()),
+      budget: z.record(z.string(), z.unknown())
+    })
+  },
+  {
+    name: "call_paid_resource",
+    description: "Verify payment, call a paid resource, settle it, and return receipt details",
+    jsonInputSchema: {
+      type: "object",
+      properties: {
+        resourceId: {
+          type: "string",
+          description: "Resource ID to call"
+        },
+        resourceUrl: {
+          type: "string",
+          description: "Optional override URL for local tests"
+        },
+        paymentPayload: {
+          type: "object",
+          description: "Optional prepared payment payload"
+        },
+        authorization: {
+          type: "object",
+          description: "Optional wallet authorization payload"
+        },
+        currentLedger: {
+          type: "number",
+          description: "Current ledger for expiry checks"
+        },
+        expiresAtLedger: {
+          type: "number",
+          description: "Optional authorization expiry ledger"
+        },
+        maxRetries: {
+          type: "number",
+          description: "Maximum paid endpoint retry attempts"
+        },
+        retryDelayMs: {
+          type: "number",
+          description: "Base retry delay in milliseconds"
+        },
+        timeoutMs: {
+          type: "number",
+          description: "Paid endpoint timeout in milliseconds"
+        }
+      },
+      required: ["resourceId"],
+      additionalProperties: false
+    },
+    inputSchema: z.object({
+      resourceId: z.string().min(1),
+      resourceUrl: z.string().url().optional(),
+      paymentPayload: z.record(z.string(), z.unknown()).optional(),
+      authorization: z.record(z.string(), z.unknown()).optional(),
+      currentLedger: z.number().int().nonnegative().optional(),
+      expiresAtLedger: z.number().int().positive().optional(),
+      maxRetries: z.number().int().min(0).max(10).optional(),
+      retryDelayMs: z.number().int().min(0).max(60_000).optional(),
+      timeoutMs: z.number().int().min(1).max(300_000).optional()
+    }),
+    outputSchema: z.record(z.string(), z.unknown())
+  },
+  {
+    name: "get_payment_receipt",
+    description: "Fetch a LumenBazaar payment receipt by ID",
+    jsonInputSchema: {
+      type: "object",
+      properties: {
+        receiptId: {
+          type: "string",
+          description: "Receipt ID returned by settlement"
+        }
+      },
+      required: ["receiptId"],
+      additionalProperties: false
+    },
+    inputSchema: z.object({
+      receiptId: z.string().min(1)
+    }),
+    outputSchema: z.record(z.string(), z.unknown())
+  },
+  {
+    name: "inspect_budget",
+    description: "Inspect the local MCP payment budget caps and current spend",
+    jsonInputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false
+    },
+    inputSchema: z.object({}).strict(),
+    outputSchema: z.record(z.string(), z.unknown())
   }
 ];
 

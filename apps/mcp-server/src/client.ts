@@ -10,6 +10,10 @@ export class BackendClient {
     this.baseUrl = baseUrl.replace(/\/$/, "");
   }
 
+  getBaseUrl() {
+    return this.baseUrl;
+  }
+
   /**
    * Fetch supported payment schemes, networks, and assets
    */

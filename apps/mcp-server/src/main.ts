@@ -2,13 +2,16 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
+import type { PaymentPayload } from "@lumenbazaar/buyer-sdk";
 import { serviceName } from "@lumenbazaar/shared";
 
 import { BackendClient } from "./client.js";
 import { handleToolError } from "./errors.js";
+import { McpPaymentToolService } from "./paymentTools.js";
 import { getToolDefinition, listToolDefinitions } from "./tools.js";
 
 const client = new BackendClient();
+const paymentTools = new McpPaymentToolService({ client });
 
 /**
  * MCP Server for LumenBazaar
@@ -131,6 +134,62 @@ server.setRequestHandler(CallToolRequestSchema, async (request: unknown) => {
         result.inputSchema = resource.inputSchema;
         result.outputSchema = resource.outputSchema;
         result.paymentTerms = resource.paymentTerms;
+        break;
+      }
+
+      case "prepare_payment": {
+        result = await paymentTools.preparePayment({
+          ...(toolInput.authorization === undefined
+            ? {}
+            : { authorization: toolInput.authorization as Record<string, unknown> }),
+          ...(toolInput.expiresAtLedger === undefined
+            ? {}
+            : { expiresAtLedger: toolInput.expiresAtLedger as number }),
+          resourceId: toolInput.resourceId as string
+        });
+        break;
+      }
+
+      case "call_paid_resource": {
+        result = await paymentTools.callPaidResource({
+          ...(toolInput.authorization === undefined
+            ? {}
+            : { authorization: toolInput.authorization as Record<string, unknown> }),
+          ...(toolInput.currentLedger === undefined
+            ? {}
+            : { currentLedger: toolInput.currentLedger as number }),
+          ...(toolInput.expiresAtLedger === undefined
+            ? {}
+            : { expiresAtLedger: toolInput.expiresAtLedger as number }),
+          ...(toolInput.maxRetries === undefined
+            ? {}
+            : { maxRetries: toolInput.maxRetries as number }),
+          ...(toolInput.paymentPayload === undefined
+            ? {}
+            : { paymentPayload: toolInput.paymentPayload as PaymentPayload }),
+          ...(toolInput.resourceUrl === undefined
+            ? {}
+            : { resourceUrl: toolInput.resourceUrl as string }),
+          ...(toolInput.retryDelayMs === undefined
+            ? {}
+            : { retryDelayMs: toolInput.retryDelayMs as number }),
+          ...(toolInput.timeoutMs === undefined
+            ? {}
+            : { timeoutMs: toolInput.timeoutMs as number }),
+          resourceId: toolInput.resourceId as string
+        });
+        break;
+      }
+
+      case "get_payment_receipt": {
+        result = await paymentTools.getPaymentReceipt({
+          receiptId: toolInput.receiptId as string
+        });
+        break;
+      }
+
+      case "inspect_budget": {
+        result = paymentTools.inspectBudget();
         break;
       }
 
