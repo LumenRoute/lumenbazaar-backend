@@ -93,9 +93,18 @@ importers:
 
   apps/examples/paid-weather-api:
     dependencies:
+      '@lumenbazaar/buyer-sdk':
+        specifier: workspace:*
+        version: link:../../../packages/buyer-sdk
+      '@lumenbazaar/seller-sdk':
+        specifier: workspace:*
+        version: link:../../../packages/seller-sdk
       '@lumenbazaar/shared':
         specifier: workspace:*
         version: link:../../../packages/shared
+      fastify:
+        specifier: 5.12.1
+        version: 5.12.1
 
   apps/mcp-server:
     dependencies:
