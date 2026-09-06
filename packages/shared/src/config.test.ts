@@ -33,4 +33,22 @@ describe("loadConfig", () => {
     expect(loadConfig({ ENABLE_UPTO_SCHEME: "true" }).features.uptoScheme).toBe(true);
     expect(loadConfig({ ENABLE_UPTO_SCHEME: "0" }).features.uptoScheme).toBe(false);
   });
+
+  it("loads optional contract IDs for capped session deployments", () => {
+    const config = loadConfig({
+      STELLAR_TESTNET_USDC_CONTRACT_ID: "CDLZUSDCTOKENCONTRACT0000000000000000000000000000000000",
+      STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID:
+        "CDLZUPTOSESSIONCONTRACT000000000000000000000000000000000"
+    });
+
+    expect(config.networks["stellar:testnet"].assets[0]).toMatchObject({
+      contractId: "CDLZUSDCTOKENCONTRACT0000000000000000000000000000000000"
+    });
+    expect(config.networks["stellar:testnet"].uptoSessionContractId).toBe(
+      "CDLZUPTOSESSIONCONTRACT000000000000000000000000000000000"
+    );
+    expect(
+      loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: "" }).networks["stellar:testnet"].assets[0]
+    ).not.toHaveProperty("contractId");
+  });
 });

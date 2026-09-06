@@ -151,6 +151,93 @@ const verificationRequest: SchemaObject = {
   properties: verificationRequestProperties
 };
 
+const paymentSessionRequired = [
+  "id",
+  "network",
+  "buyer",
+  "payTo",
+  "assetCode",
+  "assetIssuer",
+  "assetContractId",
+  "capAmount",
+  "spentAmount",
+  "remainingAmount",
+  "contractId",
+  "contractSessionId",
+  "resourceHash",
+  "expiresAtLedger",
+  "status"
+];
+
+const paymentSessionProperties: Record<string, unknown> = {
+  id: { type: "string" },
+  resourceId: { type: ["string", "null"] },
+  sellerId: { type: ["string", "null"] },
+  network: { type: "string", enum: ["stellar:testnet", "stellar:pubnet"] },
+  buyer: { type: "string" },
+  payTo: { type: "string" },
+  assetCode: { type: "string" },
+  assetIssuer: { type: "string" },
+  assetContractId: { type: "string" },
+  capAmount: { type: "string" },
+  spentAmount: { type: "string" },
+  remainingAmount: { type: "string" },
+  contractId: { type: "string" },
+  contractSessionId: { type: "string" },
+  resourceHash: { type: "string" },
+  expiresAtLedger: { type: "integer" },
+  status: { type: "string", enum: ["open", "settled"] },
+  transactionHash: { type: ["string", "null"] },
+  ledger: { type: ["integer", "null"] },
+  usageHash: { type: ["string", "null"] },
+  createdAt: { type: "string", format: "date-time" },
+  updatedAt: { type: "string", format: "date-time" }
+};
+
+const paymentSession: SchemaObject = {
+  type: "object",
+  required: paymentSessionRequired,
+  properties: paymentSessionProperties
+};
+
+const createPaymentSessionRequest: SchemaObject = {
+  type: "object",
+  required: ["scheme", "network", "buyer", "asset", "capAmount", "payTo", "expiresAtLedger"],
+  properties: {
+    scheme: { type: "string", enum: ["upto"] },
+    network: { type: "string", enum: ["stellar:testnet", "stellar:pubnet"] },
+    buyer: { type: "string" },
+    asset: assetSchema,
+    capAmount: { type: "string" },
+    payTo: { type: "string" },
+    resourceId: { type: "string" },
+    sellerId: { type: "string" },
+    expiresAtLedger: { type: "integer" },
+    currentLedger: { type: "integer" }
+  }
+};
+
+const settlePaymentSessionRequest: SchemaObject = {
+  type: "object",
+  required: ["amount", "usageHash"],
+  properties: {
+    amount: { type: "string" },
+    usageHash: { type: "string" },
+    currentLedger: { type: "integer" }
+  }
+};
+
+const settledPaymentSession: SchemaObject = {
+  type: "object",
+  required: ["scheme", "id", "status", "settlementId", "transactionHash", "ledger"],
+  properties: {
+    ...paymentSessionProperties,
+    scheme: { type: "string", enum: ["upto"] },
+    settlementId: { type: "string" },
+    settledAt: { type: "string", format: "date-time" }
+  }
+};
+
 const conformanceRun: SchemaObject = {
   type: "object",
   required: ["id", "network", "suite", "status", "results", "startedAt", "completedAt"],
@@ -253,6 +340,32 @@ export const apiRouteContracts: RouteContract[] = [
     summary: "Fetch a settlement receipt.",
     tags: ["facilitator"],
     response: jsonObject
+  },
+  {
+    method: "post",
+    path: "/v1/payment-sessions",
+    operationId: "createPaymentSession",
+    summary: "Create a capped Stellar upto payment session.",
+    tags: ["facilitator"],
+    requestBody: createPaymentSessionRequest,
+    response: paymentSession
+  },
+  {
+    method: "get",
+    path: "/v1/payment-sessions/{sessionId}",
+    operationId: "getPaymentSession",
+    summary: "Fetch a capped payment session.",
+    tags: ["facilitator"],
+    response: paymentSession
+  },
+  {
+    method: "post",
+    path: "/v1/payment-sessions/{sessionId}/settle",
+    operationId: "settlePaymentSession",
+    summary: "Settle a capped payment session up to its authorized amount.",
+    tags: ["facilitator"],
+    requestBody: settlePaymentSessionRequest,
+    response: settledPaymentSession
   },
   {
     method: "post",

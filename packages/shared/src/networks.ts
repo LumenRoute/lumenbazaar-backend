@@ -5,6 +5,7 @@ export type NetworkId = (typeof networkIds)[number];
 export type SupportedAsset = {
   code: string;
   issuer: string;
+  contractId?: string;
   decimals: number;
 };
 
@@ -15,6 +16,7 @@ export type NetworkConfig = {
   rpcUrl: string;
   horizonUrl: string;
   assets: SupportedAsset[];
+  uptoSessionContractId?: string;
 };
 
 export const stellarPassphrases: Record<NetworkId, string> = {

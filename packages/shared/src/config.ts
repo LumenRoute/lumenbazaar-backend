@@ -32,6 +32,16 @@ const booleanEnv = z.preprocess((value) => {
   return value;
 }, z.boolean());
 
+const optionalNonEmptyStringEnv = z
+  .preprocess((value) => {
+    if (value === "") {
+      return undefined;
+    }
+
+    return value;
+  }, z.string().min(1).optional())
+  .optional();
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -50,9 +60,13 @@ const envSchema = z.object({
   STELLAR_TESTNET_RPC_URL: z.string().url().default("https://soroban-testnet.stellar.org"),
   STELLAR_TESTNET_HORIZON_URL: z.string().url().default("https://horizon-testnet.stellar.org"),
   STELLAR_TESTNET_USDC_ISSUER: z.string().min(1).default(localIssuerPublicKey),
+  STELLAR_TESTNET_USDC_CONTRACT_ID: optionalNonEmptyStringEnv,
+  STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID: optionalNonEmptyStringEnv,
   STELLAR_PUBNET_RPC_URL: z.string().url().default("https://mainnet.sorobanrpc.com"),
   STELLAR_PUBNET_HORIZON_URL: z.string().url().default("https://horizon.stellar.org"),
   STELLAR_PUBNET_USDC_ISSUER: z.string().min(1).default(localIssuerPublicKey),
+  STELLAR_PUBNET_USDC_CONTRACT_ID: optionalNonEmptyStringEnv,
+  STELLAR_PUBNET_UPTO_SESSION_CONTRACT_ID: optionalNonEmptyStringEnv,
   FACILITATOR_ACCOUNT: z.string().min(1).default(localIssuerPublicKey)
 });
 
@@ -91,9 +105,15 @@ export function loadConfig(input: RawEnv = process.env as RawEnv): AppConfig {
         {
           code: defaultAssetCode,
           issuer: env.STELLAR_TESTNET_USDC_ISSUER,
+          ...(env.STELLAR_TESTNET_USDC_CONTRACT_ID === undefined
+            ? {}
+            : { contractId: env.STELLAR_TESTNET_USDC_CONTRACT_ID }),
           decimals: 7
         }
-      ]
+      ],
+      ...(env.STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID === undefined
+        ? {}
+        : { uptoSessionContractId: env.STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID })
     },
     "stellar:pubnet": {
       id: "stellar:pubnet",
@@ -105,9 +125,15 @@ export function loadConfig(input: RawEnv = process.env as RawEnv): AppConfig {
         {
           code: defaultAssetCode,
           issuer: env.STELLAR_PUBNET_USDC_ISSUER,
+          ...(env.STELLAR_PUBNET_USDC_CONTRACT_ID === undefined
+            ? {}
+            : { contractId: env.STELLAR_PUBNET_USDC_CONTRACT_ID }),
           decimals: 7
         }
-      ]
+      ],
+      ...(env.STELLAR_PUBNET_UPTO_SESSION_CONTRACT_ID === undefined
+        ? {}
+        : { uptoSessionContractId: env.STELLAR_PUBNET_UPTO_SESSION_CONTRACT_ID })
     }
   };
 

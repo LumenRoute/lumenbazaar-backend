@@ -1,6 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ConformanceRunService, conformanceDefinitions } from "./conformance.js";
+import { loadConfig } from "@lumenbazaar/shared";
+import {
+  InMemoryPaymentAttemptStore,
+  PaymentSessionService,
+  PaymentVerificationService,
+  SettlementService,
+  type X402StellarAdapter
+} from "@lumenbazaar/stellar-payments";
+
+import {
+  ConformanceRunService,
+  conformanceDefinitions,
+  createServiceConformanceRunner
+} from "./conformance.js";
 
 describe("ConformanceRunService", () => {
   it("runs exact checks and reserves upto checks separately", async () => {
@@ -55,5 +68,54 @@ describe("ConformanceRunService", () => {
     expect(
       conformanceDefinitions("stellar:testnet", false).map((definition) => definition.id)
     ).toEqual(["exact-supported", "exact-verify", "exact-settle"]);
+  });
+
+  it("runs upto checks when capped sessions are deployed", async () => {
+    const config = loadConfig({
+      ENABLE_UPTO_SCHEME: "true",
+      STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID:
+        "CDLZUPTOSESSIONCONTRACT000000000000000000000000000000000",
+      STELLAR_TESTNET_USDC_CONTRACT_ID: "CDLZUSDCTOKENCONTRACT0000000000000000000000000000000000"
+    });
+    const attemptStore = new InMemoryPaymentAttemptStore();
+    const adapter: X402StellarAdapter = {
+      async verifyExact() {
+        return {
+          valid: true,
+          adapter: "@x402/stellar"
+        };
+      },
+      async settleExact() {
+        return {
+          transactionHash: "tx_conformance",
+          ledger: 1,
+          adapter: "@x402/stellar"
+        };
+      }
+    };
+    const runner = createServiceConformanceRunner(
+      config,
+      new PaymentVerificationService(config, { adapter, attemptStore }),
+      new SettlementService(config, { adapter, attemptStore }),
+      new PaymentSessionService(config)
+    );
+    const service = new ConformanceRunService(runner, undefined, { uptoEnabled: true });
+
+    const run = await service.run({
+      network: "stellar:testnet",
+      includeReserved: false
+    });
+
+    expect(run.status).toBe("passed");
+    expect(run.reservedCount).toBe(0);
+    expect(run.results.map((result) => result.id)).toEqual([
+      "exact-supported",
+      "exact-verify",
+      "exact-settle",
+      "upto-supported",
+      "upto-session-create",
+      "upto-settle"
+    ]);
+    expect(run.results.filter((result) => result.scheme === "upto")).toHaveLength(3);
   });
 });

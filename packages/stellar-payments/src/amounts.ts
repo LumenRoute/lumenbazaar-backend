@@ -38,6 +38,19 @@ export function amountToStroops(amount: string) {
   return BigInt(wholePart) * 10_000_000n + BigInt(decimalPart.padEnd(7, "0"));
 }
 
+export function stroopsToAmount(stroops: bigint) {
+  if (stroops <= 0n) {
+    throw new LumenError("INVALID_PAYMENT_PAYLOAD", "Amount must be greater than zero.");
+  }
+
+  const normalizedWhole = stroops / 10_000_000n;
+  const normalizedFraction = (stroops % 10_000_000n).toString().padStart(7, "0").replace(/0+$/, "");
+
+  return normalizedFraction.length === 0
+    ? normalizedWhole.toString()
+    : `${normalizedWhole.toString()}.${normalizedFraction}`;
+}
+
 export function compareExactAmounts(left: string, right: string) {
   const leftUnits = amountToStroops(left);
   const rightUnits = amountToStroops(right);

@@ -20,6 +20,7 @@ export type PaymentScheme = "exact" | "upto";
 export type PaymentStatus = "received" | "verified" | "settled" | "failed";
 export type SettlementStatus = "pending" | "settled" | "failed";
 export type ReceiptStatus = "pending" | "finalized" | "failed";
+export type PaymentSessionStatus = "open" | "settled" | "cancelled" | "expired";
 export type CatalogEventType = "validated" | "cataloged" | "updated" | "deleted";
 
 export type Seller = {
@@ -164,4 +165,42 @@ export type Receipt = {
   failureReason: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PaymentSession = {
+  id: string;
+  resourceId: string | null;
+  sellerId: string | null;
+  network: NetworkId;
+  buyer: string;
+  payTo: string;
+  assetCode: string;
+  assetIssuer: string;
+  assetContractId: string;
+  capAmount: string;
+  spentAmount: string;
+  remainingAmount: string;
+  contractId: string;
+  contractSessionId: string;
+  resourceHash: string;
+  expiresAtLedger: number;
+  status: PaymentSessionStatus;
+  transactionHash: string | null;
+  ledger: number | null;
+  usageHash: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UptoSessionSettlement = {
+  id: string;
+  sessionId: string;
+  network: NetworkId;
+  amount: string;
+  transactionHash: string;
+  ledger: number;
+  usageHash: string;
+  status: SettlementStatus;
+  settledAt: string;
+  createdAt: string;
 };

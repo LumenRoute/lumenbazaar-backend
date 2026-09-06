@@ -5,50 +5,26 @@
     "version": "0.1.0",
     "description": "Facilitator, seller catalog, discovery, and conformance APIs for LumenBazaar."
   },
-  "servers": [
-    {
-      "url": "http://localhost:3000",
-      "description": "Local development"
-    }
-  ],
+  "servers": [{ "url": "http://localhost:3000", "description": "Local development" }],
   "tags": [
-    {
-      "name": "metadata"
-    },
-    {
-      "name": "facilitator"
-    },
-    {
-      "name": "sellers"
-    },
-    {
-      "name": "resources"
-    },
-    {
-      "name": "discovery"
-    },
-    {
-      "name": "conformance"
-    }
+    { "name": "metadata" },
+    { "name": "facilitator" },
+    { "name": "sellers" },
+    { "name": "resources" },
+    { "name": "discovery" },
+    { "name": "conformance" }
   ],
   "paths": {
     "/health": {
       "get": {
         "operationId": "getHealth",
         "summary": "Return API health and dependency configuration.",
-        "tags": [
-          "metadata"
-        ],
+        "tags": ["metadata"],
         "responses": {
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -57,39 +33,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -102,19 +58,12 @@
       "get": {
         "operationId": "getVersion",
         "summary": "Return backend version and environment.",
-        "tags": [
-          "metadata"
-        ],
+        "tags": ["metadata"],
         "responses": {
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -123,39 +72,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -168,19 +97,12 @@
       "get": {
         "operationId": "listNetworks",
         "summary": "List configured Stellar networks and assets.",
-        "tags": [
-          "metadata"
-        ],
+        "tags": ["metadata"],
         "responses": {
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -189,39 +111,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -234,19 +136,12 @@
       "get": {
         "operationId": "listSupportedPaymentSchemes",
         "summary": "List supported x402 payment schemes.",
-        "tags": [
-          "facilitator"
-        ],
+        "tags": ["facilitator"],
         "responses": {
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -255,39 +150,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -300,130 +175,63 @@
       "post": {
         "operationId": "verifyPayment",
         "summary": "Verify an exact Stellar x402 payment payload.",
-        "tags": [
-          "facilitator"
-        ],
+        "tags": ["facilitator"],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "paymentPayload",
-                  "paymentRequirements"
-                ],
+                "required": ["paymentPayload", "paymentRequirements"],
                 "properties": {
                   "paymentPayload": {
                     "type": "object",
-                    "required": [
-                      "scheme",
-                      "network",
-                      "asset",
-                      "amount",
-                      "payTo"
-                    ],
+                    "required": ["scheme", "network", "asset", "amount", "payTo"],
                     "properties": {
-                      "scheme": {
-                        "type": "string",
-                        "enum": [
-                          "exact"
-                        ]
-                      },
+                      "scheme": { "type": "string", "enum": ["exact"] },
                       "network": {
                         "type": "string",
-                        "enum": [
-                          "stellar:testnet",
-                          "stellar:pubnet"
-                        ]
+                        "enum": ["stellar:testnet", "stellar:pubnet"]
                       },
                       "asset": {
                         "type": "object",
-                        "required": [
-                          "code",
-                          "issuer"
-                        ],
+                        "required": ["code", "issuer"],
                         "properties": {
-                          "code": {
-                            "type": "string"
-                          },
-                          "issuer": {
-                            "type": "string"
-                          }
+                          "code": { "type": "string" },
+                          "issuer": { "type": "string" }
                         }
                       },
-                      "amount": {
-                        "type": "string"
-                      },
-                      "payTo": {
-                        "type": "string"
-                      },
-                      "expiresAtLedger": {
-                        "type": "integer"
-                      },
-                      "authorization": {
-                        "type": "object",
-                        "additionalProperties": true
-                      },
-                      "paymentHash": {
-                        "type": "string"
-                      }
+                      "amount": { "type": "string" },
+                      "payTo": { "type": "string" },
+                      "expiresAtLedger": { "type": "integer" },
+                      "authorization": { "type": "object", "additionalProperties": true },
+                      "paymentHash": { "type": "string" }
                     }
                   },
                   "paymentRequirements": {
                     "type": "object",
-                    "required": [
-                      "scheme",
-                      "network",
-                      "amount",
-                      "payTo"
-                    ],
+                    "required": ["scheme", "network", "amount", "payTo"],
                     "properties": {
-                      "scheme": {
-                        "type": "string",
-                        "enum": [
-                          "exact"
-                        ]
-                      },
+                      "scheme": { "type": "string", "enum": ["exact"] },
                       "network": {
                         "type": "string",
-                        "enum": [
-                          "stellar:testnet",
-                          "stellar:pubnet"
-                        ]
+                        "enum": ["stellar:testnet", "stellar:pubnet"]
                       },
                       "asset": {
                         "type": "object",
-                        "required": [
-                          "code",
-                          "issuer"
-                        ],
+                        "required": ["code", "issuer"],
                         "properties": {
-                          "code": {
-                            "type": "string"
-                          },
-                          "issuer": {
-                            "type": "string"
-                          }
+                          "code": { "type": "string" },
+                          "issuer": { "type": "string" }
                         }
                       },
-                      "amount": {
-                        "type": "string"
-                      },
-                      "payTo": {
-                        "type": "string"
-                      }
+                      "amount": { "type": "string" },
+                      "payTo": { "type": "string" }
                     }
                   },
-                  "resourceId": {
-                    "type": "string"
-                  },
-                  "sellerId": {
-                    "type": "string"
-                  },
-                  "currentLedger": {
-                    "type": "integer"
-                  }
+                  "resourceId": { "type": "string" },
+                  "sellerId": { "type": "string" },
+                  "currentLedger": { "type": "integer" }
                 }
               }
             }
@@ -433,12 +241,7 @@
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -447,39 +250,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -492,134 +275,64 @@
       "post": {
         "operationId": "settlePayment",
         "summary": "Settle a previously verified exact Stellar x402 payment.",
-        "tags": [
-          "facilitator"
-        ],
+        "tags": ["facilitator"],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "paymentAttemptId",
-                  "paymentPayload",
-                  "paymentRequirements"
-                ],
+                "required": ["paymentAttemptId", "paymentPayload", "paymentRequirements"],
                 "properties": {
-                  "paymentAttemptId": {
-                    "type": "string"
-                  },
+                  "paymentAttemptId": { "type": "string" },
                   "paymentPayload": {
                     "type": "object",
-                    "required": [
-                      "scheme",
-                      "network",
-                      "asset",
-                      "amount",
-                      "payTo"
-                    ],
+                    "required": ["scheme", "network", "asset", "amount", "payTo"],
                     "properties": {
-                      "scheme": {
-                        "type": "string",
-                        "enum": [
-                          "exact"
-                        ]
-                      },
+                      "scheme": { "type": "string", "enum": ["exact"] },
                       "network": {
                         "type": "string",
-                        "enum": [
-                          "stellar:testnet",
-                          "stellar:pubnet"
-                        ]
+                        "enum": ["stellar:testnet", "stellar:pubnet"]
                       },
                       "asset": {
                         "type": "object",
-                        "required": [
-                          "code",
-                          "issuer"
-                        ],
+                        "required": ["code", "issuer"],
                         "properties": {
-                          "code": {
-                            "type": "string"
-                          },
-                          "issuer": {
-                            "type": "string"
-                          }
+                          "code": { "type": "string" },
+                          "issuer": { "type": "string" }
                         }
                       },
-                      "amount": {
-                        "type": "string"
-                      },
-                      "payTo": {
-                        "type": "string"
-                      },
-                      "expiresAtLedger": {
-                        "type": "integer"
-                      },
-                      "authorization": {
-                        "type": "object",
-                        "additionalProperties": true
-                      },
-                      "paymentHash": {
-                        "type": "string"
-                      }
+                      "amount": { "type": "string" },
+                      "payTo": { "type": "string" },
+                      "expiresAtLedger": { "type": "integer" },
+                      "authorization": { "type": "object", "additionalProperties": true },
+                      "paymentHash": { "type": "string" }
                     }
                   },
                   "paymentRequirements": {
                     "type": "object",
-                    "required": [
-                      "scheme",
-                      "network",
-                      "amount",
-                      "payTo"
-                    ],
+                    "required": ["scheme", "network", "amount", "payTo"],
                     "properties": {
-                      "scheme": {
-                        "type": "string",
-                        "enum": [
-                          "exact"
-                        ]
-                      },
+                      "scheme": { "type": "string", "enum": ["exact"] },
                       "network": {
                         "type": "string",
-                        "enum": [
-                          "stellar:testnet",
-                          "stellar:pubnet"
-                        ]
+                        "enum": ["stellar:testnet", "stellar:pubnet"]
                       },
                       "asset": {
                         "type": "object",
-                        "required": [
-                          "code",
-                          "issuer"
-                        ],
+                        "required": ["code", "issuer"],
                         "properties": {
-                          "code": {
-                            "type": "string"
-                          },
-                          "issuer": {
-                            "type": "string"
-                          }
+                          "code": { "type": "string" },
+                          "issuer": { "type": "string" }
                         }
                       },
-                      "amount": {
-                        "type": "string"
-                      },
-                      "payTo": {
-                        "type": "string"
-                      }
+                      "amount": { "type": "string" },
+                      "payTo": { "type": "string" }
                     }
                   },
-                  "resourceId": {
-                    "type": "string"
-                  },
-                  "sellerId": {
-                    "type": "string"
-                  },
-                  "currentLedger": {
-                    "type": "integer"
-                  }
+                  "resourceId": { "type": "string" },
+                  "sellerId": { "type": "string" },
+                  "currentLedger": { "type": "integer" }
                 }
               }
             }
@@ -629,12 +342,7 @@
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -643,39 +351,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -688,9 +376,81 @@
       "get": {
         "operationId": "getReceipt",
         "summary": "Fetch a settlement receipt.",
-        "tags": [
-          "facilitator"
-        ],
+        "tags": ["facilitator"],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
+            }
+          },
+          "default": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok", "error"],
+                  "properties": {
+                    "ok": { "type": "boolean", "enum": [false] },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
+                      }
+                    },
+                    "requestId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payment-sessions": {
+      "post": {
+        "operationId": "createPaymentSession",
+        "summary": "Create a capped Stellar upto payment session.",
+        "tags": ["facilitator"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "scheme",
+                  "network",
+                  "buyer",
+                  "asset",
+                  "capAmount",
+                  "payTo",
+                  "expiresAtLedger"
+                ],
+                "properties": {
+                  "scheme": { "type": "string", "enum": ["upto"] },
+                  "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                  "buyer": { "type": "string" },
+                  "asset": {
+                    "type": "object",
+                    "required": ["code", "issuer"],
+                    "properties": { "code": { "type": "string" }, "issuer": { "type": "string" } }
+                  },
+                  "capAmount": { "type": "string" },
+                  "payTo": { "type": "string" },
+                  "resourceId": { "type": "string" },
+                  "sellerId": { "type": "string" },
+                  "expiresAtLedger": { "type": "integer" },
+                  "currentLedger": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful response",
@@ -698,7 +458,47 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true
+                  "required": [
+                    "id",
+                    "network",
+                    "buyer",
+                    "payTo",
+                    "assetCode",
+                    "assetIssuer",
+                    "assetContractId",
+                    "capAmount",
+                    "spentAmount",
+                    "remainingAmount",
+                    "contractId",
+                    "contractSessionId",
+                    "resourceHash",
+                    "expiresAtLedger",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": { "type": "string" },
+                    "resourceId": { "type": ["string", "null"] },
+                    "sellerId": { "type": ["string", "null"] },
+                    "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                    "buyer": { "type": "string" },
+                    "payTo": { "type": "string" },
+                    "assetCode": { "type": "string" },
+                    "assetIssuer": { "type": "string" },
+                    "assetContractId": { "type": "string" },
+                    "capAmount": { "type": "string" },
+                    "spentAmount": { "type": "string" },
+                    "remainingAmount": { "type": "string" },
+                    "contractId": { "type": "string" },
+                    "contractSessionId": { "type": "string" },
+                    "resourceHash": { "type": "string" },
+                    "expiresAtLedger": { "type": "integer" },
+                    "status": { "type": "string", "enum": ["open", "settled"] },
+                    "transactionHash": { "type": ["string", "null"] },
+                    "ledger": { "type": ["integer", "null"] },
+                    "usageHash": { "type": ["string", "null"] },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
+                  }
                 }
               }
             }
@@ -709,39 +509,197 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payment-sessions/{sessionId}": {
+      "get": {
+        "operationId": "getPaymentSession",
+        "summary": "Fetch a capped payment session.",
+        "tags": ["facilitator"],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "network",
+                    "buyer",
+                    "payTo",
+                    "assetCode",
+                    "assetIssuer",
+                    "assetContractId",
+                    "capAmount",
+                    "spentAmount",
+                    "remainingAmount",
+                    "contractId",
+                    "contractSessionId",
+                    "resourceHash",
+                    "expiresAtLedger",
+                    "status"
+                  ],
+                  "properties": {
+                    "id": { "type": "string" },
+                    "resourceId": { "type": ["string", "null"] },
+                    "sellerId": { "type": ["string", "null"] },
+                    "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                    "buyer": { "type": "string" },
+                    "payTo": { "type": "string" },
+                    "assetCode": { "type": "string" },
+                    "assetIssuer": { "type": "string" },
+                    "assetContractId": { "type": "string" },
+                    "capAmount": { "type": "string" },
+                    "spentAmount": { "type": "string" },
+                    "remainingAmount": { "type": "string" },
+                    "contractId": { "type": "string" },
+                    "contractSessionId": { "type": "string" },
+                    "resourceHash": { "type": "string" },
+                    "expiresAtLedger": { "type": "integer" },
+                    "status": { "type": "string", "enum": ["open", "settled"] },
+                    "transactionHash": { "type": ["string", "null"] },
+                    "ledger": { "type": ["integer", "null"] },
+                    "usageHash": { "type": ["string", "null"] },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok", "error"],
+                  "properties": {
+                    "ok": { "type": "boolean", "enum": [false] },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
+                      }
+                    },
+                    "requestId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payment-sessions/{sessionId}/settle": {
+      "post": {
+        "operationId": "settlePaymentSession",
+        "summary": "Settle a capped payment session up to its authorized amount.",
+        "tags": ["facilitator"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount", "usageHash"],
+                "properties": {
+                  "amount": { "type": "string" },
+                  "usageHash": { "type": "string" },
+                  "currentLedger": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "scheme",
+                    "id",
+                    "status",
+                    "settlementId",
+                    "transactionHash",
+                    "ledger"
+                  ],
+                  "properties": {
+                    "id": { "type": "string" },
+                    "resourceId": { "type": ["string", "null"] },
+                    "sellerId": { "type": ["string", "null"] },
+                    "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                    "buyer": { "type": "string" },
+                    "payTo": { "type": "string" },
+                    "assetCode": { "type": "string" },
+                    "assetIssuer": { "type": "string" },
+                    "assetContractId": { "type": "string" },
+                    "capAmount": { "type": "string" },
+                    "spentAmount": { "type": "string" },
+                    "remainingAmount": { "type": "string" },
+                    "contractId": { "type": "string" },
+                    "contractSessionId": { "type": "string" },
+                    "resourceHash": { "type": "string" },
+                    "expiresAtLedger": { "type": "integer" },
+                    "status": { "type": "string", "enum": ["open", "settled"] },
+                    "transactionHash": { "type": ["string", "null"] },
+                    "ledger": { "type": ["integer", "null"] },
+                    "usageHash": { "type": ["string", "null"] },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" },
+                    "scheme": { "type": "string", "enum": ["upto"] },
+                    "settlementId": { "type": "string" },
+                    "settledAt": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok", "error"],
+                  "properties": {
+                    "ok": { "type": "boolean", "enum": [false] },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
+                      }
+                    },
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -754,30 +712,18 @@
       "post": {
         "operationId": "createSeller",
         "summary": "Create a seller profile.",
-        "tags": [
-          "sellers"
-        ],
+        "tags": ["sellers"],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "displayName",
-                  "walletAddress",
-                  "domain"
-                ],
+                "required": ["displayName", "walletAddress", "domain"],
                 "properties": {
-                  "displayName": {
-                    "type": "string"
-                  },
-                  "walletAddress": {
-                    "type": "string"
-                  },
-                  "domain": {
-                    "type": "string"
-                  }
+                  "displayName": { "type": "string" },
+                  "walletAddress": { "type": "string" },
+                  "domain": { "type": "string" }
                 }
               }
             }
@@ -790,41 +736,15 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "id",
-                    "displayName",
-                    "walletAddress",
-                    "domain",
-                    "domainVerifiedAt"
-                  ],
+                  "required": ["id", "displayName", "walletAddress", "domain", "domainVerifiedAt"],
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "displayName": {
-                      "type": "string"
-                    },
-                    "walletAddress": {
-                      "type": "string"
-                    },
-                    "domain": {
-                      "type": "string"
-                    },
-                    "domainVerifiedAt": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "format": "date-time"
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
+                    "id": { "type": "string" },
+                    "displayName": { "type": "string" },
+                    "walletAddress": { "type": "string" },
+                    "domain": { "type": "string" },
+                    "domainVerifiedAt": { "type": ["string", "null"], "format": "date-time" },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
                   }
                 }
               }
@@ -836,39 +756,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -881,9 +781,7 @@
       "get": {
         "operationId": "getSeller",
         "summary": "Fetch a seller profile.",
-        "tags": [
-          "sellers"
-        ],
+        "tags": ["sellers"],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -891,41 +789,15 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "id",
-                    "displayName",
-                    "walletAddress",
-                    "domain",
-                    "domainVerifiedAt"
-                  ],
+                  "required": ["id", "displayName", "walletAddress", "domain", "domainVerifiedAt"],
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "displayName": {
-                      "type": "string"
-                    },
-                    "walletAddress": {
-                      "type": "string"
-                    },
-                    "domain": {
-                      "type": "string"
-                    },
-                    "domainVerifiedAt": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "format": "date-time"
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
+                    "id": { "type": "string" },
+                    "displayName": { "type": "string" },
+                    "walletAddress": { "type": "string" },
+                    "domain": { "type": "string" },
+                    "domainVerifiedAt": { "type": ["string", "null"], "format": "date-time" },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
                   }
                 }
               }
@@ -937,39 +809,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -982,30 +834,18 @@
       "post": {
         "operationId": "verifySellerDomain",
         "summary": "Create or complete a seller domain verification challenge.",
-        "tags": [
-          "sellers"
-        ],
+        "tags": ["sellers"],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            }
+            "application/json": { "schema": { "type": "object", "additionalProperties": true } }
           }
         },
         "responses": {
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -1014,39 +854,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -1059,9 +879,7 @@
       "get": {
         "operationId": "listResources",
         "summary": "List catalog resources.",
-        "tags": [
-          "resources"
-        ],
+        "tags": ["resources"],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -1069,10 +887,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "resources",
-                    "nextCursor"
-                  ],
+                  "required": ["resources", "nextCursor"],
                   "properties": {
                     "resources": {
                       "type": "array",
@@ -1097,88 +912,31 @@
                           "status"
                         ],
                         "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "sellerId": {
-                            "type": "string"
-                          },
-                          "type": {
-                            "type": "string",
-                            "enum": [
-                              "http",
-                              "mcp"
-                            ]
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "description": {
-                            "type": "string"
-                          },
-                          "url": {
-                            "type": "string",
-                            "format": "uri"
-                          },
-                          "routeTemplate": {
-                            "type": "string"
-                          },
+                          "id": { "type": "string" },
+                          "sellerId": { "type": "string" },
+                          "type": { "type": "string", "enum": ["http", "mcp"] },
+                          "name": { "type": "string" },
+                          "description": { "type": "string" },
+                          "url": { "type": "string", "format": "uri" },
+                          "routeTemplate": { "type": "string" },
                           "network": {
                             "type": "string",
-                            "enum": [
-                              "stellar:testnet",
-                              "stellar:pubnet"
-                            ]
+                            "enum": ["stellar:testnet", "stellar:pubnet"]
                           },
-                          "payTo": {
-                            "type": "string"
-                          },
-                          "assetCode": {
-                            "type": "string"
-                          },
-                          "assetIssuer": {
-                            "type": "string"
-                          },
-                          "amount": {
-                            "type": "string"
-                          },
-                          "inputSchema": {
-                            "type": "object",
-                            "additionalProperties": true
-                          },
-                          "outputSchema": {
-                            "type": "object",
-                            "additionalProperties": true
-                          },
-                          "extensions": {
-                            "type": "object",
-                            "additionalProperties": true
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "draft",
-                              "active",
-                              "inactive"
-                            ]
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
+                          "payTo": { "type": "string" },
+                          "assetCode": { "type": "string" },
+                          "assetIssuer": { "type": "string" },
+                          "amount": { "type": "string" },
+                          "inputSchema": { "type": "object", "additionalProperties": true },
+                          "outputSchema": { "type": "object", "additionalProperties": true },
+                          "extensions": { "type": "object", "additionalProperties": true },
+                          "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                          "createdAt": { "type": "string", "format": "date-time" },
+                          "updatedAt": { "type": "string", "format": "date-time" }
                         }
                       }
                     },
-                    "nextCursor": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    }
+                    "nextCursor": { "type": ["string", "null"] }
                   }
                 }
               }
@@ -1190,39 +948,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -1233,9 +971,7 @@
       "post": {
         "operationId": "createResource",
         "summary": "Create a paid resource owned by a seller.",
-        "tags": [
-          "resources"
-        ],
+        "tags": ["resources"],
         "requestBody": {
           "required": true,
           "content": {
@@ -1261,79 +997,24 @@
                   "status"
                 ],
                 "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "sellerId": {
-                    "type": "string"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "http",
-                      "mcp"
-                    ]
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "description": {
-                    "type": "string"
-                  },
-                  "url": {
-                    "type": "string",
-                    "format": "uri"
-                  },
-                  "routeTemplate": {
-                    "type": "string"
-                  },
-                  "network": {
-                    "type": "string",
-                    "enum": [
-                      "stellar:testnet",
-                      "stellar:pubnet"
-                    ]
-                  },
-                  "payTo": {
-                    "type": "string"
-                  },
-                  "assetCode": {
-                    "type": "string"
-                  },
-                  "assetIssuer": {
-                    "type": "string"
-                  },
-                  "amount": {
-                    "type": "string"
-                  },
-                  "inputSchema": {
-                    "type": "object",
-                    "additionalProperties": true
-                  },
-                  "outputSchema": {
-                    "type": "object",
-                    "additionalProperties": true
-                  },
-                  "extensions": {
-                    "type": "object",
-                    "additionalProperties": true
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "draft",
-                      "active",
-                      "inactive"
-                    ]
-                  },
-                  "createdAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "updatedAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  }
+                  "id": { "type": "string" },
+                  "sellerId": { "type": "string" },
+                  "type": { "type": "string", "enum": ["http", "mcp"] },
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "url": { "type": "string", "format": "uri" },
+                  "routeTemplate": { "type": "string" },
+                  "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                  "payTo": { "type": "string" },
+                  "assetCode": { "type": "string" },
+                  "assetIssuer": { "type": "string" },
+                  "amount": { "type": "string" },
+                  "inputSchema": { "type": "object", "additionalProperties": true },
+                  "outputSchema": { "type": "object", "additionalProperties": true },
+                  "extensions": { "type": "object", "additionalProperties": true },
+                  "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                  "createdAt": { "type": "string", "format": "date-time" },
+                  "updatedAt": { "type": "string", "format": "date-time" }
                 }
               }
             }
@@ -1365,79 +1046,24 @@
                     "status"
                   ],
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "sellerId": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "http",
-                        "mcp"
-                      ]
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "url": {
-                      "type": "string",
-                      "format": "uri"
-                    },
-                    "routeTemplate": {
-                      "type": "string"
-                    },
-                    "network": {
-                      "type": "string",
-                      "enum": [
-                        "stellar:testnet",
-                        "stellar:pubnet"
-                      ]
-                    },
-                    "payTo": {
-                      "type": "string"
-                    },
-                    "assetCode": {
-                      "type": "string"
-                    },
-                    "assetIssuer": {
-                      "type": "string"
-                    },
-                    "amount": {
-                      "type": "string"
-                    },
-                    "inputSchema": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "outputSchema": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "extensions": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "draft",
-                        "active",
-                        "inactive"
-                      ]
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
+                    "id": { "type": "string" },
+                    "sellerId": { "type": "string" },
+                    "type": { "type": "string", "enum": ["http", "mcp"] },
+                    "name": { "type": "string" },
+                    "description": { "type": "string" },
+                    "url": { "type": "string", "format": "uri" },
+                    "routeTemplate": { "type": "string" },
+                    "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                    "payTo": { "type": "string" },
+                    "assetCode": { "type": "string" },
+                    "assetIssuer": { "type": "string" },
+                    "amount": { "type": "string" },
+                    "inputSchema": { "type": "object", "additionalProperties": true },
+                    "outputSchema": { "type": "object", "additionalProperties": true },
+                    "extensions": { "type": "object", "additionalProperties": true },
+                    "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
                   }
                 }
               }
@@ -1449,39 +1075,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -1494,9 +1100,7 @@
       "get": {
         "operationId": "getResource",
         "summary": "Fetch a paid resource by ID.",
-        "tags": [
-          "resources"
-        ],
+        "tags": ["resources"],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -1523,79 +1127,24 @@
                     "status"
                   ],
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "sellerId": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "http",
-                        "mcp"
-                      ]
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "url": {
-                      "type": "string",
-                      "format": "uri"
-                    },
-                    "routeTemplate": {
-                      "type": "string"
-                    },
-                    "network": {
-                      "type": "string",
-                      "enum": [
-                        "stellar:testnet",
-                        "stellar:pubnet"
-                      ]
-                    },
-                    "payTo": {
-                      "type": "string"
-                    },
-                    "assetCode": {
-                      "type": "string"
-                    },
-                    "assetIssuer": {
-                      "type": "string"
-                    },
-                    "amount": {
-                      "type": "string"
-                    },
-                    "inputSchema": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "outputSchema": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "extensions": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "draft",
-                        "active",
-                        "inactive"
-                      ]
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
+                    "id": { "type": "string" },
+                    "sellerId": { "type": "string" },
+                    "type": { "type": "string", "enum": ["http", "mcp"] },
+                    "name": { "type": "string" },
+                    "description": { "type": "string" },
+                    "url": { "type": "string", "format": "uri" },
+                    "routeTemplate": { "type": "string" },
+                    "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                    "payTo": { "type": "string" },
+                    "assetCode": { "type": "string" },
+                    "assetIssuer": { "type": "string" },
+                    "amount": { "type": "string" },
+                    "inputSchema": { "type": "object", "additionalProperties": true },
+                    "outputSchema": { "type": "object", "additionalProperties": true },
+                    "extensions": { "type": "object", "additionalProperties": true },
+                    "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
                   }
                 }
               }
@@ -1607,39 +1156,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -1650,9 +1179,7 @@
       "patch": {
         "operationId": "updateResource",
         "summary": "Update mutable paid resource fields.",
-        "tags": [
-          "resources"
-        ],
+        "tags": ["resources"],
         "requestBody": {
           "required": true,
           "content": {
@@ -1678,79 +1205,24 @@
                   "status"
                 ],
                 "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "sellerId": {
-                    "type": "string"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "http",
-                      "mcp"
-                    ]
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "description": {
-                    "type": "string"
-                  },
-                  "url": {
-                    "type": "string",
-                    "format": "uri"
-                  },
-                  "routeTemplate": {
-                    "type": "string"
-                  },
-                  "network": {
-                    "type": "string",
-                    "enum": [
-                      "stellar:testnet",
-                      "stellar:pubnet"
-                    ]
-                  },
-                  "payTo": {
-                    "type": "string"
-                  },
-                  "assetCode": {
-                    "type": "string"
-                  },
-                  "assetIssuer": {
-                    "type": "string"
-                  },
-                  "amount": {
-                    "type": "string"
-                  },
-                  "inputSchema": {
-                    "type": "object",
-                    "additionalProperties": true
-                  },
-                  "outputSchema": {
-                    "type": "object",
-                    "additionalProperties": true
-                  },
-                  "extensions": {
-                    "type": "object",
-                    "additionalProperties": true
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "draft",
-                      "active",
-                      "inactive"
-                    ]
-                  },
-                  "createdAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "updatedAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  }
+                  "id": { "type": "string" },
+                  "sellerId": { "type": "string" },
+                  "type": { "type": "string", "enum": ["http", "mcp"] },
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "url": { "type": "string", "format": "uri" },
+                  "routeTemplate": { "type": "string" },
+                  "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                  "payTo": { "type": "string" },
+                  "assetCode": { "type": "string" },
+                  "assetIssuer": { "type": "string" },
+                  "amount": { "type": "string" },
+                  "inputSchema": { "type": "object", "additionalProperties": true },
+                  "outputSchema": { "type": "object", "additionalProperties": true },
+                  "extensions": { "type": "object", "additionalProperties": true },
+                  "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                  "createdAt": { "type": "string", "format": "date-time" },
+                  "updatedAt": { "type": "string", "format": "date-time" }
                 }
               }
             }
@@ -1782,79 +1254,24 @@
                     "status"
                   ],
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "sellerId": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "http",
-                        "mcp"
-                      ]
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "url": {
-                      "type": "string",
-                      "format": "uri"
-                    },
-                    "routeTemplate": {
-                      "type": "string"
-                    },
-                    "network": {
-                      "type": "string",
-                      "enum": [
-                        "stellar:testnet",
-                        "stellar:pubnet"
-                      ]
-                    },
-                    "payTo": {
-                      "type": "string"
-                    },
-                    "assetCode": {
-                      "type": "string"
-                    },
-                    "assetIssuer": {
-                      "type": "string"
-                    },
-                    "amount": {
-                      "type": "string"
-                    },
-                    "inputSchema": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "outputSchema": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "extensions": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "draft",
-                        "active",
-                        "inactive"
-                      ]
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
+                    "id": { "type": "string" },
+                    "sellerId": { "type": "string" },
+                    "type": { "type": "string", "enum": ["http", "mcp"] },
+                    "name": { "type": "string" },
+                    "description": { "type": "string" },
+                    "url": { "type": "string", "format": "uri" },
+                    "routeTemplate": { "type": "string" },
+                    "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                    "payTo": { "type": "string" },
+                    "assetCode": { "type": "string" },
+                    "assetIssuer": { "type": "string" },
+                    "amount": { "type": "string" },
+                    "inputSchema": { "type": "object", "additionalProperties": true },
+                    "outputSchema": { "type": "object", "additionalProperties": true },
+                    "extensions": { "type": "object", "additionalProperties": true },
+                    "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
                   }
                 }
               }
@@ -1866,39 +1283,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -1909,9 +1306,7 @@
       "delete": {
         "operationId": "deleteResource",
         "summary": "Deactivate a paid resource.",
-        "tags": [
-          "resources"
-        ],
+        "tags": ["resources"],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -1938,79 +1333,24 @@
                     "status"
                   ],
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "sellerId": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "http",
-                        "mcp"
-                      ]
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "url": {
-                      "type": "string",
-                      "format": "uri"
-                    },
-                    "routeTemplate": {
-                      "type": "string"
-                    },
-                    "network": {
-                      "type": "string",
-                      "enum": [
-                        "stellar:testnet",
-                        "stellar:pubnet"
-                      ]
-                    },
-                    "payTo": {
-                      "type": "string"
-                    },
-                    "assetCode": {
-                      "type": "string"
-                    },
-                    "assetIssuer": {
-                      "type": "string"
-                    },
-                    "amount": {
-                      "type": "string"
-                    },
-                    "inputSchema": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "outputSchema": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "extensions": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "draft",
-                        "active",
-                        "inactive"
-                      ]
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
+                    "id": { "type": "string" },
+                    "sellerId": { "type": "string" },
+                    "type": { "type": "string", "enum": ["http", "mcp"] },
+                    "name": { "type": "string" },
+                    "description": { "type": "string" },
+                    "url": { "type": "string", "format": "uri" },
+                    "routeTemplate": { "type": "string" },
+                    "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                    "payTo": { "type": "string" },
+                    "assetCode": { "type": "string" },
+                    "assetIssuer": { "type": "string" },
+                    "amount": { "type": "string" },
+                    "inputSchema": { "type": "object", "additionalProperties": true },
+                    "outputSchema": { "type": "object", "additionalProperties": true },
+                    "extensions": { "type": "object", "additionalProperties": true },
+                    "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
                   }
                 }
               }
@@ -2022,39 +1362,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -2067,19 +1387,12 @@
       "get": {
         "operationId": "listSellerResources",
         "summary": "List resources owned by a seller.",
-        "tags": [
-          "resources"
-        ],
+        "tags": ["resources"],
         "responses": {
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -2088,39 +1401,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -2133,19 +1426,12 @@
       "get": {
         "operationId": "browseDiscoveryResources",
         "summary": "Browse discoverable paid resources.",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "responses": {
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -2154,39 +1440,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -2199,19 +1465,12 @@
       "get": {
         "operationId": "searchDiscoveryResources",
         "summary": "Search paid resources by query and filters.",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "responses": {
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -2220,39 +1479,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -2265,30 +1504,18 @@
       "post": {
         "operationId": "validateDiscoveryMetadata",
         "summary": "Validate Bazaar discovery metadata without cataloging it.",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            }
+            "application/json": { "schema": { "type": "object", "additionalProperties": true } }
           }
         },
         "responses": {
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -2297,39 +1524,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -2342,30 +1549,18 @@
       "post": {
         "operationId": "catalogDiscoveryMetadata",
         "summary": "Catalog valid Bazaar discovery metadata.",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            }
+            "application/json": { "schema": { "type": "object", "additionalProperties": true } }
           }
         },
         "responses": {
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
             }
           },
           "default": {
@@ -2374,39 +1569,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -2419,9 +1594,7 @@
       "post": {
         "operationId": "createConformanceRun",
         "summary": "Run backend x402 conformance checks and persist the result.",
-        "tags": [
-          "conformance"
-        ],
+        "tags": ["conformance"],
         "requestBody": {
           "required": true,
           "content": {
@@ -2429,17 +1602,8 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "network": {
-                    "type": "string",
-                    "enum": [
-                      "stellar:testnet",
-                      "stellar:pubnet"
-                    ]
-                  },
-                  "includeReserved": {
-                    "type": "boolean",
-                    "default": true
-                  }
+                  "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                  "includeReserved": { "type": "boolean", "default": true }
                 }
               }
             }
@@ -2462,41 +1626,14 @@
                     "completedAt"
                   ],
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "network": {
-                      "type": "string",
-                      "enum": [
-                        "stellar:testnet",
-                        "stellar:pubnet"
-                      ]
-                    },
-                    "suite": {
-                      "type": "string",
-                      "enum": [
-                        "stellar-x402"
-                      ]
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "passed",
-                        "failed"
-                      ]
-                    },
-                    "passedCount": {
-                      "type": "integer"
-                    },
-                    "failedCount": {
-                      "type": "integer"
-                    },
-                    "reservedCount": {
-                      "type": "integer"
-                    },
-                    "exactResults": {
-                      "type": "integer"
-                    },
+                    "id": { "type": "string" },
+                    "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                    "suite": { "type": "string", "enum": ["stellar-x402"] },
+                    "status": { "type": "string", "enum": ["passed", "failed"] },
+                    "passedCount": { "type": "integer" },
+                    "failedCount": { "type": "integer" },
+                    "reservedCount": { "type": "integer" },
+                    "exactResults": { "type": "integer" },
                     "results": {
                       "type": "array",
                       "items": {
@@ -2511,65 +1648,22 @@
                           "passed"
                         ],
                         "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "scheme": {
-                            "type": "string",
-                            "enum": [
-                              "exact",
-                              "upto"
-                            ]
-                          },
-                          "endpoint": {
-                            "type": "string"
-                          },
-                          "method": {
-                            "type": "string",
-                            "enum": [
-                              "GET",
-                              "POST"
-                            ]
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "passed",
-                              "failed",
-                              "reserved"
-                            ]
-                          },
-                          "passed": {
-                            "type": "boolean"
-                          },
-                          "durationMs": {
-                            "type": "integer"
-                          },
-                          "details": {
-                            "type": "object",
-                            "additionalProperties": true
-                          },
-                          "error": {
-                            "type": "string"
-                          }
+                          "id": { "type": "string" },
+                          "name": { "type": "string" },
+                          "scheme": { "type": "string", "enum": ["exact", "upto"] },
+                          "endpoint": { "type": "string" },
+                          "method": { "type": "string", "enum": ["GET", "POST"] },
+                          "status": { "type": "string", "enum": ["passed", "failed", "reserved"] },
+                          "passed": { "type": "boolean" },
+                          "durationMs": { "type": "integer" },
+                          "details": { "type": "object", "additionalProperties": true },
+                          "error": { "type": "string" }
                         }
                       }
                     },
-                    "startedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "completedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
+                    "startedAt": { "type": "string", "format": "date-time" },
+                    "completedAt": { "type": "string", "format": "date-time" },
+                    "createdAt": { "type": "string", "format": "date-time" }
                   }
                 }
               }
@@ -2581,39 +1675,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -2624,9 +1698,7 @@
       "get": {
         "operationId": "listConformanceRuns",
         "summary": "List persisted conformance runs.",
-        "tags": [
-          "conformance"
-        ],
+        "tags": ["conformance"],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -2646,41 +1718,17 @@
                       "completedAt"
                     ],
                     "properties": {
-                      "id": {
-                        "type": "string"
-                      },
+                      "id": { "type": "string" },
                       "network": {
                         "type": "string",
-                        "enum": [
-                          "stellar:testnet",
-                          "stellar:pubnet"
-                        ]
+                        "enum": ["stellar:testnet", "stellar:pubnet"]
                       },
-                      "suite": {
-                        "type": "string",
-                        "enum": [
-                          "stellar-x402"
-                        ]
-                      },
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "passed",
-                          "failed"
-                        ]
-                      },
-                      "passedCount": {
-                        "type": "integer"
-                      },
-                      "failedCount": {
-                        "type": "integer"
-                      },
-                      "reservedCount": {
-                        "type": "integer"
-                      },
-                      "exactResults": {
-                        "type": "integer"
-                      },
+                      "suite": { "type": "string", "enum": ["stellar-x402"] },
+                      "status": { "type": "string", "enum": ["passed", "failed"] },
+                      "passedCount": { "type": "integer" },
+                      "failedCount": { "type": "integer" },
+                      "reservedCount": { "type": "integer" },
+                      "exactResults": { "type": "integer" },
                       "results": {
                         "type": "array",
                         "items": {
@@ -2695,65 +1743,25 @@
                             "passed"
                           ],
                           "properties": {
-                            "id": {
-                              "type": "string"
-                            },
-                            "name": {
-                              "type": "string"
-                            },
-                            "scheme": {
-                              "type": "string",
-                              "enum": [
-                                "exact",
-                                "upto"
-                              ]
-                            },
-                            "endpoint": {
-                              "type": "string"
-                            },
-                            "method": {
-                              "type": "string",
-                              "enum": [
-                                "GET",
-                                "POST"
-                              ]
-                            },
+                            "id": { "type": "string" },
+                            "name": { "type": "string" },
+                            "scheme": { "type": "string", "enum": ["exact", "upto"] },
+                            "endpoint": { "type": "string" },
+                            "method": { "type": "string", "enum": ["GET", "POST"] },
                             "status": {
                               "type": "string",
-                              "enum": [
-                                "passed",
-                                "failed",
-                                "reserved"
-                              ]
+                              "enum": ["passed", "failed", "reserved"]
                             },
-                            "passed": {
-                              "type": "boolean"
-                            },
-                            "durationMs": {
-                              "type": "integer"
-                            },
-                            "details": {
-                              "type": "object",
-                              "additionalProperties": true
-                            },
-                            "error": {
-                              "type": "string"
-                            }
+                            "passed": { "type": "boolean" },
+                            "durationMs": { "type": "integer" },
+                            "details": { "type": "object", "additionalProperties": true },
+                            "error": { "type": "string" }
                           }
                         }
                       },
-                      "startedAt": {
-                        "type": "string",
-                        "format": "date-time"
-                      },
-                      "completedAt": {
-                        "type": "string",
-                        "format": "date-time"
-                      },
-                      "createdAt": {
-                        "type": "string",
-                        "format": "date-time"
-                      }
+                      "startedAt": { "type": "string", "format": "date-time" },
+                      "completedAt": { "type": "string", "format": "date-time" },
+                      "createdAt": { "type": "string", "format": "date-time" }
                     }
                   }
                 }
@@ -2766,39 +1774,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -2811,9 +1799,7 @@
       "get": {
         "operationId": "getConformanceRun",
         "summary": "Fetch a persisted conformance run.",
-        "tags": [
-          "conformance"
-        ],
+        "tags": ["conformance"],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -2831,41 +1817,14 @@
                     "completedAt"
                   ],
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "network": {
-                      "type": "string",
-                      "enum": [
-                        "stellar:testnet",
-                        "stellar:pubnet"
-                      ]
-                    },
-                    "suite": {
-                      "type": "string",
-                      "enum": [
-                        "stellar-x402"
-                      ]
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "passed",
-                        "failed"
-                      ]
-                    },
-                    "passedCount": {
-                      "type": "integer"
-                    },
-                    "failedCount": {
-                      "type": "integer"
-                    },
-                    "reservedCount": {
-                      "type": "integer"
-                    },
-                    "exactResults": {
-                      "type": "integer"
-                    },
+                    "id": { "type": "string" },
+                    "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                    "suite": { "type": "string", "enum": ["stellar-x402"] },
+                    "status": { "type": "string", "enum": ["passed", "failed"] },
+                    "passedCount": { "type": "integer" },
+                    "failedCount": { "type": "integer" },
+                    "reservedCount": { "type": "integer" },
+                    "exactResults": { "type": "integer" },
                     "results": {
                       "type": "array",
                       "items": {
@@ -2880,65 +1839,22 @@
                           "passed"
                         ],
                         "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "scheme": {
-                            "type": "string",
-                            "enum": [
-                              "exact",
-                              "upto"
-                            ]
-                          },
-                          "endpoint": {
-                            "type": "string"
-                          },
-                          "method": {
-                            "type": "string",
-                            "enum": [
-                              "GET",
-                              "POST"
-                            ]
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "passed",
-                              "failed",
-                              "reserved"
-                            ]
-                          },
-                          "passed": {
-                            "type": "boolean"
-                          },
-                          "durationMs": {
-                            "type": "integer"
-                          },
-                          "details": {
-                            "type": "object",
-                            "additionalProperties": true
-                          },
-                          "error": {
-                            "type": "string"
-                          }
+                          "id": { "type": "string" },
+                          "name": { "type": "string" },
+                          "scheme": { "type": "string", "enum": ["exact", "upto"] },
+                          "endpoint": { "type": "string" },
+                          "method": { "type": "string", "enum": ["GET", "POST"] },
+                          "status": { "type": "string", "enum": ["passed", "failed", "reserved"] },
+                          "passed": { "type": "boolean" },
+                          "durationMs": { "type": "integer" },
+                          "details": { "type": "object", "additionalProperties": true },
+                          "error": { "type": "string" }
                         }
                       }
                     },
-                    "startedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "completedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
+                    "startedAt": { "type": "string", "format": "date-time" },
+                    "completedAt": { "type": "string", "format": "date-time" },
+                    "createdAt": { "type": "string", "format": "date-time" }
                   }
                 }
               }
@@ -2950,39 +1866,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "ok",
-                    "error"
-                  ],
+                  "required": ["ok", "error"],
                   "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
-                    },
+                    "ok": { "type": "boolean", "enum": [false] },
                     "error": {
                       "type": "object",
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "object",
-                          "additionalProperties": true
-                        }
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
                       }
                     },
-                    "requestId": {
-                      "type": "string"
-                    }
+                    "requestId": { "type": "string" }
                   }
                 }
               }

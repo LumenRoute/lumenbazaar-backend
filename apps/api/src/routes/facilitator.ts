@@ -29,8 +29,19 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
     });
   const receiptService = options.receiptService ?? settlementService.getReceiptService();
 
-  app.get("/v1/supported", async () => ({
-    schemes: listConfiguredNetworks(options.config).map((network) => ({
+  app.get("/v1/supported", async () => {
+    const networks = listConfiguredNetworks(options.config);
+    const uptoContracts = networks.flatMap((network) =>
+      options.config.features.uptoScheme && network.uptoSessionContractId !== undefined
+        ? [
+            {
+              network: network.id,
+              contractId: network.uptoSessionContractId
+            }
+          ]
+        : []
+    );
+    const exactSchemes = networks.map((network) => ({
       name: "exact",
       network: network.id,
       assets: network.assets.map((asset) => ({
@@ -42,13 +53,40 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
         x402Version: "1",
         upto: false
       }
-    })),
-    extensions: {
-      bazaar: true,
-      upto: options.config.features.uptoScheme,
-      uptoContracts: []
-    }
-  }));
+    }));
+    const uptoSchemes = networks.flatMap((network) =>
+      options.config.features.uptoScheme && network.uptoSessionContractId !== undefined
+        ? [
+            {
+              name: "upto",
+              network: network.id,
+              assets: network.assets
+                .filter((asset) => asset.contractId !== undefined)
+                .map((asset) => ({
+                  code: asset.code,
+                  issuer: asset.issuer,
+                  contractId: asset.contractId,
+                  decimals: asset.decimals
+                })),
+              extensions: {
+                contractId: network.uptoSessionContractId,
+                x402Version: "1",
+                sessionEndpoint: "/v1/payment-sessions"
+              }
+            }
+          ]
+        : []
+    );
+
+    return {
+      schemes: [...exactSchemes, ...uptoSchemes],
+      extensions: {
+        bazaar: true,
+        upto: options.config.features.uptoScheme,
+        uptoContracts
+      }
+    };
+  });
 
   app.post("/v1/verify", async (request) => {
     const startedAt = Date.now();

@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import Fastify from "fastify";
 
-import { loadConfig } from "@lumenbazaar/shared";
+import { type AppConfig, loadConfig } from "@lumenbazaar/shared";
 import {
+  PaymentSessionService,
   PaymentVerificationService,
   SettlementService,
   type ReceiptService
@@ -15,6 +16,7 @@ import { registerConformanceRoutes } from "./routes/conformance.js";
 import { registerDiscoveryRoutes } from "./routes/discovery.js";
 import { registerFacilitatorRoutes } from "./routes/facilitator.js";
 import { registerMetadataRoutes } from "./routes/metadata.js";
+import { registerPaymentSessionRoutes } from "./routes/paymentSessions.js";
 import { registerResourceRoutes } from "./routes/resources.js";
 import { registerSellerRoutes } from "./routes/sellers.js";
 import { AuditLogService } from "./services/audit.js";
@@ -29,7 +31,9 @@ import { SearchService } from "./services/search.js";
 import { SellerService } from "./services/sellers.js";
 
 export type BuildApiAppOptions = {
+  config?: AppConfig;
   logger?: boolean;
+  paymentSessionService?: PaymentSessionService;
   verificationService?: PaymentVerificationService;
   settlementService?: SettlementService;
   receiptService?: ReceiptService;
@@ -46,7 +50,7 @@ export type BuildApiAppOptions = {
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
-  const config = loadConfig();
+  const config = options.config ?? loadConfig();
   const app = Fastify({
     genReqId: () => randomUUID(),
     logger: options.logger ?? config.nodeEnv !== "test"
@@ -76,6 +80,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
       attemptStore: verificationService.getAttemptStore()
     });
   const receiptService = options.receiptService ?? settlementService.getReceiptService();
+  const paymentSessionService =
+    options.paymentSessionService ?? new PaymentSessionService(config, { auditLogService });
   const sellerService = options.sellerService ?? new SellerService(undefined, auditLogService);
   const resourceService = options.resourceService ?? new ResourceService(config, sellerService);
   const catalogValidationService =
@@ -88,7 +94,16 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   const conformanceService =
     options.conformanceService ??
     new ConformanceRunService(
-      createServiceConformanceRunner(config, verificationService, settlementService)
+      createServiceConformanceRunner(
+        config,
+        verificationService,
+        settlementService,
+        paymentSessionService
+      ),
+      undefined,
+      {
+        uptoEnabled: config.features.uptoScheme
+      }
     );
 
   registerFacilitatorRoutes(app, {
@@ -98,6 +113,7 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     receiptService,
     metrics: metricsService
   });
+  registerPaymentSessionRoutes(app, { paymentSessionService });
   registerSellerRoutes(app, { sellerService });
   registerResourceRoutes(app, { resourceService });
   registerDiscoveryRoutes(app, {

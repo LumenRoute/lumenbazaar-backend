@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { z } from "zod";
 
@@ -11,13 +11,19 @@ import {
   type NetworkId
 } from "@lumenbazaar/shared";
 import {
+  type PaymentSessionService,
   type PaymentVerificationService,
   type SettlementService
 } from "@lumenbazaar/stellar-payments";
 
 export type ConformanceCaseDefinition = {
   description: string;
-  endpoint: "/v1/supported" | "/v1/verify" | "/v1/settle" | "/v1/payment-sessions";
+  endpoint:
+    | "/v1/supported"
+    | "/v1/verify"
+    | "/v1/settle"
+    | "/v1/payment-sessions"
+    | "/v1/payment-sessions/{sessionId}/settle";
   id: string;
   method: "GET" | "POST";
   name: string;
@@ -59,6 +65,10 @@ export type ConformanceRunStore = {
   ) => Promise<ConformanceRunRecord>;
   getRun: (runId: string) => Promise<ConformanceRunRecord | undefined>;
   listRuns: (filters: ListConformanceRunsInput) => Promise<ConformanceRunRecord[]>;
+};
+
+export type ConformanceRunServiceOptions = {
+  uptoEnabled?: boolean;
 };
 
 export const runConformanceSchema = z.object({
@@ -105,13 +115,18 @@ export class InMemoryConformanceRunStore implements ConformanceRunStore {
 export class ConformanceRunService {
   constructor(
     private readonly runner: ConformanceCaseRunner,
-    private readonly store: ConformanceRunStore = new InMemoryConformanceRunStore()
+    private readonly store: ConformanceRunStore = new InMemoryConformanceRunStore(),
+    private readonly options: ConformanceRunServiceOptions = {}
   ) {}
 
   async run(input: unknown) {
     const request = runConformanceSchema.parse(input ?? {});
     const startedAt = new Date().toISOString();
-    const definitions = conformanceDefinitions(request.network, request.includeReserved);
+    const definitions = conformanceDefinitions(
+      request.network,
+      request.includeReserved,
+      this.options.uptoEnabled === true
+    );
     const results: ConformanceCaseResult[] = [];
 
     for (const definition of definitions) {
@@ -152,7 +167,7 @@ export class ConformanceRunService {
   }
 
   getDefinitions(network: NetworkId = "stellar:testnet") {
-    return conformanceDefinitions(network, true);
+    return conformanceDefinitions(network, true, this.options.uptoEnabled === true);
   }
 
   private async runCase(definition: ConformanceCaseDefinition): Promise<ConformanceCaseResult> {
@@ -190,7 +205,8 @@ export class ConformanceRunService {
 
 export function conformanceDefinitions(
   network: NetworkId,
-  includeReserved: boolean
+  includeReserved: boolean,
+  uptoEnabled = false
 ): ConformanceCaseDefinition[] {
   const exact: ConformanceCaseDefinition[] = [
     {
@@ -225,34 +241,44 @@ export function conformanceDefinitions(
     {
       id: "upto-supported",
       name: "GET /v1/supported advertises upto readiness",
-      description: "Reserved until capped session contracts are deployed.",
+      description: uptoEnabled
+        ? "Checks that the facilitator advertises deployed capped session support."
+        : "Reserved until capped session contracts are deployed.",
       endpoint: "/v1/supported",
       method: "GET",
       network,
-      reserved: true,
+      ...(uptoEnabled ? {} : { reserved: true }),
       scheme: "upto"
     },
     {
       id: "upto-session-create",
       name: "POST /v1/payment-sessions creates upto session",
-      description: "Reserved until backend session APIs are enabled.",
+      description: uptoEnabled
+        ? "Checks that capped session creation returns a contract-backed session."
+        : "Reserved until backend session APIs are enabled.",
       endpoint: "/v1/payment-sessions",
       method: "POST",
       network,
-      reserved: true,
+      ...(uptoEnabled ? {} : { reserved: true }),
       scheme: "upto"
     },
     {
       id: "upto-settle",
-      name: "POST /v1/settle processes upto session draw",
-      description: "Reserved until capped settlement validation is enabled.",
-      endpoint: "/v1/settle",
+      name: "POST /v1/payment-sessions/{sessionId}/settle processes upto draw",
+      description: uptoEnabled
+        ? "Checks that capped session settlement succeeds without the exact route."
+        : "Reserved until capped settlement validation is enabled.",
+      endpoint: "/v1/payment-sessions/{sessionId}/settle",
       method: "POST",
       network,
-      reserved: true,
+      ...(uptoEnabled ? {} : { reserved: true }),
       scheme: "upto"
     }
   ];
+
+  if (uptoEnabled) {
+    return [...exact, ...upto];
+  }
 
   return includeReserved ? [...exact, ...upto] : exact;
 }
@@ -260,7 +286,8 @@ export function conformanceDefinitions(
 export function createServiceConformanceRunner(
   config: AppConfig,
   verificationService: PaymentVerificationService,
-  settlementService: SettlementService
+  settlementService: SettlementService,
+  paymentSessionService?: PaymentSessionService
 ): ConformanceCaseRunner {
   return async (definition) => {
     switch (definition.id) {
@@ -270,6 +297,20 @@ export function createServiceConformanceRunner(
         return assertVerify(config, verificationService, definition);
       case "exact-settle":
         return assertSettle(config, verificationService, settlementService, definition);
+      case "upto-supported":
+        return assertUptoSupported(config, definition.network);
+      case "upto-session-create":
+        return assertUptoSessionCreate(
+          config,
+          requirePaymentSessionService(paymentSessionService),
+          definition
+        );
+      case "upto-settle":
+        return assertUptoSettle(
+          config,
+          requirePaymentSessionService(paymentSessionService),
+          definition
+        );
       default:
         throw new Error(`No runner registered for ${definition.id}`);
     }
@@ -333,6 +374,83 @@ async function assertSettle(
   };
 }
 
+async function assertUptoSupported(config: AppConfig, network: NetworkId): Promise<JsonObject> {
+  const networkConfig = config.networks[network];
+  const asset = networkConfig.assets.find((candidate) => candidate.contractId !== undefined);
+
+  if (!config.features.uptoScheme || networkConfig.uptoSessionContractId === undefined) {
+    throw new Error(`Upto scheme was not advertised for ${network}`);
+  }
+
+  if (asset?.contractId === undefined) {
+    throw new Error(`No capped-session asset contract was configured for ${network}`);
+  }
+
+  return {
+    advertised: true,
+    network,
+    assetContractId: asset.contractId,
+    contractId: networkConfig.uptoSessionContractId
+  };
+}
+
+async function assertUptoSessionCreate(
+  config: AppConfig,
+  paymentSessionService: PaymentSessionService,
+  definition: ConformanceCaseDefinition
+): Promise<JsonObject> {
+  const session = await paymentSessionService.createSession(
+    uptoPaymentSessionRequest(config, definition.network, definition.id)
+  );
+
+  if (session.status !== "open") {
+    throw new Error("/v1/payment-sessions did not return an open capped session");
+  }
+
+  return {
+    contractSessionId: session.contractSessionId,
+    sessionId: session.id,
+    status: session.status
+  };
+}
+
+async function assertUptoSettle(
+  config: AppConfig,
+  paymentSessionService: PaymentSessionService,
+  definition: ConformanceCaseDefinition
+): Promise<JsonObject> {
+  const session = await paymentSessionService.createSession(
+    uptoPaymentSessionRequest(config, definition.network, definition.id)
+  );
+  const settled = await paymentSessionService.settleSession({
+    sessionId: session.id,
+    amount: "0.005",
+    usageHash: digest(`upto-settle:${session.id}`),
+    currentLedger: 10
+  });
+
+  if (settled.status !== "settled") {
+    throw new Error("/v1/payment-sessions/{sessionId}/settle did not settle the session");
+  }
+
+  return {
+    remainingAmount: settled.remainingAmount,
+    sessionId: settled.id,
+    settlementId: settled.settlementId,
+    status: settled.status
+  };
+}
+
+function requirePaymentSessionService(
+  paymentSessionService: PaymentSessionService | undefined
+): PaymentSessionService {
+  if (paymentSessionService === undefined) {
+    throw new Error("Payment session service is not configured");
+  }
+
+  return paymentSessionService;
+}
+
 function exactPaymentRequest(config: AppConfig, network: NetworkId, seed: string) {
   const asset = config.networks[network].assets[0];
 
@@ -369,4 +487,31 @@ function exactPaymentRequest(config: AppConfig, network: NetworkId, seed: string
     currentLedger: 10,
     resourceId: `conformance_${seed}`
   };
+}
+
+function uptoPaymentSessionRequest(config: AppConfig, network: NetworkId, seed: string) {
+  const asset = config.networks[network].assets[0];
+
+  if (asset === undefined) {
+    throw new Error(`No configured asset for ${network}`);
+  }
+
+  return {
+    scheme: "upto" as const,
+    network,
+    buyer: localIssuerPublicKey,
+    asset: {
+      code: asset.code,
+      issuer: asset.issuer
+    },
+    capAmount: "0.01",
+    payTo: config.facilitatorAccount || localIssuerPublicKey,
+    expiresAtLedger: 20,
+    currentLedger: 10,
+    resourceId: `conformance_${seed}_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  };
+}
+
+function digest(value: string) {
+  return createHash("sha256").update(value).digest("hex");
 }
