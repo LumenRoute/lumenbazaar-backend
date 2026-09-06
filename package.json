@@ -9,7 +9,7 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json --noEmit",
+    "build": "pnpm prisma:generate && pnpm typecheck",
     "check": "pnpm prisma:generate && pnpm openapi:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm prisma:validate",
     "dev:api": "tsx apps/api/src/main.ts",
     "dev:mcp": "tsx apps/mcp-server/src/main.ts",
