@@ -725,18 +725,18 @@ Completion check:
 
 - Backend supports exact payments and capped `upto` sessions without mixing their validation paths.
 
-## Phase 51: Load Tests
+## Phase 51: Load Tests ✓
 
 Parts:
 
-- Add verify endpoint load tests.
-- Add settle endpoint load tests.
-- Add search endpoint load tests.
-- Add worker throughput tests.
+- Add verify endpoint load tests. ✓
+- Add settle endpoint load tests. ✓
+- Add search endpoint load tests. ✓
+- Add worker throughput tests. ✓
 
 Completion check:
 
-- Performance baselines are recorded for testnet and staging.
+- Performance baselines are recorded for testnet and staging. ✓
 
 ## Phase 52: Testnet Deployment
 

@@ -1,0 +1,30 @@
+{
+  "paymentPayload": {
+    "scheme": "exact",
+    "network": "stellar:testnet",
+    "asset": {
+      "code": "USDC",
+      "issuer": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+    },
+    "amount": "0.05",
+    "payTo": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    "expiresAtLedger": 1000000000,
+    "authorization": {
+      "loadTest": true,
+      "runId": "{runId}",
+      "requestIndex": "{index}"
+    },
+    "paymentHash": "{paymentHash}"
+  },
+  "paymentRequirements": {
+    "scheme": "exact",
+    "network": "stellar:testnet",
+    "asset": {
+      "code": "USDC",
+      "issuer": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+    },
+    "amount": "0.05",
+    "payTo": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+  },
+  "currentLedger": 1
+}

@@ -17,6 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "load:test": "tsx scripts/loadtest.ts",
     "openapi:check": "tsx scripts/openapi.ts --check",
     "openapi:generate": "tsx scripts/openapi.ts",
     "prisma:generate": "node scripts/prisma.mjs generate",
