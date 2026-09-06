@@ -1,4 +1,6 @@
 export { BackendClient, createBackendClient } from "./client.js";
+export { handleMcpHttpRequest, startMcpHttpServer } from "./http.js";
+export type { McpHttpServerHandle, McpHttpServerOptions } from "./http.js";
 export {
   McpError,
   ValidationError,
@@ -14,4 +16,6 @@ export type {
   McpPaymentToolServiceOptions,
   PreparePaymentInput
 } from "./paymentTools.js";
+export { createMcpServer } from "./server.js";
+export type { CreateMcpServerOptions } from "./server.js";
 export { toolDefinitions, getToolDefinition, listToolDefinitions, type ToolName } from "./tools.js";

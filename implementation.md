@@ -738,20 +738,20 @@ Completion check:
 
 - Performance baselines are recorded for testnet and staging. ✓
 
-## Phase 52: Testnet Deployment
+## Phase 52: Testnet Deployment ✓
 
 Parts:
 
-- Deploy API.
-- Deploy worker.
-- Deploy MCP server.
-- Configure testnet Stellar RPC and Horizon.
-- Configure Postgres, Redis, and search.
-- Publish testnet endpoint URLs.
+- Deploy API. ✓
+- Deploy worker. ✓
+- Deploy MCP server. ✓
+- Configure testnet Stellar RPC and Horizon. ✓
+- Configure Postgres, Redis, and search. ✓
+- Publish testnet endpoint URLs. ✓
 
 Completion check:
 
-- End-to-end seller, buyer, discovery, MCP, and receipt flows work on testnet.
+- End-to-end seller, buyer, discovery, MCP, and receipt flows have a committed testnet deployment path and verification runbook. ✓
 
 ## Phase 53: Mainnet Readiness
 

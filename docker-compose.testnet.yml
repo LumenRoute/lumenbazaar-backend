@@ -1,0 +1,115 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: lumenbazaar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lumenbazaar"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    volumes:
+      - testnet-postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    volumes:
+      - testnet-redis-data:/data
+
+  api:
+    build:
+      context: .
+    command: ["pnpm", "start:api"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ${LUMEN_ENV_FILE:-.env.testnet}
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/lumenbazaar
+      LUMEN_ENV: testnet
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      STELLAR_TESTNET_HORIZON_URL: https://horizon-testnet.stellar.org
+      STELLAR_TESTNET_RPC_URL: https://soroban-testnet.stellar.org
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://localhost:3000/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"'
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+    command: ["pnpm", "start:worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ${LUMEN_ENV_FILE:-.env.testnet}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/lumenbazaar
+      LUMEN_ENV: testnet
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      STELLAR_TESTNET_HORIZON_URL: https://horizon-testnet.stellar.org
+      STELLAR_TESTNET_RPC_URL: https://soroban-testnet.stellar.org
+    restart: unless-stopped
+
+  mcp-server:
+    build:
+      context: .
+    command: ["pnpm", "start:mcp:http"]
+    depends_on:
+      api:
+        condition: service_healthy
+    env_file:
+      - ${LUMEN_ENV_FILE:-.env.testnet}
+    environment:
+      API_BASE_URL: http://api:3000
+      LUMEN_ENV: testnet
+      MCP_HOST: 0.0.0.0
+      MCP_PATH: /mcp
+      MCP_PORT: 3001
+      NODE_ENV: production
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://localhost:3001/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"'
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
+volumes:
+  testnet-postgres-data:
+  testnet-redis-data:

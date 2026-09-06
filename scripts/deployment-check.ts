@@ -1,0 +1,271 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
+import { loadConfig, localIssuerPublicKey } from "../packages/shared/src/index.js";
+
+export type DeploymentCheckOptions = {
+  allowPlaceholders: boolean;
+  envFile?: string;
+};
+
+export type DeploymentCheckResult = {
+  endpoints: {
+    api: {
+      health: string;
+      metrics: string;
+      openapi: string;
+      supported: string;
+    };
+    mcp: {
+      health: string;
+      streamableHttp: string;
+    };
+  };
+  errors: string[];
+  ok: boolean;
+  warnings: string[];
+};
+
+type EnvMap = Record<string, string | undefined>;
+
+const requiredKeys = [
+  "NODE_ENV",
+  "LUMEN_ENV",
+  "API_PUBLIC_URL",
+  "MCP_PUBLIC_URL",
+  "DATABASE_URL",
+  "REDIS_URL",
+  "STELLAR_TESTNET_RPC_URL",
+  "STELLAR_TESTNET_HORIZON_URL",
+  "STELLAR_TESTNET_USDC_ISSUER",
+  "FACILITATOR_ACCOUNT"
+];
+
+export async function runDeploymentCheck(
+  options: DeploymentCheckOptions
+): Promise<DeploymentCheckResult> {
+  const env = await loadDeploymentEnv(options.envFile);
+  return validateTestnetDeploymentEnv(env, options);
+}
+
+export function validateTestnetDeploymentEnv(
+  env: EnvMap,
+  options: DeploymentCheckOptions
+): DeploymentCheckResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  for (const key of requiredKeys) {
+    if (env[key] === undefined || env[key] === "") {
+      errors.push(`${key} is required for testnet deployment.`);
+    }
+  }
+
+  if (env.NODE_ENV !== "production") {
+    errors.push("NODE_ENV must be production for testnet deployment.");
+  }
+
+  if (env.LUMEN_ENV !== "testnet") {
+    errors.push("LUMEN_ENV must be testnet for testnet deployment.");
+  }
+
+  collectUrlError(env.API_PUBLIC_URL, "API_PUBLIC_URL", errors);
+  collectUrlError(env.MCP_PUBLIC_URL, "MCP_PUBLIC_URL", errors);
+  collectUrlError(env.DATABASE_URL, "DATABASE_URL", errors);
+  collectUrlError(env.REDIS_URL, "REDIS_URL", errors);
+  collectUrlError(env.STELLAR_TESTNET_RPC_URL, "STELLAR_TESTNET_RPC_URL", errors);
+  collectUrlError(env.STELLAR_TESTNET_HORIZON_URL, "STELLAR_TESTNET_HORIZON_URL", errors);
+
+  if (!options.allowPlaceholders) {
+    collectPlaceholderError(env.API_PUBLIC_URL, "API_PUBLIC_URL", errors);
+    collectPlaceholderError(env.MCP_PUBLIC_URL, "MCP_PUBLIC_URL", errors);
+    collectPlaceholderError(env.STELLAR_TESTNET_USDC_ISSUER, "STELLAR_TESTNET_USDC_ISSUER", errors);
+    collectPlaceholderError(env.FACILITATOR_ACCOUNT, "FACILITATOR_ACCOUNT", errors);
+  } else {
+    collectPlaceholderWarning(env.API_PUBLIC_URL, "API_PUBLIC_URL", warnings);
+    collectPlaceholderWarning(env.MCP_PUBLIC_URL, "MCP_PUBLIC_URL", warnings);
+    collectPlaceholderWarning(
+      env.STELLAR_TESTNET_USDC_ISSUER,
+      "STELLAR_TESTNET_USDC_ISSUER",
+      warnings
+    );
+    collectPlaceholderWarning(env.FACILITATOR_ACCOUNT, "FACILITATOR_ACCOUNT", warnings);
+  }
+
+  try {
+    loadConfig(env);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  const apiBaseUrl = stripTrailingSlash(
+    env.API_PUBLIC_URL ?? "https://api.testnet.lumenbazaar.example"
+  );
+  const mcpUrl = env.MCP_PUBLIC_URL ?? "https://mcp.testnet.lumenbazaar.example/mcp";
+  const mcpHealthUrl = new URL(mcpUrl);
+  mcpHealthUrl.pathname = "/health";
+
+  return {
+    endpoints: {
+      api: {
+        health: `${apiBaseUrl}/health`,
+        metrics: `${apiBaseUrl}/metrics`,
+        openapi: `${apiBaseUrl}/openapi.json`,
+        supported: `${apiBaseUrl}/v1/supported`
+      },
+      mcp: {
+        health: mcpHealthUrl.toString(),
+        streamableHttp: mcpUrl
+      }
+    },
+    errors,
+    ok: errors.length === 0,
+    warnings
+  };
+}
+
+export function parseEnvFile(content: string): EnvMap {
+  const env: EnvMap = {};
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+
+    if (line.length === 0 || line.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf("=");
+
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim();
+    const value = line.slice(separatorIndex + 1).trim();
+    env[key] = stripQuotes(value);
+  }
+
+  return env;
+}
+
+export function parseDeploymentCheckArgs(argv: string[]): DeploymentCheckOptions {
+  const options: DeploymentCheckOptions = {
+    allowPlaceholders: false
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+
+    if (arg === undefined) {
+      continue;
+    }
+
+    if (arg === "--allow-placeholders") {
+      options.allowPlaceholders = true;
+      continue;
+    }
+
+    if (arg === "--env-file") {
+      const value = argv[index + 1];
+
+      if (value === undefined) {
+        throw new Error("--env-file requires a value.");
+      }
+
+      options.envFile = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--help" || arg === "-h") {
+      printUsage();
+      process.exit(0);
+    }
+
+    throw new Error(`Unknown deployment check option: ${arg}`);
+  }
+
+  return options;
+}
+
+async function loadDeploymentEnv(envFile: string | undefined): Promise<EnvMap> {
+  if (envFile === undefined) {
+    return process.env;
+  }
+
+  return {
+    ...process.env,
+    ...parseEnvFile(await readFile(resolve(envFile), "utf8"))
+  };
+}
+
+function collectUrlError(value: string | undefined, key: string, errors: string[]) {
+  if (value === undefined || value === "") {
+    return;
+  }
+
+  try {
+    new URL(value);
+  } catch {
+    errors.push(`${key} must be a valid URL.`);
+  }
+}
+
+function collectPlaceholderError(value: string | undefined, key: string, errors: string[]) {
+  if (isPlaceholder(value)) {
+    errors.push(`${key} still contains a placeholder value.`);
+  }
+}
+
+function collectPlaceholderWarning(value: string | undefined, key: string, warnings: string[]) {
+  if (isPlaceholder(value)) {
+    warnings.push(`${key} uses a placeholder value.`);
+  }
+}
+
+function isPlaceholder(value: string | undefined) {
+  return (
+    value !== undefined &&
+    (value.includes(".example") || value.includes("example.com") || value === localIssuerPublicKey)
+  );
+}
+
+function stripQuotes(value: string) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+
+  return value;
+}
+
+function stripTrailingSlash(value: string) {
+  return value.replace(/\/$/, "");
+}
+
+function printUsage() {
+  console.log(`Usage: pnpm deploy:testnet:check [options]
+
+Options:
+  --env-file <path>       Load environment variables from a file before checking.
+  --allow-placeholders    Allow placeholder URLs and accounts in example files.
+`);
+}
+
+async function main() {
+  const result = await runDeploymentCheck(parseDeploymentCheckArgs(process.argv.slice(2)));
+  console.log(JSON.stringify(result, null, 2));
+
+  if (!result.ok) {
+    process.exitCode = 1;
+  }
+}
+
+const entrypoint = process.argv[1] === undefined ? undefined : pathToFileURL(process.argv[1]).href;
+
+if (entrypoint === import.meta.url) {
+  await main();
+}

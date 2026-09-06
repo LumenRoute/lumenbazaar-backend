@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 import { InMemoryWorkerBackend, createWorkerApp } from "../apps/worker/src/worker.js";
 import { queueNames } from "../apps/worker/src/queues.js";

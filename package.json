@@ -22,7 +22,13 @@
     "openapi:generate": "tsx scripts/openapi.ts",
     "prisma:generate": "node scripts/prisma.mjs generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:validate": "node scripts/prisma.mjs validate",
+    "deploy:testnet:check": "tsx scripts/deployment-check.ts --env-file .env.testnet.example --allow-placeholders",
+    "start:api": "tsx apps/api/src/main.ts",
+    "start:mcp": "tsx apps/mcp-server/src/main.ts",
+    "start:mcp:http": "tsx apps/mcp-server/src/http.ts",
+    "start:worker": "tsx apps/worker/src/main.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+generated
+load-results
+.env
+.env.*
+!.env.example
+!.env.testnet.example
+*.log
+.git
+.gitignore

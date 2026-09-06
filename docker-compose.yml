@@ -64,6 +64,25 @@ services:
     volumes:
       - .:/app
 
+  mcp-server:
+    image: node:24-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm start:mcp:http"
+    depends_on:
+      api:
+        condition: service_started
+    env_file:
+      - .env.example
+    environment:
+      API_BASE_URL: http://api:3000
+      MCP_HOST: 0.0.0.0
+      MCP_PATH: /mcp
+      MCP_PORT: 3001
+    ports:
+      - "3001:3001"
+    volumes:
+      - .:/app
+
 volumes:
   postgres-data:
   redis-data:

@@ -1,0 +1,31 @@
+{
+  "environment": "testnet",
+  "status": "template",
+  "api": {
+    "baseUrl": "https://api.testnet.lumenbazaar.example",
+    "health": "https://api.testnet.lumenbazaar.example/health",
+    "metrics": "https://api.testnet.lumenbazaar.example/metrics",
+    "openapi": "https://api.testnet.lumenbazaar.example/openapi.json",
+    "supported": "https://api.testnet.lumenbazaar.example/v1/supported",
+    "discoverySearch": "https://api.testnet.lumenbazaar.example/v1/discovery/search",
+    "verify": "https://api.testnet.lumenbazaar.example/v1/verify",
+    "settle": "https://api.testnet.lumenbazaar.example/v1/settle"
+  },
+  "mcp": {
+    "streamableHttp": "https://mcp.testnet.lumenbazaar.example/mcp",
+    "health": "https://mcp.testnet.lumenbazaar.example/health",
+    "localStdioCommand": "pnpm start:mcp"
+  },
+  "worker": {
+    "service": "lumenbazaar-worker",
+    "queues": [
+      "settlement-confirmation",
+      "resource-indexing",
+      "search-sync",
+      "conformance-runner",
+      "network-health",
+      "receipt-finalizer",
+      "stale-payment-cleanup"
+    ]
+  }
+}
