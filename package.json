@@ -25,6 +25,7 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:validate": "node scripts/prisma.mjs validate",
     "deploy:testnet:check": "tsx scripts/deployment-check.ts --env-file .env.testnet.example --allow-placeholders",
+    "start": "tsx apps/api/src/main.ts",
     "start:api": "tsx apps/api/src/main.ts",
     "start:mcp": "tsx apps/mcp-server/src/main.ts",
     "start:mcp:http": "tsx apps/mcp-server/src/http.ts",
