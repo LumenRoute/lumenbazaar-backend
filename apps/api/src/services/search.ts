@@ -142,8 +142,7 @@ function buildSearchBody(resource: Resource) {
     resource.assetCode,
     resource.routeTemplate,
     JSON.stringify(resource.inputSchema),
-    JSON.stringify(resource.outputSchema),
-    JSON.stringify(resource.extensions)
+    JSON.stringify(resource.outputSchema)
   ]
     .join(" ")
     .toLowerCase();
