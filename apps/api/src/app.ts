@@ -22,7 +22,7 @@ import { CatalogService } from "./services/cataloging.js";
 import { CatalogValidationService } from "./services/catalogValidation.js";
 import { ConformanceRunService, createServiceConformanceRunner } from "./services/conformance.js";
 import { DiscoveryService } from "./services/discovery.js";
-import { createMetricsService } from "./services/metrics.js";
+import { createMetricsService, type MetricsService } from "./services/metrics.js";
 import { RateLimitService } from "./services/rateLimit.js";
 import { ResourceService } from "./services/resources.js";
 import { SearchService } from "./services/search.js";
@@ -42,6 +42,7 @@ export type BuildApiAppOptions = {
   conformanceService?: ConformanceRunService;
   auditLogService?: AuditLogService;
   rateLimitService?: RateLimitService;
+  metricsService?: MetricsService;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -59,11 +60,12 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
 
   const auditLogService = options.auditLogService ?? new AuditLogService();
   const rateLimitService = options.rateLimitService ?? new RateLimitService();
+  const metricsService = options.metricsService ?? createMetricsService();
 
   registerRateLimitHook(app, { rateLimitService });
   registerMetadataRoutes(app, {
     config,
-    metrics: createMetricsService()
+    metrics: metricsService
   });
   const verificationService =
     options.verificationService ?? new PaymentVerificationService(config, { auditLogService });
@@ -82,7 +84,7 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     options.catalogService ??
     new CatalogService(catalogValidationService, resourceService, { auditLogService });
   const discoveryService = options.discoveryService ?? new DiscoveryService(resourceService);
-  const searchService = options.searchService ?? new SearchService(resourceService);
+  const searchService = options.searchService ?? new SearchService(resourceService, metricsService);
   const conformanceService =
     options.conformanceService ??
     new ConformanceRunService(
@@ -93,7 +95,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     config,
     verificationService,
     settlementService,
-    receiptService
+    receiptService,
+    metrics: metricsService
   });
   registerSellerRoutes(app, { sellerService });
   registerResourceRoutes(app, { resourceService });

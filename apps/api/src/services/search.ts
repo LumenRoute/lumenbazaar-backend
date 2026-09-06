@@ -10,6 +10,7 @@ import {
 } from "@lumenbazaar/shared";
 
 import { type ResourceService } from "./resources.js";
+import { type MetricsService } from "./metrics.js";
 
 export const searchResourcesSchema = z.object({
   q: z.string().trim().optional(),
@@ -42,7 +43,10 @@ export type SearchResult = {
 export class SearchService {
   private readonly documents = new Map<string, SearchDocument>();
 
-  constructor(private readonly resourceService: ResourceService) {}
+  constructor(
+    private readonly resourceService: ResourceService,
+    private readonly metrics?: MetricsService
+  ) {}
 
   async rebuildIndex() {
     const page = await this.resourceService.listResources({ limit: 100 });
@@ -76,50 +80,56 @@ export class SearchService {
   }
 
   async search(input: unknown): Promise<SearchResult> {
-    const filters = searchResourcesSchema.parse(input);
-    const limit = normalizeLimit(filters.limit);
-    const page = await this.resourceService.listResources({
-      limit: 100,
-      ...(filters.network === undefined ? {} : { network: filters.network }),
-      ...(filters.asset === undefined ? {} : { asset: filters.asset }),
-      ...(filters.type === undefined ? {} : { type: filters.type }),
-      ...(filters.sellerId === undefined ? {} : { sellerId: filters.sellerId })
-    });
-    const queryTerms = tokenize(filters.q ?? "");
-    const ranked = page.resources
-      .map((resource) => {
-        const document = this.documents.get(resource.id);
-        const body = document?.body ?? buildSearchBody(resource);
-        const matchedTerms = queryTerms.filter((term) => body.includes(term));
-        const score = scoreResource(resource, matchedTerms, document);
+    const startedAt = Date.now();
 
-        return {
-          ...resource,
-          ranking: {
-            score,
-            matchedTerms
-          }
-        };
-      })
-      .filter((resource) => queryTerms.length === 0 || resource.ranking.matchedTerms.length > 0)
-      .sort(
-        (left, right) =>
-          right.ranking.score - left.ranking.score ||
-          left.name.localeCompare(right.name) ||
-          left.id.localeCompare(right.id)
-      )
-      .slice(0, limit);
+    try {
+      const filters = searchResourcesSchema.parse(input);
+      const limit = normalizeLimit(filters.limit);
+      const page = await this.resourceService.listResources({
+        limit: 100,
+        ...(filters.network === undefined ? {} : { network: filters.network }),
+        ...(filters.asset === undefined ? {} : { asset: filters.asset }),
+        ...(filters.type === undefined ? {} : { type: filters.type }),
+        ...(filters.sellerId === undefined ? {} : { sellerId: filters.sellerId })
+      });
+      const queryTerms = tokenize(filters.q ?? "");
+      const ranked = page.resources
+        .map((resource) => {
+          const document = this.documents.get(resource.id);
+          const body = document?.body ?? buildSearchBody(resource);
+          const matchedTerms = queryTerms.filter((term) => body.includes(term));
+          const score = scoreResource(resource, matchedTerms, document);
 
-    return {
-      resources: ranked,
-      ranking: {
-        strategy: "postgres-full-text-v1"
-      },
-      partialResults: page.resources.some(
-        (resource) => this.documents.get(resource.id)?.stale !== false
-      ),
-      nextCursor: null
-    };
+          return {
+            ...resource,
+            ranking: {
+              score,
+              matchedTerms
+            }
+          };
+        })
+        .filter((resource) => queryTerms.length === 0 || resource.ranking.matchedTerms.length > 0)
+        .sort(
+          (left, right) =>
+            right.ranking.score - left.ranking.score ||
+            left.name.localeCompare(right.name) ||
+            left.id.localeCompare(right.id)
+        )
+        .slice(0, limit);
+
+      return {
+        resources: ranked,
+        ranking: {
+          strategy: "postgres-full-text-v1"
+        },
+        partialResults: page.resources.some(
+          (resource) => this.documents.get(resource.id)?.stale !== false
+        ),
+        nextCursor: null
+      };
+    } finally {
+      this.metrics?.observeSearchLatency(Date.now() - startedAt);
+    }
   }
 }
 
