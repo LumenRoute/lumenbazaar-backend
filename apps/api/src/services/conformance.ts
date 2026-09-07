@@ -68,6 +68,7 @@ export type ConformanceRunStore = {
 };
 
 export type ConformanceRunServiceOptions = {
+  exactEnabled?: boolean;
   uptoEnabled?: boolean;
 };
 
@@ -125,7 +126,8 @@ export class ConformanceRunService {
     const definitions = conformanceDefinitions(
       request.network,
       request.includeReserved,
-      this.options.uptoEnabled === true
+      this.options.uptoEnabled === true,
+      this.options.exactEnabled !== false
     );
     const results: ConformanceCaseResult[] = [];
 
@@ -167,7 +169,12 @@ export class ConformanceRunService {
   }
 
   getDefinitions(network: NetworkId = "stellar:testnet") {
-    return conformanceDefinitions(network, true, this.options.uptoEnabled === true);
+    return conformanceDefinitions(
+      network,
+      true,
+      this.options.uptoEnabled === true,
+      this.options.exactEnabled !== false
+    );
   }
 
   private async runCase(definition: ConformanceCaseDefinition): Promise<ConformanceCaseResult> {
@@ -206,7 +213,8 @@ export class ConformanceRunService {
 export function conformanceDefinitions(
   network: NetworkId,
   includeReserved: boolean,
-  uptoEnabled = false
+  uptoEnabled = false,
+  exactEnabled = true
 ): ConformanceCaseDefinition[] {
   const exact: ConformanceCaseDefinition[] = [
     {
@@ -216,7 +224,8 @@ export function conformanceDefinitions(
       endpoint: "/v1/supported",
       method: "GET",
       network,
-      scheme: "exact"
+      scheme: "exact",
+      ...(exactEnabled ? {} : { reserved: true })
     },
     {
       id: "exact-verify",
@@ -225,7 +234,8 @@ export function conformanceDefinitions(
       endpoint: "/v1/verify",
       method: "POST",
       network,
-      scheme: "exact"
+      scheme: "exact",
+      ...(exactEnabled ? {} : { reserved: true })
     },
     {
       id: "exact-settle",
@@ -234,7 +244,8 @@ export function conformanceDefinitions(
       endpoint: "/v1/settle",
       method: "POST",
       network,
-      scheme: "exact"
+      scheme: "exact",
+      ...(exactEnabled ? {} : { reserved: true })
     }
   ];
   const upto: ConformanceCaseDefinition[] = [
@@ -276,11 +287,10 @@ export function conformanceDefinitions(
     }
   ];
 
-  if (uptoEnabled) {
-    return [...exact, ...upto];
-  }
-
-  return includeReserved ? [...exact, ...upto] : exact;
+  const definitions = [...exact, ...upto];
+  return includeReserved
+    ? definitions
+    : definitions.filter((definition) => definition.reserved !== true);
 }
 
 export function createServiceConformanceRunner(

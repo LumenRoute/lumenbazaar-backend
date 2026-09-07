@@ -55,6 +55,18 @@ describe("PaymentSessionService", () => {
     );
   });
 
+  it("refuses synthetic bindings when upto is enabled outside local development", () => {
+    expect(
+      () =>
+        new PaymentSessionService(
+          loadConfig({
+            ENABLE_UPTO_SCHEME: "true",
+            LUMEN_ENV: "testnet"
+          })
+        )
+    ).toThrow("ENABLE_UPTO_SCHEME requires live Soroban bindings");
+  });
+
   it("settles once up to the capped amount without using exact payment payloads", async () => {
     const client: GeneratedUptoSessionClient = {
       create_session: vi.fn(async () => "contract_session_2"),
@@ -91,6 +103,25 @@ describe("PaymentSessionService", () => {
     ).rejects.toMatchObject({
       code: "REPLAY_DETECTED"
     });
+  });
+
+  it("rejects generated clients that omit on-chain settlement evidence", async () => {
+    const client: GeneratedUptoSessionClient = {
+      create_session: vi.fn(async () => "contract_session_missing_evidence"),
+      settle: vi.fn(async () => undefined)
+    };
+    const service = new PaymentSessionService(enabledConfig(), {
+      bindings: createGeneratedUptoSessionBindings(() => client)
+    });
+    const session = await service.createSession(sessionRequest());
+
+    await expect(
+      service.settleSession({
+        sessionId: session.id,
+        amount: "0.25",
+        usageHash
+      })
+    ).rejects.toThrow("did not return transaction hash and ledger evidence");
   });
 
   it("rejects over-cap, expired, and invalid usage-hash settlements", async () => {

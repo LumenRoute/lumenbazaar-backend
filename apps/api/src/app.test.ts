@@ -31,7 +31,7 @@ describe("API server base", () => {
     await app.close();
   });
 
-  it("returns version, metrics, and supported networks", async () => {
+  it("returns version, metrics, and only non-mainnet networks", async () => {
     const app = buildApiApp({ logger: false });
 
     const version = await app.inject({ method: "GET", url: "/version" });
@@ -51,39 +51,46 @@ describe("API server base", () => {
     });
     expect(metrics.body).toContain("lumenbazaar_api_uptime_seconds");
     expect(networks.json().networks.map((network: { id: string }) => network.id)).toEqual([
-      "stellar:testnet",
-      "stellar:pubnet"
+      "stellar:testnet"
     ]);
     await app.close();
   });
 
-  it("returns x402 exact support with reserved extension fields", async () => {
+  it("does not advertise payment schemes without live runtime adapters", async () => {
     const app = buildApiApp({ logger: false });
 
     const response = await app.inject({ method: "GET", url: "/v1/supported" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      schemes: [
-        {
-          name: "exact",
-          network: "stellar:testnet",
-          extensions: {
-            x402Version: "1",
-            upto: false
-          }
-        },
-        {
-          name: "exact",
-          network: "stellar:pubnet"
-        }
-      ],
+    expect(response.json()).toEqual({
+      schemes: [],
       extensions: {
         bazaar: true,
         upto: false,
         uptoContracts: []
       }
     });
+    await app.close();
+  });
+
+  it("adds CORS headers only for configured frontend origins", async () => {
+    const app = buildApiApp({ logger: false });
+
+    const allowed = await app.inject({
+      headers: { origin: "https://lumenbazaar-frontend.vercel.app" },
+      method: "OPTIONS",
+      url: "/health"
+    });
+    const rejected = await app.inject({
+      headers: { origin: "https://untrusted.example" },
+      method: "GET",
+      url: "/health"
+    });
+
+    expect(allowed.headers["access-control-allow-origin"]).toBe(
+      "https://lumenbazaar-frontend.vercel.app"
+    );
+    expect(rejected.headers["access-control-allow-origin"]).toBeUndefined();
     await app.close();
   });
 

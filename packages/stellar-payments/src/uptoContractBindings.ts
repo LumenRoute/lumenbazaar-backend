@@ -94,11 +94,19 @@ export function createGeneratedUptoSessionBindings(
         input.usageHash
       );
 
+      if (
+        result === undefined ||
+        result.ledger === undefined ||
+        result.transactionHash === undefined
+      ) {
+        throw new Error(
+          "Generated upto-session client did not return transaction hash and ledger evidence."
+        );
+      }
+
       return {
-        ledger: result?.ledger ?? 0,
-        transactionHash:
-          result?.transactionHash ??
-          contractTransactionHash(input.contractSessionId, input.usageHash)
+        ledger: result.ledger,
+        transactionHash: result.transactionHash
       };
     }
   };

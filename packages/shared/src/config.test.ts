@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
-import { loadConfig, localIssuerPublicKey } from "./index.js";
+import { listConfiguredNetworks, loadConfig, localIssuerPublicKey } from "./index.js";
 
 describe("loadConfig", () => {
-  it("loads local defaults with testnet and pubnet network settings", () => {
+  it("loads local defaults while exposing only testnet", () => {
     const config = loadConfig({});
 
     expect(config.lumenEnv).toBe("local");
@@ -17,6 +17,9 @@ describe("loadConfig", () => {
       decimals: 7
     });
     expect(config.networks["stellar:pubnet"].passphrase).toContain("Public Global Stellar");
+    expect(listConfiguredNetworks(config).map((network) => network.id)).toEqual([
+      "stellar:testnet"
+    ]);
   });
 
   it("fails startup when a numeric setting is malformed", () => {
@@ -32,6 +35,20 @@ describe("loadConfig", () => {
   it("parses boolean feature flags explicitly", () => {
     expect(loadConfig({ ENABLE_UPTO_SCHEME: "true" }).features.uptoScheme).toBe(true);
     expect(loadConfig({ ENABLE_UPTO_SCHEME: "0" }).features.uptoScheme).toBe(false);
+  });
+
+  it("parses explicit CORS origins", () => {
+    const config = loadConfig({
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000,https://frontend.example.test"
+    });
+
+    expect(config.api.corsAllowedOrigins).toEqual([
+      "http://localhost:3000",
+      "https://frontend.example.test"
+    ]);
+    expect(() => loadConfig({ CORS_ALLOWED_ORIGINS: "*" })).toThrow(
+      "CORS_ALLOWED_ORIGINS contains an invalid origin"
+    );
   });
 
   it("loads optional contract IDs for capped session deployments", () => {

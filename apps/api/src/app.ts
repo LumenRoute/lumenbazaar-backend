@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import cors from "@fastify/cors";
 import Fastify from "fastify";
 
 import { type AppConfig, loadConfig } from "@lumenbazaar/shared";
@@ -47,6 +48,10 @@ export type BuildApiAppOptions = {
   auditLogService?: AuditLogService;
   rateLimitService?: RateLimitService;
   metricsService?: MetricsService;
+  paymentCapabilities?: {
+    exact: boolean;
+    upto: boolean;
+  };
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -54,6 +59,14 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   const app = Fastify({
     genReqId: () => randomUUID(),
     logger: options.logger ?? config.nodeEnv !== "test"
+  });
+  const paymentCapabilities = options.paymentCapabilities ?? {
+    exact: false,
+    upto: false
+  };
+
+  void app.register(cors, {
+    origin: config.api.corsAllowedOrigins
   });
 
   registerErrorHandling(app);
@@ -102,7 +115,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
       ),
       undefined,
       {
-        uptoEnabled: config.features.uptoScheme
+        exactEnabled: paymentCapabilities.exact,
+        uptoEnabled: config.features.uptoScheme && paymentCapabilities.upto
       }
     );
 
@@ -111,7 +125,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     verificationService,
     settlementService,
     receiptService,
-    metrics: metricsService
+    metrics: metricsService,
+    capabilities: paymentCapabilities
   });
   registerPaymentSessionRoutes(app, { paymentSessionService });
   registerSellerRoutes(app, { sellerService });

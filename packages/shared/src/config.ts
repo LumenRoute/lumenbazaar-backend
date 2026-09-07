@@ -50,6 +50,9 @@ const envSchema = z.object({
   API_HOST: z.string().min(1).default("0.0.0.0"),
   API_PORT: z.coerce.number().int().positive().max(65535).default(3000),
   API_PUBLIC_URL: z.string().url().default("http://localhost:3000"),
+  CORS_ALLOWED_ORIGINS: z
+    .string()
+    .default("http://localhost:3000,https://lumenbazaar-frontend.vercel.app"),
   DATABASE_URL: z
     .string()
     .min(1)
@@ -80,6 +83,7 @@ export type AppConfig = {
     host: string;
     port: number;
     publicUrl: string;
+    corsAllowedOrigins: string[];
   };
   databaseUrl: string;
   redisUrl: string;
@@ -145,7 +149,8 @@ export function loadConfig(input: RawEnv = process.env as RawEnv): AppConfig {
     api: {
       host: env.API_HOST,
       port: env.API_PORT,
-      publicUrl: env.API_PUBLIC_URL
+      publicUrl: env.API_PUBLIC_URL,
+      corsAllowedOrigins: parseCorsAllowedOrigins(env.CORS_ALLOWED_ORIGINS)
     },
     databaseUrl: env.DATABASE_URL,
     redisUrl: env.REDIS_URL,
@@ -170,5 +175,35 @@ function assertMainnetConfiguration(env: ParsedEnv, networks: Record<NetworkId, 
 }
 
 export function listConfiguredNetworks(config: AppConfig) {
-  return networkIds.map((networkId) => config.networks[networkId]);
+  const configuredNetworkIds =
+    config.lumenEnv === "mainnet" ? networkIds : (["stellar:testnet"] as const);
+
+  return configuredNetworkIds.map((networkId) => config.networks[networkId]);
+}
+
+function parseCorsAllowedOrigins(value: string) {
+  const origins = value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (origins.length === 0) {
+    throw new Error("CORS_ALLOWED_ORIGINS must include at least one origin.");
+  }
+
+  return origins.map((origin) => {
+    let url: URL;
+
+    try {
+      url = new URL(origin);
+    } catch {
+      throw new Error(`CORS_ALLOWED_ORIGINS contains an invalid origin: ${origin}`);
+    }
+
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.origin !== origin) {
+      throw new Error(`CORS_ALLOWED_ORIGINS contains an invalid origin: ${origin}`);
+    }
+
+    return origin;
+  });
 }

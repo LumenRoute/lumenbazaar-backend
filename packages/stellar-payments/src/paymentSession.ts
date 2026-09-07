@@ -177,6 +177,17 @@ export class PaymentSessionService {
     options: PaymentSessionServiceOptions = {}
   ) {
     this.auditLogService = options.auditLogService;
+
+    if (
+      this.config.features.uptoScheme &&
+      this.config.lumenEnv !== "local" &&
+      options.bindings === undefined
+    ) {
+      throw new Error(
+        "ENABLE_UPTO_SCHEME requires live Soroban bindings outside the local environment."
+      );
+    }
+
     this.bindings = options.bindings ?? createLocalUptoSessionContractBindings();
     this.store = options.store ?? new InMemoryPaymentSessionStore();
   }

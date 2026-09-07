@@ -29,7 +29,11 @@ describe("payment session routes", () => {
   it("creates, fetches, and settles capped sessions through isolated routes", async () => {
     const app = buildApiApp({
       logger: false,
-      config: enabledConfig()
+      config: enabledConfig(),
+      paymentCapabilities: {
+        exact: false,
+        upto: true
+      }
     });
 
     const supported = await app.inject({ method: "GET", url: "/v1/supported" });

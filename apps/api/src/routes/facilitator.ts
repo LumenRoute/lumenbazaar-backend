@@ -12,6 +12,10 @@ import { parseParams } from "../http/validation.js";
 import { type MetricsService } from "../services/metrics.js";
 
 export type FacilitatorRouteOptions = {
+  capabilities: {
+    exact: boolean;
+    upto: boolean;
+  };
   config: AppConfig;
   verificationService?: PaymentVerificationService;
   settlementService?: SettlementService;
@@ -32,7 +36,9 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
   app.get("/v1/supported", async () => {
     const networks = listConfiguredNetworks(options.config);
     const uptoContracts = networks.flatMap((network) =>
-      options.config.features.uptoScheme && network.uptoSessionContractId !== undefined
+      options.capabilities.upto &&
+      options.config.features.uptoScheme &&
+      network.uptoSessionContractId !== undefined
         ? [
             {
               network: network.id,
@@ -41,21 +47,25 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
           ]
         : []
     );
-    const exactSchemes = networks.map((network) => ({
-      name: "exact",
-      network: network.id,
-      assets: network.assets.map((asset) => ({
-        code: asset.code,
-        issuer: asset.issuer,
-        decimals: asset.decimals
-      })),
-      extensions: {
-        x402Version: "1",
-        upto: false
-      }
-    }));
+    const exactSchemes = options.capabilities.exact
+      ? networks.map((network) => ({
+          name: "exact",
+          network: network.id,
+          assets: network.assets.map((asset) => ({
+            code: asset.code,
+            issuer: asset.issuer,
+            decimals: asset.decimals
+          })),
+          extensions: {
+            x402Version: "2",
+            upto: false
+          }
+        }))
+      : [];
     const uptoSchemes = networks.flatMap((network) =>
-      options.config.features.uptoScheme && network.uptoSessionContractId !== undefined
+      options.capabilities.upto &&
+      options.config.features.uptoScheme &&
+      network.uptoSessionContractId !== undefined
         ? [
             {
               name: "upto",
@@ -70,7 +80,7 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
                 })),
               extensions: {
                 contractId: network.uptoSessionContractId,
-                x402Version: "1",
+                x402Version: "2",
                 sessionEndpoint: "/v1/payment-sessions"
               }
             }
@@ -82,7 +92,7 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
       schemes: [...exactSchemes, ...uptoSchemes],
       extensions: {
         bazaar: true,
-        upto: options.config.features.uptoScheme,
+        upto: options.capabilities.upto && options.config.features.uptoScheme,
         uptoContracts
       }
     };

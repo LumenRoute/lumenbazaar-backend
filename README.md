@@ -30,6 +30,11 @@ docker compose up postgres redis
 
 The Compose file also includes API and worker service definitions for full local runs.
 
+Set `CORS_ALLOWED_ORIGINS` to a comma-separated list of exact frontend origins. Pubnet is not
+advertised outside a mainnet runtime. Exact and `upto` schemes are also omitted from
+`/v1/supported` until the process is started with real runtime adapters; the default exact adapter
+fails closed, and testnet `upto` refuses synthetic local bindings.
+
 ## Repository Layout
 
 ```txt
@@ -49,3 +54,9 @@ packages/
 ## Security
 
 This repository stores payment receipts and settlement evidence. It must never store Stellar private keys, seed phrases, or wallet secrets.
+
+## Related Repositories
+
+- [Frontend](https://github.com/LumenRoute/lumenbazaar-frontend)
+- [Contracts](https://github.com/LumenRoute/lumenbazaar-contracts)
+- [Documentation](https://github.com/LumenRoute/lumenbazaar-docs)

@@ -57,9 +57,9 @@ describe("conformance routes", () => {
       network: "stellar:testnet",
       suite: "stellar-x402",
       status: "passed",
-      passedCount: 3,
+      passedCount: 0,
       failedCount: 0,
-      reservedCount: 3
+      reservedCount: 6
     });
     expect(
       created.json().results.map((result: { id: string; status: string }) => ({
@@ -67,9 +67,9 @@ describe("conformance routes", () => {
         status: result.status
       }))
     ).toEqual([
-      { id: "exact-supported", status: "passed" },
-      { id: "exact-verify", status: "passed" },
-      { id: "exact-settle", status: "passed" },
+      { id: "exact-supported", status: "reserved" },
+      { id: "exact-verify", status: "reserved" },
+      { id: "exact-settle", status: "reserved" },
       { id: "upto-supported", status: "reserved" },
       { id: "upto-session-create", status: "reserved" },
       { id: "upto-settle", status: "reserved" }
