@@ -1,8 +1,15 @@
 import { randomUUID } from "node:crypto";
 
-import { LumenError, type NetworkId, type Settlement } from "@lumenbazaar/shared";
+import {
+  createCorrelationId,
+  getCorrelationId,
+  LumenError,
+  type NetworkId,
+  type Settlement
+} from "@lumenbazaar/shared";
 
 export type CreateSettlementInput = {
+  correlationId?: string;
   paymentAttemptId: string;
   transactionHash?: string;
   ledger?: number;
@@ -37,6 +44,7 @@ export class InMemorySettlementStore implements SettlementStore {
 
     const settlement: Settlement = {
       id: `set_${randomUUID().replaceAll("-", "").slice(0, 24)}`,
+      correlationId: input.correlationId ?? getCorrelationId() ?? createCorrelationId(),
       paymentAttemptId: input.paymentAttemptId,
       transactionHash: input.transactionHash ?? null,
       ledger: input.ledger ?? null,

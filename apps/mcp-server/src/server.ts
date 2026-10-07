@@ -7,12 +7,14 @@ import type { PaymentPayload } from "@lumenbazaar/buyer-sdk";
 import { BackendClient } from "./client.js";
 import { CapabilityUnavailableError, handleToolError, ValidationError } from "./errors.js";
 import { McpPaymentToolService } from "./paymentTools.js";
+import { type McpMetricsService } from "./metrics.js";
 import { getToolDefinition, listToolDefinitions, type McpToolCapabilities } from "./tools.js";
 
 export type CreateMcpServerOptions = {
   client?: BackendClient;
   capabilityProvider?: () => Promise<McpToolCapabilities>;
   paymentTools?: McpPaymentToolService;
+  metrics?: McpMetricsService;
 };
 
 export function createMcpServer(options: CreateMcpServerOptions = {}) {
@@ -193,6 +195,7 @@ export function createMcpServer(options: CreateMcpServerOptions = {}) {
       }
 
       const output = toolDefinition.outputSchema.parse(result) as Record<string, unknown>;
+      options.metrics?.recordTool(toolName, "success");
 
       return {
         content: [
@@ -204,6 +207,10 @@ export function createMcpServer(options: CreateMcpServerOptions = {}) {
         structuredContent: output
       };
     } catch (error) {
+      options.metrics?.recordTool(
+        toolName,
+        error instanceof CapabilityUnavailableError ? "unavailable" : "error"
+      );
       const errorInfo = handleToolError(
         error instanceof ZodError
           ? new ValidationError("Tool input or output did not match its schema.", {

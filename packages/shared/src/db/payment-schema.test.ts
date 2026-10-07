@@ -12,6 +12,10 @@ const reconciliationMigration = readFileSync(
   "prisma/migrations/0006_settlement_reconciliation/migration.sql",
   "utf8"
 );
+const observabilityMigration = readFileSync(
+  "prisma/migrations/0007_observability_correlation/migration.sql",
+  "utf8"
+);
 const rollbackGuide = readFileSync("docs/migrations/0005-durable-payment-persistence.md", "utf8");
 
 describe("payment database schema", () => {
@@ -54,5 +58,13 @@ describe("payment database schema", () => {
     expect(schema).toContain("@@index([network, status])");
     expect(schema).toContain("@@index([sellerId, status])");
     expect(schema).toContain("@@index([resourceId, status])");
+  });
+
+  it("persists an indexed correlation identifier across payment evidence", () => {
+    for (const model of ["PaymentAttempt", "Settlement", "Receipt"]) {
+      expect(observabilityMigration).toContain(`ALTER TABLE "${model}" ADD COLUMN "correlationId"`);
+      expect(observabilityMigration).toContain(`"${model}_correlationId_idx"`);
+    }
+    expect(observabilityMigration).toContain('ALTER TABLE "AuditLog" ADD COLUMN "correlationId"');
   });
 });

@@ -2,6 +2,8 @@ export const serviceName = "lumenbazaar-backend";
 
 export * from "./api.js";
 export * from "./config.js";
+export * from "./correlation.js";
+export * from "./redaction.js";
 export * from "./errorMapping.js";
 export * from "./errors.js";
 export * from "./models.js";

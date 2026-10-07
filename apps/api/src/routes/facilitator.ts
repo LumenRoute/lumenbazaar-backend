@@ -87,13 +87,22 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
     };
   });
 
-  app.post("/v1/verify", async (request) => {
+  app.post("/v1/verify", async (request, reply) => {
     const startedAt = Date.now();
     const network = extractPaymentNetwork(request.body);
 
     try {
-      return toLumenVerifyResponse(await verificationService.verify(request.body));
+      const result = await verificationService.verify(request.body);
+      reply.header("x-correlation-id", result.correlationId);
+      options.metrics?.recordVerification(result.network, "accepted");
+      return toLumenVerifyResponse(result);
     } catch (error) {
+      if (error instanceof LumenError && error.code === "REPLAY_DETECTED") {
+        options.metrics?.recordVerification(network, "replay");
+        options.metrics?.recordReplayRejection(network);
+      } else {
+        options.metrics?.recordVerification(network, "rejected");
+      }
       recordRpcErrorIfNeeded(options.metrics, network, "verify", error);
       throw error;
     } finally {
@@ -101,25 +110,39 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
     }
   });
 
-  app.post("/v1/settle", async (request) => {
+  app.post("/v1/settle", async (request, reply) => {
     const startedAt = Date.now();
     const network = extractPaymentNetwork(request.body);
 
     try {
       const result = await settlementService.settle(request.body);
+      reply.header("x-correlation-id", result.correlationId);
       options.metrics?.recordSettlementResult(result.network, "settled");
+      options.metrics?.observeFinality(result.network, Date.now() - startedAt, "confirmed");
       return toLumenSettleResponse(result);
     } catch (error) {
       options.metrics?.recordSettlementResult(network, "failed");
+      options.metrics?.observeFinality(network, Date.now() - startedAt, "failed");
+      if (
+        error instanceof LumenError &&
+        typeof error.details === "object" &&
+        error.details !== null &&
+        "status" in error.details &&
+        error.details.status === "timed_out"
+      ) {
+        options.metrics?.recordReconciliation(network, "pending");
+      }
       recordRpcErrorIfNeeded(options.metrics, network, "settle", error);
       throw error;
     } finally {
       options.metrics?.observeSettleLatency(network, Date.now() - startedAt);
     }
   });
-  app.get("/v1/receipts/:receiptId", async (request) => {
+  app.get("/v1/receipts/:receiptId", async (request, reply) => {
     const params = parseParams(request, z.object({ receiptId: z.string().min(1) }));
-    return receiptService.getReceipt(params.receiptId);
+    const receipt = await receiptService.getReceipt(params.receiptId);
+    reply.header("x-correlation-id", receipt.correlationId);
+    return receipt;
   });
 }
 

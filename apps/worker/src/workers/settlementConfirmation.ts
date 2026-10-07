@@ -4,10 +4,11 @@ import { type PrismaClient } from "@prisma/client";
 import * as StellarSdk from "@stellar/stellar-sdk";
 import { type Job } from "bullmq";
 
-import { type AppConfig, getPrismaClient } from "@lumenbazaar/shared";
+import { type AppConfig, getPrismaClient, redactSensitiveText } from "@lumenbazaar/shared";
 import { createHorizonClient } from "@lumenbazaar/stellar-payments";
 
 export type SettlementConfirmationJobData = {
+  correlationId?: string;
   paymentAttemptId: string;
   settlementId?: string;
   transactionHash?: string;
@@ -67,6 +68,7 @@ export async function handleSettlementConfirmation(
       }),
       db.auditLog.create({
         data: {
+          correlationId: attempt.correlationId,
           actorType: "system",
           action: "settlement.reconciliation.needs_review",
           targetType: "payment_attempt",
@@ -81,20 +83,22 @@ export async function handleSettlementConfirmation(
 
   const state = await statusClient.getTransactionState(transactionHash, settlement.network);
   if (state.status === "pending") {
+    const stateReason = redactSensitiveText(state.reason);
     await db.settlement.update({
       where: { id: settlement.id },
       data: {
         reconciliationState: "pending",
-        reconciliationReason: state.reason,
+        reconciliationReason: stateReason,
         reconciliationAttempts: { increment: 1 },
         lastReconciledAt: new Date()
       }
     });
-    throw new ReconciliationPendingError(state.reason);
+    throw new ReconciliationPendingError(stateReason);
   }
   if (state.status === "failed") {
-    await recordNeedsReview(db, attempt.id, settlement.id, state.reason);
-    await job.log(`Settlement ${settlement.id} requires manual review: ${state.reason}`);
+    const reason = redactSensitiveText(state.reason);
+    await recordNeedsReview(db, attempt.id, settlement.id, reason);
+    await job.log(`Settlement ${settlement.id} requires manual review: ${reason}`);
     return;
   }
 
@@ -134,6 +138,7 @@ export async function handleSettlementConfirmation(
       where: { paymentAttemptId: attempt.id },
       create: {
         id: `receipt_${randomUUID().replaceAll("-", "").slice(0, 24)}`,
+        correlationId: attempt.correlationId,
         paymentAttemptId: attempt.id,
         resourceId: attempt.resourceId,
         sellerId: attempt.sellerId,
@@ -161,6 +166,7 @@ export async function handleSettlementConfirmation(
     });
     await tx.auditLog.create({
       data: {
+        correlationId: attempt.correlationId,
         actorType: "system",
         action: "settlement.reconciliation.confirmed",
         targetType: "settlement",
@@ -221,6 +227,10 @@ async function recordNeedsReview(
   settlementId: string,
   reason: string
 ) {
+  const attempt = await db.paymentAttempt.findUniqueOrThrow({
+    where: { id: paymentAttemptId },
+    select: { correlationId: true }
+  });
   await db.$transaction([
     db.settlement.update({
       where: { id: settlementId },
@@ -238,6 +248,7 @@ async function recordNeedsReview(
     }),
     db.auditLog.create({
       data: {
+        correlationId: attempt.correlationId,
         actorType: "system",
         action: "settlement.reconciliation.needs_review",
         targetType: "settlement",

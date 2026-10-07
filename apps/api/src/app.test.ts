@@ -25,6 +25,7 @@ describe("API server base", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["x-request-id"]).toBeDefined();
+    expect(response.headers["x-correlation-id"]).toBe(response.headers["x-request-id"]);
     expect(response.json()).toMatchObject({
       ok: true,
       service: "lumenbazaar-backend",
@@ -151,6 +152,18 @@ describe("API server base", () => {
       }
     });
     expect(response.json().extra.lumenbazaar.paymentHash).toHaveLength(64);
+    expect(response.json().extra.lumenbazaar.correlationId).toBe(
+      response.headers["x-correlation-id"]
+    );
+    const repeated = await app.inject({
+      method: "POST",
+      url: "/v1/verify",
+      payload: exactPaymentRequest()
+    });
+    expect(repeated.headers["x-correlation-id"]).toBe(
+      response.json().extra.lumenbazaar.correlationId
+    );
+    expect(repeated.headers["x-correlation-id"]).not.toBe(repeated.headers["x-request-id"]);
     await app.close();
   });
 
@@ -195,6 +208,7 @@ describe("API server base", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.headers["x-correlation-id"]).toBe(verified.correlationId);
     expect(response.json()).toMatchObject({
       success: true,
       transaction: "tx_api_settle",
@@ -217,7 +231,9 @@ describe("API server base", () => {
     });
 
     expect(receipt.statusCode).toBe(200);
+    expect(receipt.headers["x-correlation-id"]).toBe(verified.correlationId);
     expect(receipt.json()).toMatchObject({
+      correlationId: verified.correlationId,
       paymentAttemptId: verified.paymentAttemptId,
       transactionHash: "tx_api_settle",
       status: "finalized"

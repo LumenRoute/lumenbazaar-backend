@@ -133,6 +133,7 @@ export type SearchDocument = {
 
 export type PaymentAttempt = {
   id: string;
+  correlationId: string;
   resourceId: string | null;
   sellerId: string | null;
   paymentHash: string;
@@ -152,6 +153,7 @@ export type PaymentAttempt = {
 
 export type Settlement = {
   id: string;
+  correlationId: string;
   paymentAttemptId: string;
   transactionHash: string | null;
   ledger: number | null;
@@ -170,6 +172,7 @@ export type Settlement = {
 
 export type Receipt = {
   id: string;
+  correlationId: string;
   paymentAttemptId: string;
   resourceId: string | null;
   sellerId: string | null;

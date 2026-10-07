@@ -52,13 +52,16 @@ describePostgres("Prisma payment persistence", () => {
     const restartedAttempts = new PrismaPaymentAttemptStore(client);
     const restartedReceipts = new PrismaReceiptStore(client);
     await expect(restartedAttempts.getPaymentAttempt(attempt.id)).resolves.toMatchObject({
+      correlationId: attempt.correlationId,
       status: "confirmed"
     });
     await expect(restartedReceipts.getReceipt(result.receipt.id)).resolves.toMatchObject({
       id: result.receipt.id,
+      correlationId: attempt.correlationId,
       transactionHash: "transaction_hash_restart",
       evidenceHash: expect.stringMatching(/^[a-f0-9]{64}$/u)
     });
+    expect(result.settlement.correlationId).toBe(attempt.correlationId);
   });
 
   it("rolls back a partial confirmation and rejects duplicate evidence", async () => {

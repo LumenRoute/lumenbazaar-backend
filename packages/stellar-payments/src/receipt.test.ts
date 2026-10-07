@@ -8,6 +8,7 @@ const now = "2026-09-03T00:00:00.000Z";
 
 const attempt: PaymentAttempt = {
   id: "pay_1",
+  correlationId: "corr_1",
   resourceId: "resource_1",
   sellerId: "seller_1",
   paymentHash: "hash_1",
@@ -27,6 +28,7 @@ const attempt: PaymentAttempt = {
 
 const settlement: Settlement = {
   id: "set_1",
+  correlationId: "corr_1",
   paymentAttemptId: "pay_1",
   transactionHash: "tx_1",
   ledger: 123,

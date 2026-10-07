@@ -28,6 +28,7 @@ export class ReceiptService {
     }
 
     return this.receiptStore.createReceipt({
+      correlationId: paymentAttempt.correlationId,
       paymentAttemptId: paymentAttempt.id,
       resourceId: paymentAttempt.resourceId,
       sellerId: paymentAttempt.sellerId,

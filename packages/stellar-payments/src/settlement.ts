@@ -37,6 +37,7 @@ export type SettlementServiceOptions = {
 };
 
 export type SettlementServiceResult = {
+  correlationId: string;
   settlementId: string;
   receiptId: string;
   transactionHash: string;
@@ -162,6 +163,7 @@ export class SettlementService {
 
     const settledAt = new Date().toISOString();
     const settlementInput = {
+      correlationId: attempt.correlationId,
       paymentAttemptId: attempt.id,
       transactionHash: adapterResult.transactionHash,
       ledger: adapterResult.ledger,
@@ -206,6 +208,7 @@ export class SettlementService {
     });
 
     return {
+      correlationId: attempt.correlationId,
       settlementId: settlement.id,
       receiptId: receipt.id,
       transactionHash: adapterResult.transactionHash,
@@ -236,6 +239,7 @@ export class SettlementService {
         settlement.ledger !== null
       ) {
         return {
+          correlationId: attempt.correlationId,
           settlementId: settlement.id,
           receiptId: receipt.id,
           transactionHash: settlement.transactionHash,
@@ -313,6 +317,7 @@ export class SettlementService {
     const failureCode = result.failureCode ?? "SETTLEMENT_FAILED";
     const failureReason = result.failureReason ?? "Stellar settlement failed.";
     const settlementInput = {
+      correlationId: attempt.correlationId,
       paymentAttemptId: attempt.id,
       ...(result.transactionHash === undefined ? {} : { transactionHash: result.transactionHash }),
       network: normalized.network,
@@ -336,6 +341,7 @@ export class SettlementService {
     if (result.transactionHash !== undefined) {
       try {
         await this.reconciliationScheduler?.enqueue({
+          correlationId: attempt.correlationId,
           paymentAttemptId: attempt.id,
           settlementId: settlement.id,
           transactionHash: result.transactionHash,

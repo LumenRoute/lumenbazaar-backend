@@ -115,6 +115,7 @@ model PaymentRequirement {
 
 model PaymentAttempt {
   id              String      @id @default(cuid())
+  correlationId   String      @db.VarChar(64)
   resourceId      String?
   sellerId        String?
   paymentHash     String      @unique
@@ -138,10 +139,12 @@ model PaymentAttempt {
   @@index([network, status])
   @@index([sellerId, status])
   @@index([resourceId, status])
+  @@index([correlationId])
 }
 
 model Settlement {
   id                     String         @id @default(cuid())
+  correlationId          String         @db.VarChar(64)
   paymentAttemptId       String         @unique
   transactionHash        String?        @unique
   ledger                 Int?
@@ -161,10 +164,12 @@ model Settlement {
   @@index([network, status])
   @@index([ledger])
   @@index([reconciliationState, lastReconciledAt])
+  @@index([correlationId])
 }
 
 model Receipt {
   id               String         @id @default(cuid())
+  correlationId    String         @db.VarChar(64)
   paymentAttemptId String         @unique
   resourceId       String?
   sellerId         String?
@@ -189,6 +194,7 @@ model Receipt {
   @@index([sellerId, status])
   @@index([resourceId, status])
   @@index([transactionHash])
+  @@index([correlationId])
 }
 
 model PaymentSession {
@@ -367,18 +373,20 @@ model RateLimitEvent {
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
-  actorType  String
-  actorId    String?
-  action     String
-  targetType String
-  targetId   String?
-  metadata   Json
-  createdAt  DateTime @default(now())
+  id            String   @id @default(cuid())
+  correlationId String? @db.VarChar(64)
+  actorType     String
+  actorId       String?
+  action        String
+  targetType    String
+  targetId      String?
+  metadata      Json
+  createdAt     DateTime @default(now())
 
   @@index([actorType, actorId])
   @@index([targetType, targetId])
   @@index([action, createdAt])
+  @@index([correlationId])
 }
 
 model OperatorConfig {

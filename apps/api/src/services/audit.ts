@@ -1,12 +1,21 @@
 import { randomUUID } from "node:crypto";
 
-import { type JsonObject, type JsonValue } from "@lumenbazaar/shared";
+import { PrismaClient, type Prisma } from "@prisma/client";
+
+import {
+  getCorrelationId,
+  redactSensitiveText,
+  type AppConfig,
+  type JsonObject,
+  type JsonValue
+} from "@lumenbazaar/shared";
 
 const sensitiveKeyPattern =
   /(secret|seed|private|token|signature|authorization|password|api[_-]?key|payment[_-]?payload)/i;
 
 export type AuditLogInput = {
   action: string;
+  correlationId?: string | null;
   actorId?: string | null;
   actorType: "buyer" | "facilitator" | "seller" | "system";
   metadata?: Record<string, unknown>;
@@ -16,6 +25,7 @@ export type AuditLogInput = {
 
 export type AuditLogRecord = {
   action: string;
+  correlationId: string | null;
   actorId: string | null;
   actorType: AuditLogInput["actorType"];
   createdAt: string;
@@ -49,12 +59,32 @@ export class InMemoryAuditLogStore implements AuditLogStore {
   }
 }
 
+export class PrismaAuditLogStore implements AuditLogStore {
+  constructor(private readonly db: PrismaClient) {}
+
+  async create(input: Omit<AuditLogRecord, "id" | "createdAt">) {
+    const row = await this.db.auditLog.create({
+      data: {
+        ...input,
+        metadata: input.metadata as Prisma.InputJsonValue
+      }
+    });
+    return mapAuditLog(row);
+  }
+
+  async list() {
+    const rows = await this.db.auditLog.findMany({ orderBy: { createdAt: "asc" } });
+    return rows.map(mapAuditLog);
+  }
+}
+
 export class AuditLogService {
   constructor(private readonly store: AuditLogStore = new InMemoryAuditLogStore()) {}
 
   async record(input: AuditLogInput) {
     return this.store.create({
       action: input.action,
+      correlationId: input.correlationId ?? getCorrelationId() ?? null,
       actorId: input.actorId ?? null,
       actorType: input.actorType,
       metadata: sanitizeAuditMetadata(input.metadata ?? {}),
@@ -78,13 +108,12 @@ export function sanitizeAuditMetadata(metadata: Record<string, unknown>): JsonOb
 }
 
 function toJsonValue(value: unknown): JsonValue {
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
+  if (value === null || typeof value === "number" || typeof value === "boolean") {
     return value;
+  }
+
+  if (typeof value === "string") {
+    return redactSensitiveText(value);
   }
 
   if (Array.isArray(value)) {
@@ -96,4 +125,43 @@ function toJsonValue(value: unknown): JsonValue {
   }
 
   return String(value);
+}
+
+export function createRuntimeAuditLog(config: AppConfig) {
+  if (
+    process.env.VITEST !== undefined ||
+    process.env.NODE_ENV === "test" ||
+    config.nodeEnv !== "production" ||
+    config.lumenEnv === "local"
+  ) {
+    return {
+      service: new AuditLogService(),
+      close: async () => undefined
+    };
+  }
+
+  const db = new PrismaClient({ datasources: { db: { url: config.databaseUrl } } });
+  return {
+    service: new AuditLogService(new PrismaAuditLogStore(db)),
+    close: async () => db.$disconnect()
+  };
+}
+
+function mapAuditLog(row: {
+  action: string;
+  actorId: string | null;
+  actorType: string;
+  correlationId: string | null;
+  createdAt: Date;
+  id: string;
+  metadata: Prisma.JsonValue;
+  targetId: string | null;
+  targetType: string;
+}): AuditLogRecord {
+  return {
+    ...row,
+    actorType: row.actorType as AuditLogRecord["actorType"],
+    createdAt: row.createdAt.toISOString(),
+    metadata: row.metadata as JsonObject
+  };
 }

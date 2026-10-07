@@ -6,6 +6,7 @@ import { type AppConfig, type NetworkId } from "@lumenbazaar/shared";
 export const settlementReconciliationQueueName = "settlement-confirmation";
 
 export type SettlementReconciliationJob = {
+  correlationId: string;
   paymentAttemptId: string;
   settlementId: string;
   transactionHash: string;

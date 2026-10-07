@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 
 import {
+  createCorrelationId,
+  getCorrelationId,
   LumenError,
   isSupportedNetwork,
   type ErrorCode,
@@ -35,6 +37,7 @@ export class PrismaPaymentAttemptStore implements PaymentAttemptStore {
       return mapPaymentAttempt(
         await this.db.paymentAttempt.create({
           data: {
+            correlationId: input.correlationId ?? getCorrelationId() ?? createCorrelationId(),
             paymentHash: input.paymentHash,
             idempotencyKey: input.idempotencyKey ?? `verify:${input.paymentHash}`,
             network: input.network,
@@ -149,7 +152,12 @@ export class PrismaPaymentStatePersistence implements PaymentStatePersistence {
     try {
       return await this.client.$transaction(async (tx) => {
         const settlement = mapSettlement(
-          await tx.settlement.create({ data: settlementData(input.settlement) })
+          await tx.settlement.create({
+            data: settlementData({
+              ...input.settlement,
+              correlationId: input.attempt.correlationId
+            })
+          })
         );
         const transition = await tx.paymentAttempt.updateMany({
           where: { id: input.attempt.id, status: "settling" },
@@ -164,6 +172,7 @@ export class PrismaPaymentStatePersistence implements PaymentStatePersistence {
         const receipt = mapReceipt(
           await tx.receipt.create({
             data: receiptData({
+              correlationId: attempt.correlationId,
               paymentAttemptId: attempt.id,
               resourceId: attempt.resourceId,
               sellerId: attempt.sellerId,
@@ -192,7 +201,12 @@ export class PrismaPaymentStatePersistence implements PaymentStatePersistence {
     try {
       return await this.client.$transaction(async (tx) => {
         const settlement = mapSettlement(
-          await tx.settlement.create({ data: settlementData(input.settlement) })
+          await tx.settlement.create({
+            data: settlementData({
+              ...input.settlement,
+              correlationId: input.attempt.correlationId
+            })
+          })
         );
         const transition = await tx.paymentAttempt.updateMany({
           where: { id: input.attempt.id, status: "settling" },
@@ -218,6 +232,7 @@ export class PrismaPaymentStatePersistence implements PaymentStatePersistence {
 
 function settlementData(input: CreateSettlementInput): Prisma.SettlementUncheckedCreateInput {
   return {
+    correlationId: input.correlationId ?? getCorrelationId() ?? createCorrelationId(),
     paymentAttemptId: input.paymentAttemptId,
     network: input.network,
     amount: input.amount,
@@ -234,6 +249,7 @@ function settlementData(input: CreateSettlementInput): Prisma.SettlementUnchecke
 function receiptData(input: CreateReceiptInput): Prisma.ReceiptUncheckedCreateInput {
   return {
     id: `receipt_${randomUUID().replaceAll("-", "").slice(0, 24)}`,
+    correlationId: input.correlationId ?? getCorrelationId() ?? createCorrelationId(),
     paymentAttemptId: input.paymentAttemptId,
     resourceId: input.resourceId,
     sellerId: input.sellerId,

@@ -143,6 +143,7 @@ describePostgres("settlement reconciliation", () => {
     });
     const settlement = await client.settlement.create({
       data: {
+        correlationId: attempt.correlationId,
         paymentAttemptId: attempt.id,
         transactionHash: "tx_retention",
         network: attempt.network,
@@ -156,6 +157,7 @@ describePostgres("settlement reconciliation", () => {
     await client.receipt.create({
       data: {
         id: "receipt_retention",
+        correlationId: attempt.correlationId,
         paymentAttemptId: attempt.id,
         transactionHash: settlement.transactionHash,
         network: attempt.network,
@@ -187,6 +189,7 @@ describePostgres("settlement reconciliation", () => {
     const attempt = await client.paymentAttempt.create({ data: attemptData(seed, "timed_out") });
     const settlement = await client.settlement.create({
       data: {
+        correlationId: attempt.correlationId,
         paymentAttemptId: attempt.id,
         transactionHash: `tx_${seed}`,
         network: attempt.network,
@@ -199,6 +202,7 @@ describePostgres("settlement reconciliation", () => {
     });
     return {
       paymentAttemptId: attempt.id,
+      correlationId: attempt.correlationId,
       settlementId: settlement.id,
       transactionHash: settlement.transactionHash!,
       network: attempt.network
@@ -208,6 +212,7 @@ describePostgres("settlement reconciliation", () => {
 
 function attemptData(seed: string, status: string) {
   return {
+    correlationId: `corr_${seed}`,
     paymentHash: `payment_hash_${seed}`,
     idempotencyKey: `verify:payment_hash_${seed}`,
     network: "stellar:testnet",

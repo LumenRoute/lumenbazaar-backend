@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { redactSensitiveText } from "@lumenbazaar/shared";
+
 import { AuditLogService, sanitizeAuditMetadata } from "./audit.js";
 
 describe("AuditLogService", () => {
@@ -45,6 +47,17 @@ describe("AuditLogService", () => {
     ).toEqual({
       callback: expect.stringContaining("=>"),
       token: "[redacted]"
+    });
+  });
+
+  it("redacts credentials embedded in otherwise safe log values", () => {
+    expect(
+      redactSensitiveText(
+        "provider failed: Authorization: Bearer ey.secret.token signing_key=SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      )
+    ).not.toContain("ey.secret.token");
+    expect(sanitizeAuditMetadata({ reason: "API_KEY=do-not-log" })).toEqual({
+      reason: "[redacted]"
     });
   });
 });

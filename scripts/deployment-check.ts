@@ -20,6 +20,7 @@ export type DeploymentCheckResult = {
     };
     mcp: {
       health: string;
+      metrics: string;
       readiness: string;
       schema: string;
       streamableHttp: string;
@@ -175,6 +176,7 @@ export function validateTestnetDeploymentEnv(
       },
       mcp: {
         health: mcpEndpoint("/health"),
+        metrics: mcpEndpoint("/metrics"),
         readiness: mcpEndpoint("/ready"),
         schema: mcpEndpoint("/schema"),
         streamableHttp: mcpUrl,

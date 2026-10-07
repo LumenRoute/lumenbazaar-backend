@@ -58,6 +58,7 @@ describe("testnet deployment check", () => {
         },
         mcp: {
           health: "https://mcp.testnet.lumenbazaar.dev/health",
+          metrics: "https://mcp.testnet.lumenbazaar.dev/metrics",
           readiness: "https://mcp.testnet.lumenbazaar.dev/ready",
           schema: "https://mcp.testnet.lumenbazaar.dev/schema",
           streamableHttp: "https://mcp.testnet.lumenbazaar.dev/mcp",

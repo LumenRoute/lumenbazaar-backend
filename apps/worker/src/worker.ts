@@ -4,7 +4,8 @@ import {
   disconnectPrismaClient,
   getPrismaClient,
   type AppConfig,
-  loadConfig
+  loadConfig,
+  redactSensitiveText
 } from "@lumenbazaar/shared";
 import { settlementReconciliationJobId } from "@lumenbazaar/stellar-payments";
 
@@ -235,6 +236,7 @@ export class BullMqWorkerBackend implements WorkerBackend {
     });
     for (const attempt of attempts) {
       await enqueueSettlementConfirmation(this.settlementQueue, {
+        correlationId: attempt.correlationId,
         paymentAttemptId: attempt.id,
         network: attempt.network,
         ...(attempt.settlement === null
@@ -252,13 +254,14 @@ export class BullMqWorkerBackend implements WorkerBackend {
   private async deadLetterSettlement(job: Job<SettlementConfirmationJobData>, error: Error) {
     const reason =
       error.name === "ReconciliationPendingError"
-        ? `Reconciliation retries exhausted: ${error.message.slice(0, 300)}`
+        ? `Reconciliation retries exhausted: ${redactSensitiveText(error.message).slice(0, 300)}`
         : "Reconciliation retries exhausted after an internal dependency failure.";
     await this.deadLetterQueue.add(
       "settlement-reconciliation-dead-letter",
       {
         sourceJobId: String(job.id),
         sourceQueue: queueNames.settlementConfirmation,
+        correlationId: job.data.correlationId,
         paymentAttemptId: job.data.paymentAttemptId,
         settlementId: job.data.settlementId,
         reason

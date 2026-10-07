@@ -1,4 +1,10 @@
-import { LumenError, type AppConfig, type PaymentAttempt } from "@lumenbazaar/shared";
+import {
+  createCorrelationId,
+  getCorrelationId,
+  LumenError,
+  type AppConfig,
+  type PaymentAttempt
+} from "@lumenbazaar/shared";
 import { type VerifyResponse } from "@x402/core/types";
 
 import { computePaymentHash } from "./hash.js";
@@ -14,6 +20,7 @@ import {
 import { InMemoryPaymentAttemptStore, type PaymentAttemptStore } from "./paymentAttemptStore.js";
 
 export type PaymentVerificationResult = {
+  correlationId: string;
   paymentAttemptId: string;
   paymentHash: string;
   network: NormalizedVerifyPaymentRequest["network"];
@@ -88,6 +95,7 @@ export class PaymentVerificationService {
     let attempt: PaymentAttempt;
     try {
       attempt = await this.attemptStore.createVerifiedAttempt({
+        correlationId: getCorrelationId() ?? createCorrelationId(),
         paymentHash,
         idempotencyKey: `verify:${paymentHash}`,
         network: normalized.network,
@@ -123,6 +131,7 @@ export class PaymentVerificationService {
     });
 
     return {
+      correlationId: attempt.correlationId,
       paymentAttemptId: attempt.id,
       paymentHash,
       network: normalized.network,
@@ -157,6 +166,7 @@ function existingVerificationResult(
     throw new LumenError("REPLAY_DETECTED", "Payment authorization is no longer reusable.");
   }
   return {
+    correlationId: existing.correlationId,
     paymentAttemptId: existing.id,
     paymentHash,
     network: normalized.network,

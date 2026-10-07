@@ -3,7 +3,12 @@ import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 
-import { type AppConfig, listConfiguredNetworks, loadConfig } from "@lumenbazaar/shared";
+import {
+  type AppConfig,
+  listConfiguredNetworks,
+  loadConfig,
+  runWithCorrelationId
+} from "@lumenbazaar/shared";
 import {
   PaymentSessionService,
   PaymentVerificationService,
@@ -24,13 +29,14 @@ import { registerMetadataRoutes } from "./routes/metadata.js";
 import { registerPaymentSessionRoutes } from "./routes/paymentSessions.js";
 import { registerResourceRoutes } from "./routes/resources.js";
 import { registerSellerRoutes } from "./routes/sellers.js";
-import { AuditLogService } from "./services/audit.js";
+import { createRuntimeAuditLog, type AuditLogService } from "./services/audit.js";
 import { createCatalogPersistence } from "./services/catalogPersistence.js";
 import { CatalogService } from "./services/cataloging.js";
 import { CatalogValidationService } from "./services/catalogValidation.js";
 import { ConformanceRunService, createServiceConformanceRunner } from "./services/conformance.js";
 import { DiscoveryService } from "./services/discovery.js";
 import { createMetricsService, type MetricsService } from "./services/metrics.js";
+import { createOperationalMetricsRefresher } from "./services/operationalMetrics.js";
 import { createRuntimeRateLimitService, type RateLimitService } from "./services/rateLimit.js";
 import {
   createReadinessService,
@@ -103,11 +109,20 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
 
   registerErrorHandling(app);
 
-  app.addHook("onRequest", async (request, reply) => {
-    reply.header("x-request-id", request.id);
+  app.addHook("onRequest", (request, reply, done) => {
+    runWithCorrelationId(request.id, () => {
+      reply.header("x-request-id", request.id);
+      reply.header("x-correlation-id", request.id);
+      done();
+    });
   });
 
-  const auditLogService = options.auditLogService ?? new AuditLogService();
+  const runtimeAuditLog =
+    options.auditLogService === undefined ? createRuntimeAuditLog(config) : undefined;
+  const auditLogService = options.auditLogService ?? runtimeAuditLog!.service;
+  if (runtimeAuditLog !== undefined) {
+    app.addHook("onClose", async () => runtimeAuditLog.close());
+  }
   const runtimeRateLimit =
     options.rateLimitService === undefined ? createRuntimeRateLimitService(config) : undefined;
   const rateLimitService = options.rateLimitService ?? runtimeRateLimit!.service;
@@ -115,6 +130,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     app.addHook("onClose", async () => runtimeRateLimit.close());
   }
   const metricsService = options.metricsService ?? createMetricsService();
+  const operationalMetrics = createOperationalMetricsRefresher(config, metricsService);
+  app.addHook("onClose", async () => operationalMetrics.close());
   const receiptService =
     options.receiptService ?? new ReceiptService({ receiptStore: paymentPersistence.receiptStore });
 
@@ -122,7 +139,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   registerMetadataRoutes(app, {
     config,
     metrics: metricsService,
-    readiness: readinessService
+    readiness: readinessService,
+    operationalMetrics
   });
   const verificationService =
     options.verificationService ??
@@ -167,7 +185,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     new CatalogService(catalogValidationService, resourceService, {
       auditLogService,
       eventStore: catalogPersistence.eventStore,
-      indexingQueue: catalogPersistence.indexingQueue
+      indexingQueue: catalogPersistence.indexingQueue,
+      metrics: metricsService
     });
   const discoveryService = options.discoveryService ?? new DiscoveryService(resourceService);
   const searchService =

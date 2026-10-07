@@ -80,6 +80,15 @@ describe("public MCP Streamable HTTP protocol", () => {
       });
       expect(unavailable.isError).toBe(true);
       expect(JSON.stringify(unavailable.content)).toContain("CAPABILITY_UNAVAILABLE");
+
+      const metrics = await fetch(`http://127.0.0.1:${server.port}/metrics`);
+      const metricBody = await metrics.text();
+      expect(metricBody).toContain(
+        'lumenbazaar_mcp_tool_calls_total{tool="search_paid_resources",result="success"} 1'
+      );
+      expect(metricBody).toContain(
+        'lumenbazaar_mcp_tool_calls_total{tool="call_paid_resource",result="unavailable"} 1'
+      );
     } finally {
       await client.close();
       await server.close();

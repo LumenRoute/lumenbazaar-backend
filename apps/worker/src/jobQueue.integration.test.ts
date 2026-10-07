@@ -61,6 +61,7 @@ describeRedis("durable settlement jobs", () => {
     const paymentAttemptId = "attempt_api_scheduler";
 
     await runtime.scheduler!.enqueue({
+      correlationId: "corr_api_scheduler",
       paymentAttemptId,
       settlementId: "settlement_api_scheduler",
       transactionHash: "tx_api_scheduler",
@@ -72,6 +73,7 @@ describeRedis("durable settlement jobs", () => {
       reader.getJob(settlementReconciliationJobId(paymentAttemptId))
     ).resolves.toMatchObject({
       data: {
+        correlationId: "corr_api_scheduler",
         paymentAttemptId,
         settlementId: "settlement_api_scheduler",
         transactionHash: "tx_api_scheduler"

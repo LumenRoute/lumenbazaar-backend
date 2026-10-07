@@ -10,6 +10,7 @@ import { loadConfig, serviceName } from "@lumenbazaar/shared";
 
 import { BackendClient } from "./client.js";
 import { createMcpServer, mcpToolSchemaDocument } from "./server.js";
+import { createMcpMetricsService, mcpMetricRoute, type McpMetricsService } from "./metrics.js";
 import { type McpToolCapabilities } from "./tools.js";
 
 export type McpHttpServerOptions = {
@@ -19,6 +20,7 @@ export type McpHttpServerOptions = {
   client?: BackendClient;
   capabilityProvider?: () => Promise<McpToolCapabilities>;
   requestGuard?: McpHttpRequestGuard;
+  metrics?: McpMetricsService;
 };
 
 export type McpHttpServerHandle = {
@@ -35,6 +37,7 @@ type McpHttpRouteOptions = {
   capabilityProvider?: () => Promise<McpToolCapabilities>;
   environment?: string;
   requestGuard?: McpHttpRequestGuard;
+  metrics?: McpMetricsService;
 };
 
 export class McpHttpRequestGuard {
@@ -100,10 +103,11 @@ export async function startMcpHttpServer(
   const requestGuard =
     options.requestGuard ??
     new McpHttpRequestGuard(120, 60_000, 1024 * 1024, process.env.MCP_TRUST_PROXY === "true");
+  const metrics = options.metrics ?? createMcpMetricsService();
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID()
   });
-  const mcpServer = createMcpServer({ client, capabilityProvider });
+  const mcpServer = createMcpServer({ client, capabilityProvider, metrics });
 
   await mcpServer.connect(transport as unknown as Transport);
 
@@ -111,6 +115,7 @@ export async function startMcpHttpServer(
     handleMcpHttpRequest(request, response, transport, path, {
       capabilityProvider,
       requestGuard,
+      metrics,
       environment: config.lumenEnv
     }).catch(() => {
       sendJson(response, 500, {
@@ -163,6 +168,17 @@ export async function handleMcpHttpRequest(
 ) {
   const requestPath = parseMcpRequestPath(request.url);
   const expectedPath = normalizePath(mcpPath);
+  const metricRoute = mcpMetricRoute(requestPath, expectedPath);
+
+  response.once("finish", () => {
+    const result =
+      response.statusCode === 429
+        ? "rate_limited"
+        : response.statusCode >= 400
+          ? "rejected"
+          : "accepted";
+    options.metrics?.recordHttp(metricRoute, result);
+  });
 
   if (requestPath === null) {
     sendJson(response, 400, {
@@ -219,6 +235,17 @@ export async function handleMcpHttpRequest(
     if (request.method !== "GET") return methodNotAllowed(response);
     const capabilities = await probeCapabilities(options.capabilityProvider);
     sendJson(response, 200, mcpToolSchemaDocument(capabilities));
+    return;
+  }
+
+  if (requestPath === "/metrics") {
+    if (request.method !== "GET") return methodNotAllowed(response);
+    response.writeHead(200, {
+      "cache-control": "no-store",
+      "content-type": "text/plain; version=0.0.4",
+      "x-content-type-options": "nosniff"
+    });
+    response.end((await options.metrics?.collect()) ?? "");
     return;
   }
 

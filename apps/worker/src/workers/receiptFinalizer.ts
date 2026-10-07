@@ -1,6 +1,6 @@
 import { type Job } from "bullmq";
 
-import { getPrismaClient } from "@lumenbazaar/shared";
+import { getPrismaClient, redactSensitiveText } from "@lumenbazaar/shared";
 
 export type ReceiptFinalizerJobData = {
   action: "finalize_pending" | "finalize_by_settlement" | "retry_failed";
@@ -56,7 +56,7 @@ export async function handleReceiptFinalizer(job: Job<ReceiptFinalizerJobData>) 
             job.log(`Finalized receipt ${receipt.id} from settlement ${settlement.id}`);
           }
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
+          const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
           job.log(`Failed to finalize receipt ${receipt.id}: ${errorMsg}`);
         }
       }
@@ -144,7 +144,7 @@ export async function handleReceiptFinalizer(job: Job<ReceiptFinalizerJobData>) 
             job.log(`Recovered receipt ${receipt.id} from settlement ${settlement.id}`);
           }
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
+          const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
           job.log(`Failed to retry receipt ${receipt.id}: ${errorMsg}`);
         }
       }
@@ -152,7 +152,7 @@ export async function handleReceiptFinalizer(job: Job<ReceiptFinalizerJobData>) 
       job.log(`Retried ${retriedCount} failed receipts`);
     }
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
     job.log(`Receipt finalizer job failed: ${errorMsg}`);
     throw err;
   }

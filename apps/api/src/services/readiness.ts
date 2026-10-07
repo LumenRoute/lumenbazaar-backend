@@ -54,7 +54,10 @@ const requiredMigrations = [
   "0001_core_catalog",
   "0002_payment_records",
   "0003_discovery_operations",
-  "0004_upto_sessions"
+  "0004_upto_sessions",
+  "0005_durable_payment_persistence",
+  "0006_settlement_reconciliation",
+  "0007_observability_correlation"
 ] as const;
 
 export function createReadinessService(

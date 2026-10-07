@@ -22,6 +22,11 @@ describe("MCP HTTP server", () => {
         app: "mcp-server",
         transport: "streamable-http"
       });
+      const metrics = await fetch(`http://127.0.0.1:${server.port}/metrics`);
+      expect(metrics.status).toBe(200);
+      expect(await metrics.text()).toContain(
+        'lumenbazaar_mcp_http_requests_total{route="health",result="accepted"} 1'
+      );
     } finally {
       await server.close();
     }

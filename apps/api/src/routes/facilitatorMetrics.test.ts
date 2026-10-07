@@ -64,6 +64,12 @@ describe("facilitator metrics", () => {
       expect.any(Number)
     );
     expect(metrics.recordSettlementResult).toHaveBeenCalledWith("stellar:testnet", "settled");
+    expect(metrics.recordVerification).toHaveBeenCalledWith("stellar:testnet", "accepted");
+    expect(metrics.observeFinality).toHaveBeenCalledWith(
+      "stellar:testnet",
+      expect.any(Number),
+      "confirmed"
+    );
     expect(metrics.recordRpcError).not.toHaveBeenCalled();
 
     await app.close();
@@ -78,7 +84,15 @@ function fakeMetrics(): MetricsService {
     observeSearchLatency: vi.fn(),
     recordRpcError: vi.fn(),
     recordSettlementResult: vi.fn(),
-    setQueueDepth: vi.fn()
+    setQueueDepth: vi.fn(),
+    observeFinality: vi.fn(),
+    recordVerification: vi.fn(),
+    recordReplayRejection: vi.fn(),
+    recordReconciliation: vi.fn(),
+    recordCatalog: vi.fn(),
+    setDependencyStatus: vi.fn(),
+    setStuckSettlements: vi.fn(),
+    setReconciliationBacklog: vi.fn()
   };
 }
 

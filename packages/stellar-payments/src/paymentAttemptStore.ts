@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  createCorrelationId,
+  getCorrelationId,
   LumenError,
   type ErrorCode,
   type NetworkId,
@@ -8,6 +10,7 @@ import {
 } from "@lumenbazaar/shared";
 
 export type CreatePaymentAttemptInput = {
+  correlationId?: string;
   resourceId?: string;
   sellerId?: string;
   paymentHash: string;
@@ -52,6 +55,7 @@ export class InMemoryPaymentAttemptStore implements PaymentAttemptStore {
     const id = `pay_${randomUUID().replaceAll("-", "").slice(0, 24)}`;
     const attempt: PaymentAttempt = {
       id,
+      correlationId: input.correlationId ?? getCorrelationId() ?? createCorrelationId(),
       resourceId: input.resourceId ?? null,
       sellerId: input.sellerId ?? null,
       paymentHash: input.paymentHash,

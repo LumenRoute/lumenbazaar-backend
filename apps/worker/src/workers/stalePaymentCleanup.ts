@@ -2,7 +2,7 @@ import { type Job } from "bullmq";
 
 import { type PrismaClient } from "@prisma/client";
 
-import { getPrismaClient } from "@lumenbazaar/shared";
+import { getPrismaClient, redactSensitiveText } from "@lumenbazaar/shared";
 
 export type StalePaymentCleanupJobData = {
   action: "cleanup_expired" | "cleanup_failed" | "archive";
@@ -49,7 +49,7 @@ export async function handleStalePaymentCleanup(
 
           expiredCount++;
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
+          const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
           job.log(`Failed to expire payment ${attempt.id}: ${errorMsg}`);
         }
       }
@@ -86,7 +86,7 @@ export async function handleStalePaymentCleanup(
           retainedCount++;
           job.log(`Retained failed payment evidence ${attempt.id}`);
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
+          const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
           job.log(`Failed to record retention review for ${attempt.id}: ${errorMsg}`);
         }
       }
@@ -130,7 +130,7 @@ export async function handleStalePaymentCleanup(
 
           archivedCount++;
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
+          const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
           job.log(`Failed to archive payment ${attempt.id}: ${errorMsg}`);
         }
       }
@@ -140,7 +140,7 @@ export async function handleStalePaymentCleanup(
 
     job.log("Financial and audit evidence retention rules applied");
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
     job.log(`Stale payment cleanup job failed: ${errorMsg}`);
     throw err;
   }
