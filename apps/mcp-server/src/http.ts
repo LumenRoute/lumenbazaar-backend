@@ -93,10 +93,18 @@ export async function handleMcpHttpRequest(
   transport: McpHttpTransport,
   mcpPath = "/mcp"
 ) {
-  const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+  const requestPath = parseMcpRequestPath(request.url);
   const expectedPath = normalizePath(mcpPath);
 
-  if (requestUrl.pathname === "/health") {
+  if (requestPath === null) {
+    sendJson(response, 400, {
+      ok: false,
+      error: "invalid_request_url"
+    });
+    return;
+  }
+
+  if (requestPath === "/health") {
     sendJson(response, 200, {
       ok: true,
       service: serviceName,
@@ -106,7 +114,7 @@ export async function handleMcpHttpRequest(
     return;
   }
 
-  if (requestUrl.pathname !== expectedPath) {
+  if (requestPath !== expectedPath) {
     sendJson(response, 404, {
       ok: false,
       error: "not_found"
@@ -115,6 +123,28 @@ export async function handleMcpHttpRequest(
   }
 
   await transport.handleRequest(request, response);
+}
+
+export function parseMcpRequestPath(rawUrl: string | undefined) {
+  const value = rawUrl ?? "/";
+
+  if (
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.includes("\\") ||
+    [...value].some((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 31 || code === 127;
+    })
+  ) {
+    return null;
+  }
+
+  try {
+    return new URL(value, "http://localhost").pathname;
+  } catch {
+    return null;
+  }
 }
 
 function sendJson(response: ServerResponse, statusCode: number, body: Record<string, unknown>) {

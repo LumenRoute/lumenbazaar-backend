@@ -11,6 +11,6 @@
     "@lumenbazaar/buyer-sdk": "workspace:*",
     "@lumenbazaar/seller-sdk": "workspace:*",
     "@lumenbazaar/shared": "workspace:*",
-    "fastify": "5.12.1"
+    "fastify": "5.12.5"
   }
 }

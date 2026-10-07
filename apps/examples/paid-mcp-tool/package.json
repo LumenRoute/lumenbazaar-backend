@@ -11,7 +11,7 @@
     "@lumenbazaar/mcp-server": "workspace:*",
     "@lumenbazaar/seller-sdk": "workspace:*",
     "@lumenbazaar/shared": "workspace:*",
-    "fastify": "5.12.1",
+    "fastify": "5.12.5",
     "zod": "4.1.12"
   }
 }

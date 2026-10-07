@@ -58,7 +58,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   const config = options.config ?? loadConfig();
   const app = Fastify({
     genReqId: () => randomUUID(),
-    logger: options.logger ?? config.nodeEnv !== "test"
+    logger: options.logger ?? config.nodeEnv !== "test",
+    trustProxy: false
   });
   const paymentCapabilities = options.paymentCapabilities ?? {
     exact: false,

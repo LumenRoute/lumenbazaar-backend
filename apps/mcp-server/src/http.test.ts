@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 
 import { describe, expect, it } from "vitest";
 
-import { handleMcpHttpRequest, startMcpHttpServer } from "./http.js";
+import { handleMcpHttpRequest, parseMcpRequestPath, startMcpHttpServer } from "./http.js";
 
 describe("MCP HTTP server", () => {
   it("exposes a deployment health endpoint", async () => {
@@ -61,6 +61,31 @@ describe("MCP HTTP server", () => {
           resolve();
         });
       });
+    }
+  });
+
+  it("rejects absolute, protocol-relative, and malformed request targets", () => {
+    expect(parseMcpRequestPath("/mcp?session=one")).toBe("/mcp");
+    expect(parseMcpRequestPath("https://attacker.example/mcp")).toBeNull();
+    expect(parseMcpRequestPath("//attacker.example/mcp")).toBeNull();
+    expect(parseMcpRequestPath("/\\attacker.example/mcp")).toBeNull();
+    expect(parseMcpRequestPath("/mcp\u0000suffix")).toBeNull();
+  });
+
+  it("does not expose OAuth metadata or redirect unmatched paths", async () => {
+    const server = await startMcpHttpServer({ host: "127.0.0.1", port: 0 });
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${server.port}/.well-known/oauth-authorization-server`,
+        { redirect: "manual" }
+      );
+
+      expect(response.status).toBe(404);
+      expect(response.headers.get("location")).toBeNull();
+      await expect(response.json()).resolves.toEqual({ ok: false, error: "not_found" });
+    } finally {
+      await server.close();
     }
   });
 });
