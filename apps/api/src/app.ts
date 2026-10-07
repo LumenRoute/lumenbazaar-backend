@@ -10,6 +10,7 @@ import {
   ReceiptService,
   SettlementService,
   createPaymentPersistence,
+  createRuntimePaymentReconciliation,
   createX402StellarAdapter,
   type FacilitatorSignerProvider
 } from "@lumenbazaar/stellar-payments";
@@ -71,6 +72,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   });
   const paymentPersistence = createPaymentPersistence(config);
   app.addHook("onClose", async () => paymentPersistence.close());
+  const paymentReconciliation = createRuntimePaymentReconciliation(config);
+  app.addHook("onClose", async () => paymentReconciliation.close());
   const runtimeAdapter =
     options.signerProvider === undefined
       ? undefined
@@ -132,6 +135,9 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
       attemptStore: verificationService.getAttemptStore(),
       settlementStore: paymentPersistence.settlementStore,
       receiptService,
+      ...(paymentReconciliation.scheduler === undefined
+        ? {}
+        : { reconciliationScheduler: paymentReconciliation.scheduler }),
       ...(options.verificationService === undefined &&
       paymentPersistence.statePersistence !== undefined
         ? { statePersistence: paymentPersistence.statePersistence }

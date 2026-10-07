@@ -141,22 +141,26 @@ model PaymentAttempt {
 }
 
 model Settlement {
-  id                  String         @id @default(cuid())
-  paymentAttemptId    String         @unique
-  transactionHash     String?        @unique
-  ledger              Int?
-  network             String
-  amount              Decimal        @db.Decimal(24, 7)
-  assetCode           String
-  assetIssuer         String
-  status              String         @default("pending")
-  reconciliationState String         @default("not_required")
-  settledAt           DateTime?
-  createdAt           DateTime       @default(now())
-  paymentAttempt      PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
+  id                     String         @id @default(cuid())
+  paymentAttemptId       String         @unique
+  transactionHash        String?        @unique
+  ledger                 Int?
+  network                String
+  amount                 Decimal        @db.Decimal(24, 7)
+  assetCode              String
+  assetIssuer            String
+  status                 String         @default("pending")
+  reconciliationState    String         @default("not_required")
+  reconciliationReason   String?
+  reconciliationAttempts Int            @default(0)
+  lastReconciledAt       DateTime?
+  settledAt              DateTime?
+  createdAt              DateTime       @default(now())
+  paymentAttempt         PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
 
   @@index([network, status])
   @@index([ledger])
+  @@index([reconciliationState, lastReconciledAt])
 }
 
 model Receipt {

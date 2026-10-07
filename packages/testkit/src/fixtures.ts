@@ -103,6 +103,9 @@ export const testSettlement = {
   assetIssuer: testPaymentAttempt.assetIssuer,
   status: "confirmed",
   reconciliationState: "not_required",
+  reconciliationReason: null,
+  reconciliationAttempts: 0,
+  lastReconciledAt: null,
   settledAt: new Date().toISOString(),
   createdAt: new Date().toISOString()
 };

@@ -270,6 +270,9 @@ function mapSettlement(row: Prisma.SettlementGetPayload<object>): Settlement {
     amount: row.amount.toString(),
     status: row.status as Settlement["status"],
     reconciliationState: row.reconciliationState as Settlement["reconciliationState"],
+    reconciliationReason: row.reconciliationReason,
+    reconciliationAttempts: row.reconciliationAttempts,
+    lastReconciledAt: row.lastReconciledAt?.toISOString() ?? null,
     settledAt: row.settledAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString()
   };

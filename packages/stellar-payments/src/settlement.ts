@@ -10,6 +10,7 @@ import {
 } from "./paymentPayload.js";
 import { InMemoryPaymentAttemptStore, type PaymentAttemptStore } from "./paymentAttemptStore.js";
 import { type PaymentStatePersistence } from "./paymentStatePersistence.js";
+import { type PaymentReconciliationScheduler } from "./reconciliation.js";
 import { ReceiptService } from "./receipt.js";
 import { InMemorySettlementStore, type SettlementStore } from "./settlementStore.js";
 import { type PaymentAuditLogger } from "./verification.js";
@@ -32,6 +33,7 @@ export type SettlementServiceOptions = {
   settlementStore?: SettlementStore;
   receiptService?: ReceiptService;
   statePersistence?: PaymentStatePersistence;
+  reconciliationScheduler?: PaymentReconciliationScheduler;
 };
 
 export type SettlementServiceResult = {
@@ -71,6 +73,7 @@ export class SettlementService {
   private readonly settlementStore: SettlementStore;
   private readonly receiptService: ReceiptService;
   private readonly statePersistence: PaymentStatePersistence | undefined;
+  private readonly reconciliationScheduler: PaymentReconciliationScheduler | undefined;
 
   constructor(
     private readonly config: AppConfig,
@@ -82,6 +85,7 @@ export class SettlementService {
     this.settlementStore = options.settlementStore ?? new InMemorySettlementStore();
     this.receiptService = options.receiptService ?? new ReceiptService();
     this.statePersistence = options.statePersistence;
+    this.reconciliationScheduler = options.reconciliationScheduler;
   }
 
   async settle(input: unknown): Promise<SettlementServiceResult> {
@@ -318,17 +322,39 @@ export class SettlementService {
       status,
       reconciliationState: result.transactionHash === undefined ? "not_required" : "pending"
     } as const;
+    const settlement =
+      this.statePersistence === undefined
+        ? await this.settlementStore.createSettlement(settlementInput)
+        : (
+            await this.statePersistence.recordFailed({
+              attempt,
+              settlement: settlementInput,
+              failureCode,
+              failureReason
+            })
+          ).settlement;
+    if (result.transactionHash !== undefined) {
+      try {
+        await this.reconciliationScheduler?.enqueue({
+          paymentAttemptId: attempt.id,
+          settlementId: settlement.id,
+          transactionHash: result.transactionHash,
+          network: normalized.network
+        });
+      } catch {
+        await this.auditLogService?.record({
+          action: "settlement.reconciliation.enqueue_failed",
+          actorId: attempt.sellerId,
+          actorType: "system",
+          targetId: settlement.id,
+          targetType: "settlement",
+          metadata: { paymentAttemptId: attempt.id, network: normalized.network }
+        });
+      }
+    }
     if (this.statePersistence === undefined) {
-      await this.settlementStore.createSettlement(settlementInput);
       await this.attemptStore.updatePaymentAttempt(attempt.id, {
         status,
-        failureCode,
-        failureReason
-      });
-    } else {
-      await this.statePersistence.recordFailed({
-        attempt,
-        settlement: settlementInput,
         failureCode,
         failureReason
       });

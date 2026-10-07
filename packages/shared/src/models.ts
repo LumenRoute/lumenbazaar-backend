@@ -24,6 +24,7 @@ export type PaymentStatus =
   | "submitted"
   | "confirmed"
   | "settled"
+  | "expired"
   | "timed_out"
   | "failed";
 export type SettlementStatus =
@@ -160,6 +161,9 @@ export type Settlement = {
   assetIssuer: string;
   status: SettlementStatus;
   reconciliationState: "not_required" | "pending" | "reconciled" | "needs_review";
+  reconciliationReason: string | null;
+  reconciliationAttempts: number;
+  lastReconciledAt: string | null;
   settledAt: string | null;
   createdAt: string;
 };

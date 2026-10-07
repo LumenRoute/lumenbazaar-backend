@@ -8,6 +8,10 @@ const durabilityMigration = readFileSync(
   "prisma/migrations/0005_durable_payment_persistence/migration.sql",
   "utf8"
 );
+const reconciliationMigration = readFileSync(
+  "prisma/migrations/0006_settlement_reconciliation/migration.sql",
+  "utf8"
+);
 const rollbackGuide = readFileSync("docs/migrations/0005-durable-payment-persistence.md", "utf8");
 
 describe("payment database schema", () => {
@@ -29,10 +33,21 @@ describe("payment database schema", () => {
   });
 
   it("tracks reconciliation state and documents a controlled rollback", () => {
-    expect(schema).toContain('reconciliationState String         @default("not_required")');
+    expect(schema).toMatch(/reconciliationState\s+String\s+@default\("not_required"\)/u);
     expect(durabilityMigration).toContain('ADD COLUMN "reconciliationState"');
     expect(rollbackGuide).toContain("Rollback");
     expect(rollbackGuide).toContain("financial evidence");
+  });
+
+  it("stores bounded reconciliation attempts and operator reasons", () => {
+    expect(schema).toMatch(/reconciliationReason\s+String\?/u);
+    expect(schema).toMatch(/reconciliationAttempts\s+Int\s+@default\(0\)/u);
+    expect(schema).toMatch(/lastReconciledAt\s+DateTime\?/u);
+    expect(schema).toContain("@@index([reconciliationState, lastReconciledAt])");
+    expect(reconciliationMigration).toContain('"reconciliationReason"');
+    expect(reconciliationMigration).toContain(
+      '"Settlement_reconciliationState_lastReconciledAt_idx"'
+    );
   });
 
   it("indexes payment state by network, seller, resource, and status", () => {

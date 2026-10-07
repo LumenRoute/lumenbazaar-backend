@@ -36,6 +36,9 @@ const settlement: Settlement = {
   assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
   status: "confirmed",
   reconciliationState: "not_required",
+  reconciliationReason: null,
+  reconciliationAttempts: 0,
+  lastReconciledAt: null,
   settledAt: now,
   createdAt: now
 };

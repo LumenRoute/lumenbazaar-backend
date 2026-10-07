@@ -1,8 +1,15 @@
-import { type Job, Worker } from "bullmq";
+import { type Job, type Queue, Worker } from "bullmq";
 
-import { type AppConfig, loadConfig } from "@lumenbazaar/shared";
+import {
+  disconnectPrismaClient,
+  getPrismaClient,
+  type AppConfig,
+  loadConfig
+} from "@lumenbazaar/shared";
+import { settlementReconciliationJobId } from "@lumenbazaar/stellar-payments";
 
-import { createBullMqConnection, queueNames, type QueueName } from "./queues.js";
+import { enqueueSettlementConfirmation } from "./jobQueue.js";
+import { createBullMqConnection, createBullMqQueue, queueNames, type QueueName } from "./queues.js";
 import { handleNetworkHealth, type NetworkHealthJobData } from "./workers/networkHealth.js";
 import {
   handleReceiptFinalizer,
@@ -15,6 +22,7 @@ import {
 import { handleSearchSync, type SearchSyncJobData } from "./workers/searchSync.js";
 import {
   handleSettlementConfirmation,
+  markReconciliationDeadLetter,
   type SettlementConfirmationJobData
 } from "./workers/settlementConfirmation.js";
 import {
@@ -78,9 +86,13 @@ export class BullMqWorkerBackend implements WorkerBackend {
   private readonly connection;
   private readonly workers: Worker[] = [];
   private readonly processed: WorkerJob[] = [];
+  private readonly settlementQueue: Queue;
+  private readonly deadLetterQueue: Queue;
 
   constructor(private readonly config: AppConfig) {
     this.connection = createBullMqConnection(config);
+    this.settlementQueue = createBullMqQueue(queueNames.settlementConfirmation, config);
+    this.deadLetterQueue = createBullMqQueue(queueNames.deadLetter, config);
   }
 
   async start() {
@@ -98,21 +110,22 @@ export class BullMqWorkerBackend implements WorkerBackend {
     );
 
     // Add settlement confirmation worker
-    this.workers.push(
-      new Worker(
-        queueNames.settlementConfirmation,
-        async (job: Job<Record<string, unknown>>) => {
-          await handleSettlementConfirmation(
-            job as Job<SettlementConfirmationJobData>,
-            this.config
-          );
-          this.recordProcessedJob(job, queueNames.settlementConfirmation);
-        },
-        {
-          connection: this.connection
-        }
-      )
+    const settlementWorker = new Worker(
+      queueNames.settlementConfirmation,
+      async (job: Job<Record<string, unknown>>) => {
+        await handleSettlementConfirmation(job as Job<SettlementConfirmationJobData>, this.config);
+        this.recordProcessedJob(job, queueNames.settlementConfirmation);
+      },
+      {
+        connection: this.connection
+      }
     );
+    settlementWorker.on("failed", (job, error) => {
+      if (job !== undefined && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+        void this.deadLetterSettlement(job as Job<SettlementConfirmationJobData>, error);
+      }
+    });
+    this.workers.push(settlementWorker);
 
     // Add search sync worker
     this.workers.push(
@@ -169,11 +182,16 @@ export class BullMqWorkerBackend implements WorkerBackend {
         }
       )
     );
+
+    await Promise.all(this.workers.map(async (worker) => worker.waitUntilReady()));
+    await this.resumePendingSettlements();
   }
 
   async stop() {
     await Promise.all(this.workers.map((worker) => worker.close()));
+    await Promise.all([this.settlementQueue.close(), this.deadLetterQueue.close()]);
     await this.connection.quit();
+    await disconnectPrismaClient();
   }
 
   async enqueue(_job: WorkerJob) {
@@ -192,6 +210,67 @@ export class BullMqWorkerBackend implements WorkerBackend {
       data: job.data
     });
   }
+
+  private async resumePendingSettlements() {
+    const db = getPrismaClient();
+    const attempts = await db.paymentAttempt.findMany({
+      where: {
+        OR: [
+          { status: "settling", settlement: null },
+          {
+            settlement: {
+              is: {
+                transactionHash: { not: null },
+                OR: [
+                  { reconciliationState: "pending" },
+                  { status: { in: ["pending", "submitted", "timed_out"] } }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      include: { settlement: true },
+      take: 1000
+    });
+    for (const attempt of attempts) {
+      await enqueueSettlementConfirmation(this.settlementQueue, {
+        paymentAttemptId: attempt.id,
+        network: attempt.network,
+        ...(attempt.settlement === null
+          ? {}
+          : {
+              settlementId: attempt.settlement.id,
+              ...(attempt.settlement.transactionHash === null
+                ? {}
+                : { transactionHash: attempt.settlement.transactionHash })
+            })
+      });
+    }
+  }
+
+  private async deadLetterSettlement(job: Job<SettlementConfirmationJobData>, error: Error) {
+    const reason =
+      error.name === "ReconciliationPendingError"
+        ? `Reconciliation retries exhausted: ${error.message.slice(0, 300)}`
+        : "Reconciliation retries exhausted after an internal dependency failure.";
+    await this.deadLetterQueue.add(
+      "settlement-reconciliation-dead-letter",
+      {
+        sourceJobId: String(job.id),
+        sourceQueue: queueNames.settlementConfirmation,
+        paymentAttemptId: job.data.paymentAttemptId,
+        settlementId: job.data.settlementId,
+        reason
+      },
+      {
+        jobId: `dead-letter-${settlementReconciliationJobId(job.data.paymentAttemptId)}`,
+        removeOnComplete: false,
+        removeOnFail: false
+      }
+    );
+    await markReconciliationDeadLetter(getPrismaClient(), job.data, reason);
+  }
 }
 
 export type WorkerAppOptions = {
@@ -201,7 +280,11 @@ export type WorkerAppOptions = {
 
 export function createWorkerApp(options: WorkerAppOptions = {}) {
   const config = options.config ?? loadConfig();
-  const backend = options.backend ?? new InMemoryWorkerBackend();
+  const backend =
+    options.backend ??
+    (config.nodeEnv === "production" && config.lumenEnv !== "local"
+      ? new BullMqWorkerBackend(config)
+      : new InMemoryWorkerBackend());
   let shutdownRegistered = false;
 
   return {

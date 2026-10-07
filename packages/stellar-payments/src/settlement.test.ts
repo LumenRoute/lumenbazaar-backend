@@ -180,6 +180,7 @@ describe("SettlementService", () => {
       },
       settleExact
     };
+    const enqueue = vi.fn(async () => undefined);
     const config = loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId });
     const verification = new PaymentVerificationService(config, {
       adapter: failingAdapter,
@@ -188,7 +189,8 @@ describe("SettlementService", () => {
     const settlement = new SettlementService(config, {
       adapter: failingAdapter,
       attemptStore,
-      settlementStore
+      settlementStore,
+      reconciliationScheduler: { enqueue }
     });
     const verified = await verification.verify(testPaymentRequest);
 
@@ -208,6 +210,7 @@ describe("SettlementService", () => {
       details: { status, transactionHash: hash }
     });
     expect(settleExact).toHaveBeenCalledTimes(1);
+    expect(enqueue).toHaveBeenCalledTimes(1);
   });
 
   it("rejects settlement when the payload differs from the verified attempt", async () => {

@@ -46,6 +46,9 @@ export class InMemorySettlementStore implements SettlementStore {
       assetIssuer: input.assetIssuer,
       status: input.status,
       reconciliationState: input.reconciliationState ?? "not_required",
+      reconciliationReason: null,
+      reconciliationAttempts: 0,
+      lastReconciledAt: null,
       settledAt: input.settledAt ?? null,
       createdAt: new Date().toISOString()
     };
