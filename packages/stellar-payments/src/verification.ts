@@ -86,6 +86,7 @@ export class PaymentVerificationService {
 
     const attempt = await this.attemptStore.createVerifiedAttempt({
       paymentHash,
+      idempotencyKey: `verify:${paymentHash}`,
       network: normalized.network,
       assetCode: normalized.asset.code,
       assetIssuer: normalized.asset.issuer,

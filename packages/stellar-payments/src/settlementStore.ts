@@ -11,6 +11,7 @@ export type CreateSettlementInput = {
   assetCode: string;
   assetIssuer: string;
   status: Settlement["status"];
+  reconciliationState?: Settlement["reconciliationState"];
   settledAt?: string;
 };
 
@@ -44,6 +45,7 @@ export class InMemorySettlementStore implements SettlementStore {
       assetCode: input.assetCode,
       assetIssuer: input.assetIssuer,
       status: input.status,
+      reconciliationState: input.reconciliationState ?? "not_required",
       settledAt: input.settledAt ?? null,
       createdAt: new Date().toISOString()
     };

@@ -9,6 +9,7 @@ import {
   parseVerifyPaymentRequest
 } from "./paymentPayload.js";
 import { InMemoryPaymentAttemptStore, type PaymentAttemptStore } from "./paymentAttemptStore.js";
+import { type PaymentStatePersistence } from "./paymentStatePersistence.js";
 import { ReceiptService } from "./receipt.js";
 import { InMemorySettlementStore, type SettlementStore } from "./settlementStore.js";
 import { type PaymentAuditLogger } from "./verification.js";
@@ -30,6 +31,7 @@ export type SettlementServiceOptions = {
   attemptStore?: PaymentAttemptStore;
   settlementStore?: SettlementStore;
   receiptService?: ReceiptService;
+  statePersistence?: PaymentStatePersistence;
 };
 
 export type SettlementServiceResult = {
@@ -68,6 +70,7 @@ export class SettlementService {
   private readonly attemptStore: PaymentAttemptStore;
   private readonly settlementStore: SettlementStore;
   private readonly receiptService: ReceiptService;
+  private readonly statePersistence: PaymentStatePersistence | undefined;
 
   constructor(
     private readonly config: AppConfig,
@@ -78,6 +81,7 @@ export class SettlementService {
     this.attemptStore = options.attemptStore ?? new InMemoryPaymentAttemptStore();
     this.settlementStore = options.settlementStore ?? new InMemorySettlementStore();
     this.receiptService = options.receiptService ?? new ReceiptService();
+    this.statePersistence = options.statePersistence;
   }
 
   async settle(input: unknown): Promise<SettlementServiceResult> {
@@ -143,7 +147,7 @@ export class SettlementService {
     }
 
     const settledAt = new Date().toISOString();
-    const settlement = await this.settlementStore.createSettlement({
+    const settlementInput = {
       paymentAttemptId: attempt.id,
       transactionHash: adapterResult.transactionHash,
       ledger: adapterResult.ledger,
@@ -152,16 +156,21 @@ export class SettlementService {
       assetCode: normalized.asset.code,
       assetIssuer: normalized.asset.issuer,
       status: "confirmed",
+      reconciliationState: "not_required",
       settledAt
-    });
-
-    const confirmedAttempt = await this.attemptStore.updatePaymentAttempt(attempt.id, {
-      status: "confirmed"
-    });
-    const receipt = await this.receiptService.finalizeSettlementReceipt(
-      confirmedAttempt,
-      settlement
-    );
+    } as const;
+    const persisted =
+      this.statePersistence === undefined
+        ? undefined
+        : await this.statePersistence.recordConfirmed({ attempt, settlement: settlementInput });
+    const settlement =
+      persisted?.settlement ?? (await this.settlementStore.createSettlement(settlementInput));
+    const confirmedAttempt =
+      persisted?.attempt ??
+      (await this.attemptStore.updatePaymentAttempt(attempt.id, { status: "confirmed" }));
+    const receipt =
+      persisted?.receipt ??
+      (await this.receiptService.finalizeSettlementReceipt(confirmedAttempt, settlement));
 
     await this.auditLogService?.record({
       action: "payment.settle",
@@ -224,32 +233,41 @@ export class SettlementService {
     result: X402SettlementResult
   ): Promise<never> {
     const status = result.status === "timed_out" ? "timed_out" : "failed";
-    await this.settlementStore.createSettlement({
+    const failureCode = result.failureCode ?? "SETTLEMENT_FAILED";
+    const failureReason = result.failureReason ?? "Stellar settlement failed.";
+    const settlementInput = {
       paymentAttemptId: attempt.id,
       ...(result.transactionHash === undefined ? {} : { transactionHash: result.transactionHash }),
       network: normalized.network,
       amount: normalized.amount,
       assetCode: normalized.asset.code,
       assetIssuer: normalized.asset.issuer,
-      status
-    });
-    await this.attemptStore.updatePaymentAttempt(attempt.id, {
       status,
-      failureCode: result.failureCode ?? "SETTLEMENT_FAILED",
-      failureReason: result.failureReason ?? "Stellar settlement failed."
-    });
-    throw new LumenError(
-      result.failureCode ?? "SETTLEMENT_FAILED",
-      result.failureReason ?? "Stellar settlement failed.",
-      {
-        details: {
-          status,
-          ...(result.transactionHash === undefined
-            ? {}
-            : { transactionHash: result.transactionHash }),
-          ...(result.officialContext ?? {})
-        }
+      reconciliationState: result.transactionHash === undefined ? "not_required" : "pending"
+    } as const;
+    if (this.statePersistence === undefined) {
+      await this.settlementStore.createSettlement(settlementInput);
+      await this.attemptStore.updatePaymentAttempt(attempt.id, {
+        status,
+        failureCode,
+        failureReason
+      });
+    } else {
+      await this.statePersistence.recordFailed({
+        attempt,
+        settlement: settlementInput,
+        failureCode,
+        failureReason
+      });
+    }
+    throw new LumenError(failureCode, failureReason, {
+      details: {
+        status,
+        ...(result.transactionHash === undefined
+          ? {}
+          : { transactionHash: result.transactionHash }),
+        ...(result.officialContext ?? {})
       }
-    );
+    });
   }
 }

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   LumenError,
   type PaymentAttempt,
@@ -38,7 +40,8 @@ export class ReceiptService {
       status: settlement.status === "confirmed" ? "finalized" : "pending",
       settledAt: settlement.settledAt,
       failureCode: paymentAttempt.failureCode,
-      failureReason: paymentAttempt.failureReason
+      failureReason: paymentAttempt.failureReason,
+      evidenceHash: receiptEvidenceHash(paymentAttempt, settlement)
     });
   }
 
@@ -51,4 +54,21 @@ export class ReceiptService {
 
     return receipt;
   }
+}
+
+export function receiptEvidenceHash(paymentAttempt: PaymentAttempt, settlement: Settlement) {
+  return createHash("sha256")
+    .update(
+      [
+        paymentAttempt.id,
+        paymentAttempt.paymentHash,
+        settlement.transactionHash ?? "",
+        String(settlement.ledger ?? ""),
+        settlement.network,
+        settlement.amount,
+        settlement.assetIssuer
+      ].join(":"),
+      "utf8"
+    )
+    .digest("hex");
 }

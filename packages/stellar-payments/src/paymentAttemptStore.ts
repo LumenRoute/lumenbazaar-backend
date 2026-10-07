@@ -11,6 +11,7 @@ export type CreatePaymentAttemptInput = {
   resourceId?: string;
   sellerId?: string;
   paymentHash: string;
+  idempotencyKey?: string;
   network: NetworkId;
   assetCode: string;
   assetIssuer: string;
@@ -38,9 +39,11 @@ export type PaymentAttemptStore = {
 export class InMemoryPaymentAttemptStore implements PaymentAttemptStore {
   private readonly attempts = new Map<string, PaymentAttempt>();
   private readonly hashes = new Map<string, string>();
+  private readonly idempotencyKeys = new Map<string, string>();
 
   async createVerifiedAttempt(input: CreatePaymentAttemptInput) {
-    if (this.hashes.has(input.paymentHash)) {
+    const idempotencyKey = input.idempotencyKey ?? `verify:${input.paymentHash}`;
+    if (this.hashes.has(input.paymentHash) || this.idempotencyKeys.has(idempotencyKey)) {
       throw new LumenError("REPLAY_DETECTED", "Payment payload has already been used.");
     }
 
@@ -51,6 +54,7 @@ export class InMemoryPaymentAttemptStore implements PaymentAttemptStore {
       resourceId: input.resourceId ?? null,
       sellerId: input.sellerId ?? null,
       paymentHash: input.paymentHash,
+      idempotencyKey,
       network: input.network,
       assetCode: input.assetCode,
       assetIssuer: input.assetIssuer,
@@ -66,6 +70,7 @@ export class InMemoryPaymentAttemptStore implements PaymentAttemptStore {
 
     this.attempts.set(id, attempt);
     this.hashes.set(input.paymentHash, id);
+    this.idempotencyKeys.set(idempotencyKey, id);
 
     return attempt;
   }

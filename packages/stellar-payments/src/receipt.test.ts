@@ -11,6 +11,7 @@ const attempt: PaymentAttempt = {
   resourceId: "resource_1",
   sellerId: "seller_1",
   paymentHash: "hash_1",
+  idempotencyKey: "verify:hash_1",
   network: "stellar:testnet",
   assetCode: "USDC",
   assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
@@ -34,6 +35,7 @@ const settlement: Settlement = {
   assetCode: "USDC",
   assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
   status: "confirmed",
+  reconciliationState: "not_required",
   settledAt: now,
   createdAt: now
 };

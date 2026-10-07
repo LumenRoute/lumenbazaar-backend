@@ -75,6 +75,7 @@ export const testPaymentAttempt = {
   resourceId: testResource.id,
   sellerId: testSeller.id,
   paymentHash: "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+  idempotencyKey: "verify:a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
   network: testnetConfig.network,
   assetCode: "USDC",
   assetIssuer: testResource.assetIssuer,
@@ -101,6 +102,7 @@ export const testSettlement = {
   assetCode: testPaymentAttempt.assetCode,
   assetIssuer: testPaymentAttempt.assetIssuer,
   status: "confirmed",
+  reconciliationState: "not_required",
   settledAt: new Date().toISOString(),
   createdAt: new Date().toISOString()
 };
@@ -123,6 +125,7 @@ export const testReceipt = {
   settledAt: testSettlement.settledAt,
   failureCode: null,
   failureReason: null,
+  evidenceHash: "receipt-evidence-fixture",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString()
 };

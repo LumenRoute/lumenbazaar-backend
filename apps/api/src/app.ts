@@ -7,10 +7,11 @@ import { type AppConfig, listConfiguredNetworks, loadConfig } from "@lumenbazaar
 import {
   PaymentSessionService,
   PaymentVerificationService,
+  ReceiptService,
   SettlementService,
+  createPaymentPersistence,
   createX402StellarAdapter,
-  type FacilitatorSignerProvider,
-  type ReceiptService
+  type FacilitatorSignerProvider
 } from "@lumenbazaar/stellar-payments";
 
 import { registerErrorHandling } from "./http/errors.js";
@@ -68,6 +69,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     logger: options.logger ?? config.nodeEnv !== "test",
     trustProxy: false
   });
+  const paymentPersistence = createPaymentPersistence(config);
+  app.addHook("onClose", async () => paymentPersistence.close());
   const runtimeAdapter =
     options.signerProvider === undefined
       ? undefined
@@ -101,6 +104,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   const auditLogService = options.auditLogService ?? new AuditLogService();
   const rateLimitService = options.rateLimitService ?? new RateLimitService();
   const metricsService = options.metricsService ?? createMetricsService();
+  const receiptService =
+    options.receiptService ?? new ReceiptService({ receiptStore: paymentPersistence.receiptStore });
 
   registerRateLimitHook(app, { rateLimitService });
   registerMetadataRoutes(app, {
@@ -112,6 +117,7 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     options.verificationService ??
     new PaymentVerificationService(config, {
       auditLogService,
+      attemptStore: paymentPersistence.attemptStore,
       ...(runtimeAdapter === undefined ? {} : { adapter: runtimeAdapter })
     });
   const settlementService =
@@ -119,9 +125,15 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     new SettlementService(config, {
       auditLogService,
       attemptStore: verificationService.getAttemptStore(),
+      settlementStore: paymentPersistence.settlementStore,
+      receiptService,
+      ...(options.verificationService === undefined &&
+      paymentPersistence.statePersistence !== undefined
+        ? { statePersistence: paymentPersistence.statePersistence }
+        : {}),
       ...(runtimeAdapter === undefined ? {} : { adapter: runtimeAdapter })
     });
-  const receiptService = options.receiptService ?? settlementService.getReceiptService();
+  const routeReceiptService = options.receiptService ?? settlementService.getReceiptService();
   const paymentSessionService =
     options.paymentSessionService ?? new PaymentSessionService(config, { auditLogService });
   const sellerService = options.sellerService ?? new SellerService(undefined, auditLogService);
@@ -153,7 +165,7 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     config,
     verificationService,
     settlementService,
-    receiptService,
+    receiptService: routeReceiptService,
     metrics: metricsService,
     readiness: readinessService
   });

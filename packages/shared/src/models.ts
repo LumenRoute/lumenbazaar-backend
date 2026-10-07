@@ -134,6 +134,7 @@ export type PaymentAttempt = {
   resourceId: string | null;
   sellerId: string | null;
   paymentHash: string;
+  idempotencyKey: string;
   network: NetworkId;
   assetCode: string;
   assetIssuer: string;
@@ -157,6 +158,7 @@ export type Settlement = {
   assetCode: string;
   assetIssuer: string;
   status: SettlementStatus;
+  reconciliationState: "not_required" | "pending" | "reconciled" | "needs_review";
   settledAt: string | null;
   createdAt: string;
 };
@@ -176,6 +178,7 @@ export type Receipt = {
   settledAt: string | null;
   failureCode: string | null;
   failureReason: string | null;
+  evidenceHash: string;
   createdAt: string;
   updatedAt: string;
 };

@@ -8,13 +8,13 @@ datasource db {
 }
 
 model Seller {
-  id               String         @id @default(cuid())
+  id               String           @id @default(cuid())
   displayName      String
-  walletAddress    String         @unique
+  walletAddress    String           @unique
   domain           String
   domainVerifiedAt DateTime?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
   domains          SellerDomain[]
   resources        Resource[]
   paymentAttempts  PaymentAttempt[]
@@ -118,6 +118,7 @@ model PaymentAttempt {
   resourceId      String?
   sellerId        String?
   paymentHash     String      @unique
+  idempotencyKey  String      @unique
   network         String
   assetCode       String
   assetIssuer     String
@@ -140,18 +141,19 @@ model PaymentAttempt {
 }
 
 model Settlement {
-  id               String         @id @default(cuid())
-  paymentAttemptId String         @unique
-  transactionHash  String?        @unique
-  ledger           Int?
-  network          String
-  amount           Decimal        @db.Decimal(24, 7)
-  assetCode        String
-  assetIssuer      String
-  status           String         @default("pending")
-  settledAt        DateTime?
-  createdAt        DateTime       @default(now())
-  paymentAttempt   PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Cascade)
+  id                  String         @id @default(cuid())
+  paymentAttemptId    String         @unique
+  transactionHash     String?        @unique
+  ledger              Int?
+  network             String
+  amount              Decimal        @db.Decimal(24, 7)
+  assetCode           String
+  assetIssuer         String
+  status              String         @default("pending")
+  reconciliationState String         @default("not_required")
+  settledAt           DateTime?
+  createdAt           DateTime       @default(now())
+  paymentAttempt      PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
 
   @@index([network, status])
   @@index([ledger])
@@ -172,9 +174,10 @@ model Receipt {
   settledAt        DateTime?
   failureCode      String?
   failureReason    String?
+  evidenceHash     String         @unique
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
-  paymentAttempt   PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Cascade)
+  paymentAttempt   PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
   resource         Resource?      @relation(fields: [resourceId], references: [id], onDelete: SetNull)
   seller           Seller?        @relation(fields: [sellerId], references: [id], onDelete: SetNull)
 
