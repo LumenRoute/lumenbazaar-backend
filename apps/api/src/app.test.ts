@@ -44,7 +44,8 @@ describe("API server base", () => {
 
     expect(version.json()).toMatchObject({
       service: "lumenbazaar-backend",
-      version: "0.1.0"
+      version: "0.1.0",
+      commit: expect.any(String)
     });
     expect(openapi.json()).toMatchObject({
       openapi: "3.1.0",

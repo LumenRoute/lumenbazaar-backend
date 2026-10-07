@@ -118,7 +118,8 @@ describe("MCP HTTP server", () => {
       });
       await expect(version.json()).resolves.toMatchObject({
         app: "mcp-server",
-        version: "0.1.0"
+        version: "0.1.0",
+        commit: expect.any(String)
       });
       const schemaBody = (await schema.json()) as { tools: Array<{ name: string }> };
       expect(schemaBody.tools.map((tool) => tool.name)).toContain("search_paid_resources");

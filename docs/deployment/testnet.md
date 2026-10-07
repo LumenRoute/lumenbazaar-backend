@@ -74,12 +74,18 @@ Health checks:
 ```bash
 curl "$API_PUBLIC_URL/health"
 curl "$API_PUBLIC_URL/ready"
+curl "$API_PUBLIC_URL/version"
+curl "$API_PUBLIC_URL/metrics"
 curl "$API_PUBLIC_URL/v1/supported"
 curl "https://lumenbazaar-mcp.onrender.com/health"
 curl "https://lumenbazaar-mcp.onrender.com/metrics"
 curl "https://lumenbazaar-mcp.onrender.com/ready"
 curl "https://lumenbazaar-mcp.onrender.com/version"
 curl "https://lumenbazaar-mcp.onrender.com/schema"
+curl "$PAID_RESOURCE_PUBLIC_URL/health"
+curl "$PAID_RESOURCE_PUBLIC_URL/ready"
+curl "$PAID_RESOURCE_PUBLIC_URL/version"
+curl "$PAID_RESOURCE_PUBLIC_URL/metrics"
 ```
 
 `/health` is process liveness only. `/ready` returns HTTP 503 unless Postgres, Redis, migrations,
@@ -100,6 +106,33 @@ are configured. The docs repository can import that manifest directly or copy th
 Mintlify pages.
 
 ## Post-Deployment Checks
+
+Replace every placeholder in `docs/deployment/testnet-endpoints.json`, set `status` to `deployed`,
+record the full Git SHA for each service and the hosting provider's separate migration run ID, then
+run the public probe from outside the hosting environment:
+
+```bash
+pnpm deploy:testnet:probe -- --output deployment-evidence/testnet-probe.json
+```
+
+The probe fails unless API, MCP, and paid-resource health, readiness, version, and metrics endpoints
+are public; deployed version endpoints match the pinned commits; exact testnet is advertised; MCP
+advertises its paid-call tool; and the paid resource returns a canonical v2 `PAYMENT-REQUIRED`.
+
+Fund a separate testnet client account with the configured asset and supply its secret only through
+the operator's secret environment. The exact gate creates the authorization with the official
+`@x402/stellar` client, executes `402 -> sign -> verify -> retry -> settle -> receipt`, and pauses
+without writing the replayable signature. Restart the pinned API and worker while it is paused, wait
+for readiness, then press Enter:
+
+```bash
+CLIENT_PRIVATE_KEY="$CLIENT_PRIVATE_KEY" pnpm deploy:testnet:exact
+```
+
+The gate retrieves the same receipt and repeats settlement with the in-memory authorization. It
+fails if the receipt or transaction identity changes. The generated evidence contains only a hash
+of the authorization, public transaction/receipt facts, commit pins, and probe results. Review it
+before publication; never publish the client secret or encoded `PAYMENT-SIGNATURE`.
 
 Run conformance:
 

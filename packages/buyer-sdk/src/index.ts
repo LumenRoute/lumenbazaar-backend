@@ -49,6 +49,7 @@ export type {
   CallResult,
   PaidResourceFlowOptions,
   PaidResourceFlowResult,
+  ReceiptResult,
   RetryConfig
 } from "./call.js";
 

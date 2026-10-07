@@ -54,7 +54,8 @@ describe("testnet deployment check", () => {
           readiness: "https://api.testnet.lumenbazaar.dev/ready",
           metrics: "https://api.testnet.lumenbazaar.dev/metrics",
           openapi: "https://api.testnet.lumenbazaar.dev/openapi.json",
-          supported: "https://api.testnet.lumenbazaar.dev/v1/supported"
+          supported: "https://api.testnet.lumenbazaar.dev/v1/supported",
+          version: "https://api.testnet.lumenbazaar.dev/version"
         },
         mcp: {
           health: "https://mcp.testnet.lumenbazaar.dev/health",

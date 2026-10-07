@@ -1,5 +1,6 @@
 import Fastify, { type FastifyRequest } from "fastify";
 import { pathToFileURL } from "node:url";
+import { Counter, Registry } from "prom-client";
 
 import {
   createBudgetManager,
@@ -14,7 +15,12 @@ import {
   paymentRequirement,
   sendFastifyPaymentRequired
 } from "@lumenbazaar/seller-sdk";
-import { localIssuerPublicKey, serviceName, type JsonObject } from "@lumenbazaar/shared";
+import {
+  getReleaseCommit,
+  localIssuerPublicKey,
+  serviceName,
+  type JsonObject
+} from "@lumenbazaar/shared";
 
 const testAssetContractId = "CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS";
 
@@ -132,7 +138,25 @@ export function createWeatherCatalogMetadata(options: WeatherCatalogOptions = {}
 export function createWeatherApp(options: WeatherExampleOptions = {}) {
   const app = Fastify({ logger: options.logger ?? false });
   const metadata = createWeatherCatalogMetadata(options);
+  const registry = new Registry();
+  const requests = new Counter({
+    name: "lumenbazaar_weather_requests_total",
+    help: "Paid weather requests by bounded payment outcome.",
+    labelNames: ["result"] as const,
+    registers: [registry]
+  });
 
+  app.get("/health", async () => ({ ok: true, app: "paid-weather-api" }));
+  app.get("/ready", async () => ({ ok: true, app: "paid-weather-api" }));
+  app.get("/version", async () => ({
+    app: "paid-weather-api",
+    version: "0.1.0",
+    commit: getReleaseCommit()
+  }));
+  app.get("/metrics", async (_request, reply) => {
+    reply.type("text/plain; version=0.0.4");
+    return registry.metrics();
+  });
   app.get("/.well-known/lumenbazaar.json", async () => metadata);
   app.get("/metadata", async () => metadata);
 
@@ -141,9 +165,11 @@ export function createWeatherApp(options: WeatherExampleOptions = {}) {
     url: "/weather/:city",
     handler: async (request, reply) => {
       if (!hasPaymentHeader(request)) {
+        requests.inc({ result: "payment_required" });
         return sendFastifyPaymentRequired(reply, weatherPaymentRequirement);
       }
 
+      requests.inc({ result: "paid" });
       return forecastForCity(request.params.city);
     }
   });

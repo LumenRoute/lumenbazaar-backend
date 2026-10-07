@@ -1,6 +1,11 @@
 import { type FastifyInstance } from "fastify";
 
-import { type AppConfig, listConfiguredNetworks, serviceName } from "@lumenbazaar/shared";
+import {
+  getReleaseCommit,
+  type AppConfig,
+  listConfiguredNetworks,
+  serviceName
+} from "@lumenbazaar/shared";
 
 import { apiOpenApiSpec } from "../openapi.js";
 import { type MetricsService } from "../services/metrics.js";
@@ -35,6 +40,7 @@ export function registerMetadataRoutes(app: FastifyInstance, options: MetadataRo
   app.get("/version", async () => ({
     service: serviceName,
     version: "0.1.0",
+    commit: getReleaseCommit(),
     environment: options.config.lumenEnv
   }));
 

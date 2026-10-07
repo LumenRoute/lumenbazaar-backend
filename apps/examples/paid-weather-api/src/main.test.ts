@@ -45,6 +45,31 @@ describe("paid weather API example", () => {
     await app.close();
   });
 
+  it("exposes deployment health, version, and payment metrics", async () => {
+    const app = createWeatherApp();
+    await app.inject({ method: "GET", url: "/weather/Lagos" });
+    await app.inject({
+      method: "GET",
+      url: "/weather/Lagos",
+      headers: { "payment-signature": "signed" }
+    });
+
+    const health = await app.inject({ method: "GET", url: "/health" });
+    const ready = await app.inject({ method: "GET", url: "/ready" });
+    const version = await app.inject({ method: "GET", url: "/version" });
+    const metrics = await app.inject({ method: "GET", url: "/metrics" });
+
+    expect(health.json()).toEqual({ ok: true, app: "paid-weather-api" });
+    expect(ready.json()).toEqual({ ok: true, app: "paid-weather-api" });
+    expect(version.json()).toMatchObject({ app: "paid-weather-api", version: "0.1.0" });
+    expect(metrics.body).toContain(
+      'lumenbazaar_weather_requests_total{result="payment_required"} 1'
+    );
+    expect(metrics.body).toContain('lumenbazaar_weather_requests_total{result="paid"} 1');
+
+    await app.close();
+  });
+
   it("publishes Bazaar discovery metadata for cataloging", async () => {
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       expect(init?.method).toBe("POST");

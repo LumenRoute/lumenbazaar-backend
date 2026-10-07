@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-import { loadConfig, serviceName } from "@lumenbazaar/shared";
+import { getReleaseCommit, loadConfig, serviceName } from "@lumenbazaar/shared";
 
 import { BackendClient } from "./client.js";
 import { createMcpServer, mcpToolSchemaDocument } from "./server.js";
@@ -226,6 +226,7 @@ export async function handleMcpHttpRequest(
       service: serviceName,
       app: "mcp-server",
       version: "0.1.0",
+      commit: getReleaseCommit(),
       environment: options.environment ?? "unknown"
     });
     return;

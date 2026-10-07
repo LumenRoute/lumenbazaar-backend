@@ -17,6 +17,7 @@ export type DeploymentCheckResult = {
       metrics: string;
       openapi: string;
       supported: string;
+      version: string;
     };
     mcp: {
       health: string;
@@ -172,7 +173,8 @@ export function validateTestnetDeploymentEnv(
         readiness: `${apiBaseUrl}/ready`,
         metrics: `${apiBaseUrl}/metrics`,
         openapi: `${apiBaseUrl}/openapi.json`,
-        supported: `${apiBaseUrl}/v1/supported`
+        supported: `${apiBaseUrl}/v1/supported`,
+        version: `${apiBaseUrl}/version`
       },
       mcp: {
         health: mcpEndpoint("/health"),
