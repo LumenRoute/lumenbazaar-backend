@@ -29,7 +29,7 @@ import { CatalogValidationService } from "./services/catalogValidation.js";
 import { ConformanceRunService, createServiceConformanceRunner } from "./services/conformance.js";
 import { DiscoveryService } from "./services/discovery.js";
 import { createMetricsService, type MetricsService } from "./services/metrics.js";
-import { RateLimitService } from "./services/rateLimit.js";
+import { createRuntimeRateLimitService, type RateLimitService } from "./services/rateLimit.js";
 import {
   createReadinessService,
   createRuntimeReadinessProbes,
@@ -102,7 +102,12 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   });
 
   const auditLogService = options.auditLogService ?? new AuditLogService();
-  const rateLimitService = options.rateLimitService ?? new RateLimitService();
+  const runtimeRateLimit =
+    options.rateLimitService === undefined ? createRuntimeRateLimitService(config) : undefined;
+  const rateLimitService = options.rateLimitService ?? runtimeRateLimit!.service;
+  if (runtimeRateLimit !== undefined) {
+    app.addHook("onClose", async () => runtimeRateLimit.close());
+  }
   const metricsService = options.metricsService ?? createMetricsService();
   const receiptService =
     options.receiptService ?? new ReceiptService({ receiptStore: paymentPersistence.receiptStore });

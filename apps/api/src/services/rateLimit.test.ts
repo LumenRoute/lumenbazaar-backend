@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { RateLimitService } from "./rateLimit.js";
+import { InMemoryRateLimitCounterStore, RateLimitService } from "./rateLimit.js";
 
 describe("RateLimitService", () => {
   it("allows requests inside a window and records blocked events with hashed keys", async () => {
@@ -45,5 +45,33 @@ describe("RateLimitService", () => {
       remaining: 0
     });
     expect(events[0]?.key).not.toContain("client-secret-api-key");
+  });
+
+  it("shares an atomic bucket across service instances", async () => {
+    const counterStore = new InMemoryRateLimitCounterStore();
+    const services = [
+      new RateLimitService({
+        counterStore,
+        rules: { facilitator: { limit: 2, windowMs: 60_000 } }
+      }),
+      new RateLimitService({
+        counterStore,
+        rules: { facilitator: { limit: 2, windowMs: 60_000 } }
+      })
+    ];
+    const request = {
+      key: "shared-client",
+      route: "POST /v1/settle",
+      scope: "facilitator" as const
+    };
+
+    const results = await Promise.all([
+      services[0]!.consume(request),
+      services[1]!.consume(request),
+      services[0]!.consume(request)
+    ]);
+
+    expect(results.filter((result) => result.allowed)).toHaveLength(2);
+    expect(results.filter((result) => !result.allowed)).toHaveLength(1);
   });
 });

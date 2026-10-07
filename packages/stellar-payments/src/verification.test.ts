@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { loadConfig, type LumenError } from "@lumenbazaar/shared";
 import {
@@ -42,6 +42,19 @@ describe("PaymentVerificationService", () => {
       status: "verified",
       adapter: "@x402/stellar"
     });
+  });
+
+  it("returns the original attempt for an identical safe retry", async () => {
+    const verifyExact = vi.fn(acceptingAdapter.verifyExact);
+    const service = new PaymentVerificationService(config, {
+      adapter: { verifyExact }
+    });
+
+    const first = await service.verify(testPaymentRequest);
+    const retry = await service.verify(testPaymentRequest);
+
+    expect(retry).toEqual(first);
+    expect(verifyExact).toHaveBeenCalledTimes(1);
   });
 
   it("rejects invalid payment details before settlement", async () => {

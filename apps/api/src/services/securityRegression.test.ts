@@ -53,7 +53,7 @@ describe("security regressions", () => {
     );
   });
 
-  it("rejects replayed and expired exact payment authorizations", async () => {
+  it("returns an idempotent verification result and rejects expired authorizations", async () => {
     const verification = new PaymentVerificationService(loadConfig(testPaymentConfigEnv), {
       adapter: {
         async verifyExact(input) {
@@ -74,12 +74,9 @@ describe("security regressions", () => {
       attemptStore: new InMemoryPaymentAttemptStore()
     });
 
-    await verification.verify(exactPaymentRequest("security_replay"));
-
-    await expect(verification.verify(exactPaymentRequest("security_replay"))).rejects.toMatchObject(
-      {
-        code: "REPLAY_DETECTED"
-      }
+    const original = await verification.verify(exactPaymentRequest("security_replay"));
+    await expect(verification.verify(exactPaymentRequest("security_replay"))).resolves.toEqual(
+      original
     );
     await expect(verification.verify(testExpiredPaymentRequest)).rejects.toMatchObject({
       code: "AUTH_EXPIRED"

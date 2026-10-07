@@ -28,6 +28,7 @@ export type UpdatePaymentAttemptInput = {
 
 export type PaymentAttemptStore = {
   createVerifiedAttempt: (input: CreatePaymentAttemptInput) => Promise<PaymentAttempt>;
+  claimSettlement: (paymentAttemptId: string) => Promise<PaymentAttempt | undefined>;
   getPaymentAttempt: (paymentAttemptId: string) => Promise<PaymentAttempt | undefined>;
   findPaymentAttemptByHash: (paymentHash: string) => Promise<PaymentAttempt | undefined>;
   updatePaymentAttempt: (
@@ -77,6 +78,21 @@ export class InMemoryPaymentAttemptStore implements PaymentAttemptStore {
 
   async getPaymentAttempt(paymentAttemptId: string) {
     return this.attempts.get(paymentAttemptId);
+  }
+
+  async claimSettlement(paymentAttemptId: string) {
+    const attempt = this.attempts.get(paymentAttemptId);
+    if (attempt === undefined || attempt.status !== "verified") {
+      return undefined;
+    }
+
+    const claimed: PaymentAttempt = {
+      ...attempt,
+      status: "settling",
+      updatedAt: new Date().toISOString()
+    };
+    this.attempts.set(paymentAttemptId, claimed);
+    return claimed;
   }
 
   async findPaymentAttemptByHash(paymentHash: string) {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { type SettleResponse } from "@x402/core/types";
 
-import { LumenError, type AppConfig, type PaymentAttempt } from "@lumenbazaar/shared";
+import { LumenError, isErrorCode, type AppConfig, type PaymentAttempt } from "@lumenbazaar/shared";
 
 import { computePaymentHash } from "./hash.js";
 import {
@@ -110,13 +110,17 @@ export class SettlementService {
       throw new LumenError("INVALID_PAYMENT_PAYLOAD", "Payment attempt was not found.");
     }
 
-    const existingSettlement = await this.settlementStore.getSettlementByAttempt(attempt.id);
-    if (existingSettlement !== undefined) {
-      throw new LumenError("REPLAY_DETECTED", "Payment attempt has already been settled.");
-    }
-
     if (attempt.paymentHash !== paymentHash) {
       throw new LumenError("INVALID_PAYMENT_PAYLOAD", "Payment payload does not match attempt.");
+    }
+
+    const existingResult = await this.existingResult(attempt);
+    if (existingResult !== undefined) {
+      return existingResult;
+    }
+    const claimedAttempt = await this.attemptStore.claimSettlement(attempt.id);
+    if (claimedAttempt === undefined) {
+      return this.waitForDurableResult(attempt.id);
     }
 
     const verification = await this.adapter.verifyExact({
@@ -125,6 +129,12 @@ export class SettlementService {
       normalizedRequest: normalized
     });
     if (!verification.valid) {
+      await this.attemptStore.updatePaymentAttempt(attempt.id, {
+        status: "failed",
+        failureCode: verification.failureCode ?? "INVALID_SIGNATURE",
+        failureReason:
+          verification.failureReason ?? "Fresh Stellar verification rejected the settlement."
+      });
       throw new LumenError(
         verification.failureCode ?? "INVALID_SIGNATURE",
         verification.failureReason ?? "Fresh Stellar verification rejected the settlement.",
@@ -210,6 +220,69 @@ export class SettlementService {
     return this.receiptService;
   }
 
+  private async existingResult(
+    attempt: PaymentAttempt
+  ): Promise<SettlementServiceResult | undefined> {
+    const settlement = await this.settlementStore.getSettlementByAttempt(attempt.id);
+    if (settlement?.status === "confirmed") {
+      const receipt = await this.receiptService.getReceiptByAttempt(attempt.id);
+      if (
+        receipt !== undefined &&
+        settlement.transactionHash !== null &&
+        settlement.ledger !== null
+      ) {
+        return {
+          settlementId: settlement.id,
+          receiptId: receipt.id,
+          transactionHash: settlement.transactionHash,
+          ledger: settlement.ledger,
+          network: attempt.network,
+          status: "confirmed",
+          amount: attempt.amount
+        };
+      }
+    }
+    if (settlement?.status === "failed" || settlement?.status === "timed_out") {
+      throw new LumenError(
+        settlementFailureCode(attempt.failureCode),
+        attempt.failureReason ?? "Stellar settlement failed.",
+        {
+          details: {
+            status: settlement.status,
+            ...(settlement.transactionHash === null
+              ? {}
+              : { transactionHash: settlement.transactionHash })
+          }
+        }
+      );
+    }
+    return undefined;
+  }
+
+  private async waitForDurableResult(paymentAttemptId: string): Promise<SettlementServiceResult> {
+    for (let check = 0; check < 250; check += 1) {
+      const current = await this.attemptStore.getPaymentAttempt(paymentAttemptId);
+      if (current === undefined) {
+        break;
+      }
+      const result = await this.existingResult(current);
+      if (result !== undefined) {
+        return result;
+      }
+      if (current.status === "failed" || current.status === "timed_out") {
+        throw new LumenError(
+          settlementFailureCode(current.failureCode),
+          current.failureReason ?? "Stellar settlement failed."
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new LumenError("SETTLEMENT_FAILED", "Settlement is already in progress.", {
+      statusCode: 409,
+      details: { status: "settling" }
+    });
+  }
+
   private async settleWithAdapter(
     normalized: NormalizedVerifyPaymentRequest
   ): Promise<X402SettlementResult> {
@@ -270,4 +343,8 @@ export class SettlementService {
       }
     });
   }
+}
+
+function settlementFailureCode(code: string | null) {
+  return code !== null && isErrorCode(code) ? code : "SETTLEMENT_FAILED";
 }

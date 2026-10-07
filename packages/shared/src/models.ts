@@ -20,6 +20,7 @@ export type PaymentScheme = "exact" | "upto";
 export type PaymentStatus =
   | "received"
   | "verified"
+  | "settling"
   | "submitted"
   | "confirmed"
   | "settled"

@@ -1,4 +1,4 @@
-import { LumenError, type AppConfig } from "@lumenbazaar/shared";
+import { LumenError, type AppConfig, type PaymentAttempt } from "@lumenbazaar/shared";
 import { type VerifyResponse } from "@x402/core/types";
 
 import { computePaymentHash } from "./hash.js";
@@ -72,8 +72,9 @@ export class PaymentVerificationService {
     const normalized = parseVerifyPaymentRequest(input, this.config);
     const paymentHash = computePaymentHash(normalized.paymentPayload);
 
-    if ((await this.attemptStore.findPaymentAttemptByHash(paymentHash)) !== undefined) {
-      throw new LumenError("REPLAY_DETECTED", "Payment payload has already been used.");
+    const existing = await this.attemptStore.findPaymentAttemptByHash(paymentHash);
+    if (existing !== undefined) {
+      return existingVerificationResult(existing, normalized, paymentHash);
     }
 
     const adapterResult = await this.adapter.verifyExact({
@@ -84,15 +85,26 @@ export class PaymentVerificationService {
 
     assertAdapterAccepted(adapterResult);
 
-    const attempt = await this.attemptStore.createVerifiedAttempt({
-      paymentHash,
-      idempotencyKey: `verify:${paymentHash}`,
-      network: normalized.network,
-      assetCode: normalized.asset.code,
-      assetIssuer: normalized.asset.issuer,
-      amount: normalized.amount,
-      payTo: normalized.payTo
-    });
+    let attempt: PaymentAttempt;
+    try {
+      attempt = await this.attemptStore.createVerifiedAttempt({
+        paymentHash,
+        idempotencyKey: `verify:${paymentHash}`,
+        network: normalized.network,
+        assetCode: normalized.asset.code,
+        assetIssuer: normalized.asset.issuer,
+        amount: normalized.amount,
+        payTo: normalized.payTo
+      });
+    } catch (error) {
+      if (error instanceof LumenError && error.code === "REPLAY_DETECTED") {
+        const concurrent = await this.attemptStore.findPaymentAttemptByHash(paymentHash);
+        if (concurrent !== undefined) {
+          return existingVerificationResult(concurrent, normalized, paymentHash);
+        }
+      }
+      throw error;
+    }
 
     await this.auditLogService?.record({
       action: "payment.verify",
@@ -122,6 +134,35 @@ export class PaymentVerificationService {
   getAttemptStore() {
     return this.attemptStore;
   }
+}
+
+function existingVerificationResult(
+  existing: PaymentAttempt,
+  normalized: NormalizedVerifyPaymentRequest,
+  paymentHash: string
+): PaymentVerificationResult {
+  if (
+    existing.network !== normalized.network ||
+    existing.assetCode !== normalized.asset.code ||
+    existing.assetIssuer !== normalized.asset.issuer ||
+    existing.amount !== normalized.amount ||
+    existing.payTo !== normalized.payTo
+  ) {
+    throw new LumenError(
+      "REPLAY_DETECTED",
+      "Payment authorization was retried with conflicting requirements."
+    );
+  }
+  if (!["verified", "settling", "confirmed"].includes(existing.status)) {
+    throw new LumenError("REPLAY_DETECTED", "Payment authorization is no longer reusable.");
+  }
+  return {
+    paymentAttemptId: existing.id,
+    paymentHash,
+    network: normalized.network,
+    status: "verified",
+    adapter: "@x402/stellar"
+  };
 }
 
 function assertAdapterAccepted(result: X402VerificationResult) {

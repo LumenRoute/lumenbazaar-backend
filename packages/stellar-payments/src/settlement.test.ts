@@ -7,6 +7,7 @@ import {
   InMemoryPaymentAttemptStore,
   InMemorySettlementStore,
   PaymentVerificationService,
+  ReceiptService,
   SettlementService,
   type X402StellarAdapter
 } from "./index.js";
@@ -52,6 +53,54 @@ describe("SettlementService", () => {
       paymentAttemptId: verified.paymentAttemptId,
       status: "confirmed"
     });
+  });
+
+  it("converges concurrent and repeated settlement requests on one result", async () => {
+    const attemptStore = new InMemoryPaymentAttemptStore();
+    const settlementStore = new InMemorySettlementStore();
+    const receiptService = new ReceiptService();
+    const settleExact = vi.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      return {
+        transactionHash: "tx_concurrent_123",
+        ledger: 12346,
+        status: "confirmed" as const,
+        adapter: "@x402/stellar" as const
+      };
+    });
+    const concurrentAdapter: X402StellarAdapter = {
+      verifyExact: adapter.verifyExact,
+      settleExact
+    };
+    const config = loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId });
+    const verification = new PaymentVerificationService(config, {
+      adapter: concurrentAdapter,
+      attemptStore
+    });
+    const services = [
+      new SettlementService(config, {
+        adapter: concurrentAdapter,
+        attemptStore,
+        settlementStore,
+        receiptService
+      }),
+      new SettlementService(config, {
+        adapter: concurrentAdapter,
+        attemptStore,
+        settlementStore,
+        receiptService
+      })
+    ];
+    await verification.verify(testPaymentRequest);
+
+    const [first, concurrent] = await Promise.all(
+      services.map(async (service) => service.settle(testPaymentRequest))
+    );
+    const retry = await services[0]!.settle(testPaymentRequest);
+
+    expect(concurrent).toEqual(first);
+    expect(retry).toEqual(first);
+    expect(settleExact).toHaveBeenCalledTimes(1);
   });
 
   it("independently re-verifies immediately before official settlement", async () => {
@@ -117,20 +166,19 @@ describe("SettlementService", () => {
   ] as const)("persists %s finality without issuing a success response", async (status, hash) => {
     const attemptStore = new InMemoryPaymentAttemptStore();
     const settlementStore = new InMemorySettlementStore();
+    const settleExact = vi.fn(async () => ({
+      status,
+      transactionHash: hash,
+      failureCode: "SETTLEMENT_FAILED" as const,
+      failureReason: `Settlement ${status}.`,
+      officialContext: { stage: status === "timed_out" ? "timeout" : "failed" },
+      adapter: "@x402/stellar" as const
+    }));
     const failingAdapter: X402StellarAdapter = {
       async verifyExact() {
         return { valid: true, adapter: "@x402/stellar" };
       },
-      async settleExact() {
-        return {
-          status,
-          transactionHash: hash,
-          failureCode: "SETTLEMENT_FAILED",
-          failureReason: `Settlement ${status}.`,
-          officialContext: { stage: status === "timed_out" ? "timeout" : "failed" },
-          adapter: "@x402/stellar"
-        };
-      }
+      settleExact
     };
     const config = loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId });
     const verification = new PaymentVerificationService(config, {
@@ -155,6 +203,11 @@ describe("SettlementService", () => {
     await expect(attemptStore.getPaymentAttempt(verified.paymentAttemptId)).resolves.toMatchObject({
       status
     });
+    await expect(settlement.settle(testPaymentRequest)).rejects.toMatchObject({
+      code: "SETTLEMENT_FAILED",
+      details: { status, transactionHash: hash }
+    });
+    expect(settleExact).toHaveBeenCalledTimes(1);
   });
 
   it("rejects settlement when the payload differs from the verified attempt", async () => {

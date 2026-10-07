@@ -54,6 +54,10 @@ export class ReceiptService {
 
     return receipt;
   }
+
+  async getReceiptByAttempt(paymentAttemptId: string) {
+    return this.receiptStore.getReceiptByAttempt(paymentAttemptId);
+  }
 }
 
 export function receiptEvidenceHash(paymentAttempt: PaymentAttempt, settlement: Settlement) {

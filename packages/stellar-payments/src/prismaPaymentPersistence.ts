@@ -61,6 +61,17 @@ export class PrismaPaymentAttemptStore implements PaymentAttemptStore {
     return row === null ? undefined : mapPaymentAttempt(row);
   }
 
+  async claimSettlement(paymentAttemptId: string) {
+    const claimed = await this.db.paymentAttempt.updateMany({
+      where: { id: paymentAttemptId, status: "verified" },
+      data: { status: "settling", failureCode: null, failureReason: null }
+    });
+    if (claimed.count === 0) {
+      return undefined;
+    }
+    return this.getPaymentAttempt(paymentAttemptId);
+  }
+
   async findPaymentAttemptByHash(paymentHash: string) {
     const row = await this.db.paymentAttempt.findUnique({ where: { paymentHash } });
     return row === null ? undefined : mapPaymentAttempt(row);
@@ -140,11 +151,15 @@ export class PrismaPaymentStatePersistence implements PaymentStatePersistence {
         const settlement = mapSettlement(
           await tx.settlement.create({ data: settlementData(input.settlement) })
         );
+        const transition = await tx.paymentAttempt.updateMany({
+          where: { id: input.attempt.id, status: "settling" },
+          data: { status: "confirmed", failureCode: null, failureReason: null }
+        });
+        if (transition.count !== 1) {
+          throw new LumenError("REPLAY_DETECTED", "Payment state transition was already claimed.");
+        }
         const attempt = mapPaymentAttempt(
-          await tx.paymentAttempt.update({
-            where: { id: input.attempt.id },
-            data: { status: "confirmed", failureCode: null, failureReason: null }
-          })
+          await tx.paymentAttempt.findUniqueOrThrow({ where: { id: input.attempt.id } })
         );
         const receipt = mapReceipt(
           await tx.receipt.create({
@@ -179,15 +194,19 @@ export class PrismaPaymentStatePersistence implements PaymentStatePersistence {
         const settlement = mapSettlement(
           await tx.settlement.create({ data: settlementData(input.settlement) })
         );
+        const transition = await tx.paymentAttempt.updateMany({
+          where: { id: input.attempt.id, status: "settling" },
+          data: {
+            status: input.settlement.status,
+            failureCode: input.failureCode,
+            failureReason: input.failureReason
+          }
+        });
+        if (transition.count !== 1) {
+          throw new LumenError("REPLAY_DETECTED", "Payment state transition was already claimed.");
+        }
         const attempt = mapPaymentAttempt(
-          await tx.paymentAttempt.update({
-            where: { id: input.attempt.id },
-            data: {
-              status: input.settlement.status,
-              failureCode: input.failureCode,
-              failureReason: input.failureReason
-            }
-          })
+          await tx.paymentAttempt.findUniqueOrThrow({ where: { id: input.attempt.id } })
         );
         return { attempt, settlement };
       });

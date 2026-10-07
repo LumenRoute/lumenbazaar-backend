@@ -23,7 +23,7 @@ function request() {
 }
 
 describe("replay protection", () => {
-  it("stores verified payment attempts and rejects duplicate hashes", async () => {
+  it("stores one verified attempt and reuses it for duplicate hashes", async () => {
     const attemptStore = new InMemoryPaymentAttemptStore();
     const service = new PaymentVerificationService(loadConfig(testPaymentConfigEnv), {
       adapter: acceptingAdapter,
@@ -37,8 +37,6 @@ describe("replay protection", () => {
       paymentHash: first.paymentHash,
       status: "verified"
     });
-    await expect(service.verify(request())).rejects.toMatchObject({
-      code: "REPLAY_DETECTED"
-    });
+    await expect(service.verify(request())).resolves.toEqual(first);
   });
 });

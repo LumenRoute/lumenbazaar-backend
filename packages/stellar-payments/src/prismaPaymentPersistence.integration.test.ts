@@ -40,6 +40,7 @@ describePostgres("Prisma payment persistence", () => {
       amount: "0.0500000",
       payTo: issuer
     });
+    await attemptStore.claimSettlement(attempt.id);
     const result = await persistence.recordConfirmed({
       attempt,
       settlement: confirmedSettlement(attempt.id, "transaction_hash_restart")
@@ -71,6 +72,7 @@ describePostgres("Prisma payment persistence", () => {
       amount: "0.0500000",
       payTo: issuer
     });
+    await attemptStore.claimSettlement(first.id);
     await persistence.recordConfirmed({
       attempt: first,
       settlement: confirmedSettlement(first.id, "transaction_hash_shared")
@@ -83,6 +85,7 @@ describePostgres("Prisma payment persistence", () => {
       amount: "0.0500000",
       payTo: issuer
     });
+    await attemptStore.claimSettlement(second.id);
 
     await expect(
       persistence.recordConfirmed({
@@ -91,7 +94,7 @@ describePostgres("Prisma payment persistence", () => {
       })
     ).rejects.toMatchObject({ code: "REPLAY_DETECTED" } satisfies Partial<LumenError>);
     await expect(attemptStore.getPaymentAttempt(second.id)).resolves.toMatchObject({
-      status: "verified"
+      status: "settling"
     });
     await expect(
       client.settlement.findUnique({ where: { paymentAttemptId: second.id } })
