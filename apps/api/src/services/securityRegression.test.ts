@@ -90,6 +90,7 @@ describe("security regressions", () => {
     const settleExact = vi.fn(async () => ({
       transactionHash: "tx_should_not_happen",
       ledger: 123,
+      status: "confirmed" as const,
       adapter: "@x402/stellar" as const
     }));
     const adapter = {

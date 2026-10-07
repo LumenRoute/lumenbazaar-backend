@@ -35,7 +35,7 @@ export class ReceiptService {
       amount: paymentAttempt.amount,
       assetCode: paymentAttempt.assetCode,
       assetIssuer: paymentAttempt.assetIssuer,
-      status: settlement.status === "settled" ? "finalized" : "pending",
+      status: settlement.status === "confirmed" ? "finalized" : "pending",
       settledAt: settlement.settledAt,
       failureCode: paymentAttempt.failureCode,
       failureReason: paymentAttempt.failureReason

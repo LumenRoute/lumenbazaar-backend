@@ -27,6 +27,7 @@ describe("facilitator metrics", () => {
         return {
           transactionHash: "tx_metrics",
           ledger: 654,
+          status: "confirmed",
           adapter: "@x402/stellar"
         };
       }

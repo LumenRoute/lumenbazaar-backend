@@ -166,6 +166,7 @@ describe("API server base", () => {
         return {
           transactionHash: "tx_api_settle",
           ledger: 456,
+          status: "confirmed",
           adapter: "@x402/stellar"
         };
       }
@@ -203,7 +204,7 @@ describe("API server base", () => {
           transactionHash: "tx_api_settle",
           receiptId: expect.stringMatching(/^receipt_/),
           ledger: 456,
-          status: "settled"
+          status: "confirmed"
         }
       }
     });

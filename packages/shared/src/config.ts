@@ -76,7 +76,9 @@ const envSchema = z.object({
   FACILITATOR_SIGNER_NETWORK: z
     .enum(["stellar:testnet", "stellar:pubnet"])
     .default("stellar:testnet"),
-  FACILITATOR_SIGNING_KEY_VERSION: optionalNonEmptyStringEnv
+  FACILITATOR_SIGNING_KEY_VERSION: optionalNonEmptyStringEnv,
+  STELLAR_MAX_TRANSACTION_FEE_STROOPS: z.coerce.number().int().positive().default(50_000),
+  STELLAR_INCLUSION_FEE_STROOPS: z.coerce.number().int().positive().default(100)
 });
 
 export type RawEnv = z.input<typeof envSchema>;
@@ -101,6 +103,10 @@ export type AppConfig = {
     provider: ParsedEnv["FACILITATOR_SIGNER_PROVIDER"];
     network: NetworkId;
     keyVersion?: string;
+  };
+  settlement: {
+    maxTransactionFeeStroops: number;
+    inclusionFeeStroops: number;
   };
   features: {
     uptoScheme: boolean;
@@ -186,6 +192,10 @@ export function loadConfig(
         ? {}
         : { keyVersion: env.FACILITATOR_SIGNING_KEY_VERSION })
     },
+    settlement: {
+      maxTransactionFeeStroops: env.STELLAR_MAX_TRANSACTION_FEE_STROOPS,
+      inclusionFeeStroops: env.STELLAR_INCLUSION_FEE_STROOPS
+    },
     features: {
       uptoScheme: env.ENABLE_UPTO_SCHEME
     },
@@ -205,6 +215,12 @@ function assertEnvironmentConfiguration(
   networks: Record<NetworkId, NetworkConfig>,
   options: LoadConfigOptions
 ) {
+  if (env.STELLAR_INCLUSION_FEE_STROOPS > env.STELLAR_MAX_TRANSACTION_FEE_STROOPS) {
+    throw new Error(
+      "STELLAR_INCLUSION_FEE_STROOPS must not exceed STELLAR_MAX_TRANSACTION_FEE_STROOPS."
+    );
+  }
+
   const activeNetwork =
     env.LUMEN_ENV === "mainnet" ? networks["stellar:pubnet"] : networks["stellar:testnet"];
   const activeAsset = activeNetwork.assets[0];

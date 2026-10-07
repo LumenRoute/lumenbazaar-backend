@@ -31,6 +31,7 @@ describe("payment audit logging", () => {
         return {
           transactionHash: "tx_audit",
           ledger: 987,
+          status: "confirmed",
           adapter: "@x402/stellar"
         };
       }

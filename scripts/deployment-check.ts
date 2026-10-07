@@ -44,7 +44,9 @@ const requiredKeys = [
   "FACILITATOR_ACCOUNT",
   "FACILITATOR_SIGNER_PROVIDER",
   "FACILITATOR_SIGNER_NETWORK",
-  "FACILITATOR_SIGNING_KEY_VERSION"
+  "FACILITATOR_SIGNING_KEY_VERSION",
+  "STELLAR_MAX_TRANSACTION_FEE_STROOPS",
+  "STELLAR_INCLUSION_FEE_STROOPS"
 ];
 
 export async function runDeploymentCheck(
@@ -81,6 +83,26 @@ export function validateTestnetDeploymentEnv(
 
   if (env.FACILITATOR_SIGNER_NETWORK !== "stellar:testnet") {
     errors.push("FACILITATOR_SIGNER_NETWORK must be stellar:testnet for testnet deployment.");
+  }
+
+  collectPositiveIntegerError(
+    env.STELLAR_MAX_TRANSACTION_FEE_STROOPS,
+    "STELLAR_MAX_TRANSACTION_FEE_STROOPS",
+    errors
+  );
+  collectPositiveIntegerError(
+    env.STELLAR_INCLUSION_FEE_STROOPS,
+    "STELLAR_INCLUSION_FEE_STROOPS",
+    errors
+  );
+  if (
+    /^\d+$/.test(env.STELLAR_INCLUSION_FEE_STROOPS ?? "") &&
+    /^\d+$/.test(env.STELLAR_MAX_TRANSACTION_FEE_STROOPS ?? "") &&
+    Number(env.STELLAR_INCLUSION_FEE_STROOPS) > Number(env.STELLAR_MAX_TRANSACTION_FEE_STROOPS)
+  ) {
+    errors.push(
+      "STELLAR_INCLUSION_FEE_STROOPS must not exceed STELLAR_MAX_TRANSACTION_FEE_STROOPS."
+    );
   }
 
   collectUrlError(env.API_PUBLIC_URL, "API_PUBLIC_URL", errors);
@@ -147,6 +169,12 @@ export function validateTestnetDeploymentEnv(
     ok: errors.length === 0,
     warnings
   };
+}
+
+function collectPositiveIntegerError(value: string | undefined, key: string, errors: string[]) {
+  if (value === undefined || !/^\d+$/.test(value) || Number(value) <= 0) {
+    errors.push(`${key} must be a positive integer.`);
+  }
 }
 
 export function parseEnvFile(content: string): EnvMap {

@@ -14,6 +14,10 @@ describe("loadConfig", () => {
       provider: "disabled",
       network: "stellar:testnet"
     });
+    expect(config.settlement).toEqual({
+      maxTransactionFeeStroops: 50_000,
+      inclusionFeeStroops: 100
+    });
     expect(config.networks["stellar:testnet"].passphrase).toContain("Test SDF Network");
     expect(config.networks["stellar:testnet"].assets[0]).toMatchObject({
       code: "USDC",
@@ -28,6 +32,14 @@ describe("loadConfig", () => {
 
   it("fails startup when a numeric setting is malformed", () => {
     expect(() => loadConfig({ API_PORT: "not-a-number" })).toThrow(ZodError);
+    expect(() => loadConfig({ STELLAR_MAX_TRANSACTION_FEE_STROOPS: "0" })).toThrow(ZodError);
+    expect(() => loadConfig({ STELLAR_INCLUSION_FEE_STROOPS: "not-a-number" })).toThrow(ZodError);
+    expect(() =>
+      loadConfig({
+        STELLAR_MAX_TRANSACTION_FEE_STROOPS: "100",
+        STELLAR_INCLUSION_FEE_STROOPS: "101"
+      })
+    ).toThrow("must not exceed");
   });
 
   it("fails closed for mainnet without an explicit pubnet USDC issuer", () => {

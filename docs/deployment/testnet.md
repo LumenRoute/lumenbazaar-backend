@@ -32,6 +32,8 @@ Required settings:
 - `FACILITATOR_SIGNER_PROVIDER=environment`
 - `FACILITATOR_SIGNER_NETWORK=stellar:testnet`
 - `FACILITATOR_SIGNING_KEY_VERSION`
+- `STELLAR_MAX_TRANSACTION_FEE_STROOPS` (recommended initial ceiling: `50000`)
+- `STELLAR_INCLUSION_FEE_STROOPS` (recommended initial bid: `100`)
 
 Store `FACILITATOR_SIGNING_KEY` only in the hosting provider's secret manager. It is intentionally
 absent from `config/testnet.release.env`. Follow

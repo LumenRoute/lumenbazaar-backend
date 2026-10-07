@@ -21,7 +21,9 @@ const validEnv = {
   FACILITATOR_ACCOUNT: "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ",
   FACILITATOR_SIGNER_PROVIDER: "environment",
   FACILITATOR_SIGNER_NETWORK: "stellar:testnet",
-  FACILITATOR_SIGNING_KEY_VERSION: "render-secret-v1"
+  FACILITATOR_SIGNING_KEY_VERSION: "render-secret-v1",
+  STELLAR_MAX_TRANSACTION_FEE_STROOPS: "50000",
+  STELLAR_INCLUSION_FEE_STROOPS: "100"
 };
 
 describe("testnet deployment check", () => {
@@ -93,6 +95,24 @@ describe("testnet deployment check", () => {
       ])
     );
     expect(JSON.stringify(result)).not.toContain("FACILITATOR_SIGNING_KEY=");
+  });
+
+  it("rejects invalid settlement fee controls", () => {
+    const result = validateTestnetDeploymentEnv(
+      {
+        ...validEnv,
+        STELLAR_MAX_TRANSACTION_FEE_STROOPS: "0",
+        STELLAR_INCLUSION_FEE_STROOPS: "invalid"
+      },
+      { allowPlaceholders: false }
+    );
+
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        "STELLAR_MAX_TRANSACTION_FEE_STROOPS must be a positive integer.",
+        "STELLAR_INCLUSION_FEE_STROOPS must be a positive integer."
+      ])
+    );
   });
 
   it("parses CLI arguments", () => {

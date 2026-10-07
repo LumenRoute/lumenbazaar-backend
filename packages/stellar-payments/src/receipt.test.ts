@@ -16,7 +16,7 @@ const attempt: PaymentAttempt = {
   assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
   amount: "0.05",
   payTo: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-  status: "settled",
+  status: "confirmed",
   failureCode: null,
   failureReason: null,
   expiresAtLedger: 100,
@@ -33,7 +33,7 @@ const settlement: Settlement = {
   amount: "0.05",
   assetCode: "USDC",
   assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-  status: "settled",
+  status: "confirmed",
   settledAt: now,
   createdAt: now
 };

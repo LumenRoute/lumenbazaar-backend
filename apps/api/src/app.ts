@@ -118,7 +118,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     options.settlementService ??
     new SettlementService(config, {
       auditLogService,
-      attemptStore: verificationService.getAttemptStore()
+      attemptStore: verificationService.getAttemptStore(),
+      ...(runtimeAdapter === undefined ? {} : { adapter: runtimeAdapter })
     });
   const receiptService = options.receiptService ?? settlementService.getReceiptService();
   const paymentSessionService =

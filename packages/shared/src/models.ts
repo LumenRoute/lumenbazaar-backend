@@ -17,8 +17,21 @@ export type JsonObject = {
 export type ResourceType = "http" | "mcp";
 export type ResourceStatus = "draft" | "active" | "inactive";
 export type PaymentScheme = "exact" | "upto";
-export type PaymentStatus = "received" | "verified" | "settled" | "failed";
-export type SettlementStatus = "pending" | "settled" | "failed";
+export type PaymentStatus =
+  | "received"
+  | "verified"
+  | "submitted"
+  | "confirmed"
+  | "settled"
+  | "timed_out"
+  | "failed";
+export type SettlementStatus =
+  | "pending"
+  | "submitted"
+  | "confirmed"
+  | "settled"
+  | "timed_out"
+  | "failed";
 export type ReceiptStatus = "pending" | "finalized" | "failed";
 export type PaymentSessionStatus = "open" | "settled" | "cancelled" | "expired";
 export type CatalogEventType = "validated" | "cataloged" | "updated" | "deleted";

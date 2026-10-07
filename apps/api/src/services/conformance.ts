@@ -370,8 +370,8 @@ async function assertSettle(
   await verificationService.verify(payload);
   const settled = await settlementService.settle(payload);
 
-  if (settled.status !== "settled") {
-    throw new Error("/v1/settle did not return a settled receipt");
+  if (settled.status !== "confirmed") {
+    throw new Error("/v1/settle did not return a confirmed receipt");
   }
 
   return {

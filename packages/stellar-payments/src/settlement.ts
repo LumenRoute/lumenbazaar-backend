@@ -1,8 +1,7 @@
-import { type Queue } from "bullmq";
 import { z } from "zod";
 import { type SettleResponse } from "@x402/core/types";
 
-import { LumenError, type AppConfig } from "@lumenbazaar/shared";
+import { LumenError, type AppConfig, type PaymentAttempt } from "@lumenbazaar/shared";
 
 import { computePaymentHash } from "./hash.js";
 import {
@@ -31,7 +30,6 @@ export type SettlementServiceOptions = {
   attemptStore?: PaymentAttemptStore;
   settlementStore?: SettlementStore;
   receiptService?: ReceiptService;
-  confirmationQueue?: Queue;
 };
 
 export type SettlementServiceResult = {
@@ -40,7 +38,7 @@ export type SettlementServiceResult = {
   transactionHash: string;
   ledger: number;
   network: NormalizedVerifyPaymentRequest["network"];
-  status: "settled";
+  status: "confirmed";
   amount: string;
 };
 
@@ -70,7 +68,6 @@ export class SettlementService {
   private readonly attemptStore: PaymentAttemptStore;
   private readonly settlementStore: SettlementStore;
   private readonly receiptService: ReceiptService;
-  private readonly confirmationQueue: Queue | undefined;
 
   constructor(
     private readonly config: AppConfig,
@@ -81,7 +78,6 @@ export class SettlementService {
     this.attemptStore = options.attemptStore ?? new InMemoryPaymentAttemptStore();
     this.settlementStore = options.settlementStore ?? new InMemorySettlementStore();
     this.receiptService = options.receiptService ?? new ReceiptService();
-    this.confirmationQueue = options.confirmationQueue;
   }
 
   async settle(input: unknown): Promise<SettlementServiceResult> {
@@ -110,7 +106,8 @@ export class SettlementService {
       throw new LumenError("INVALID_PAYMENT_PAYLOAD", "Payment attempt was not found.");
     }
 
-    if (attempt.status === "settled") {
+    const existingSettlement = await this.settlementStore.getSettlementByAttempt(attempt.id);
+    if (existingSettlement !== undefined) {
       throw new LumenError("REPLAY_DETECTED", "Payment attempt has already been settled.");
     }
 
@@ -118,7 +115,33 @@ export class SettlementService {
       throw new LumenError("INVALID_PAYMENT_PAYLOAD", "Payment payload does not match attempt.");
     }
 
+    const verification = await this.adapter.verifyExact({
+      paymentPayload: normalized.paymentPayload,
+      paymentRequirements: normalized.paymentRequirements,
+      normalizedRequest: normalized
+    });
+    if (!verification.valid) {
+      throw new LumenError(
+        verification.failureCode ?? "INVALID_SIGNATURE",
+        verification.failureReason ?? "Fresh Stellar verification rejected the settlement.",
+        {
+          details: {
+            stage: "simulation",
+            ...(verification.officialContext ?? {})
+          }
+        }
+      );
+    }
+
     const adapterResult = await this.settleWithAdapter(normalized);
+    if (
+      adapterResult.status !== "confirmed" ||
+      adapterResult.transactionHash === undefined ||
+      adapterResult.ledger === undefined
+    ) {
+      return this.recordFailedSettlement(attempt, normalized, adapterResult);
+    }
+
     const settledAt = new Date().toISOString();
     const settlement = await this.settlementStore.createSettlement({
       paymentAttemptId: attempt.id,
@@ -128,12 +151,17 @@ export class SettlementService {
       amount: normalized.amount,
       assetCode: normalized.asset.code,
       assetIssuer: normalized.asset.issuer,
-      status: "settled",
+      status: "confirmed",
       settledAt
     });
 
-    await this.attemptStore.updatePaymentAttempt(attempt.id, { status: "settled" });
-    const receipt = await this.receiptService.finalizeSettlementReceipt(attempt, settlement);
+    const confirmedAttempt = await this.attemptStore.updatePaymentAttempt(attempt.id, {
+      status: "confirmed"
+    });
+    const receipt = await this.receiptService.finalizeSettlementReceipt(
+      confirmedAttempt,
+      settlement
+    );
 
     await this.auditLogService?.record({
       action: "payment.settle",
@@ -154,36 +182,13 @@ export class SettlementService {
       }
     });
 
-    // Enqueue settlement confirmation job if queue is available
-    if (this.confirmationQueue) {
-      await this.confirmationQueue.add(
-        "settlement-confirmation",
-        {
-          settlementId: settlement.id,
-          transactionHash: adapterResult.transactionHash,
-          network: normalized.network,
-          paymentAttemptId: attempt.id
-        },
-        {
-          delay: 5000, // Wait 5 seconds before first check
-          attempts: 30,
-          backoff: {
-            type: "exponential",
-            delay: 5000
-          },
-          removeOnComplete: true,
-          removeOnFail: false
-        }
-      );
-    }
-
     return {
       settlementId: settlement.id,
       receiptId: receipt.id,
       transactionHash: adapterResult.transactionHash,
       ledger: adapterResult.ledger,
       network: normalized.network,
-      status: "settled",
+      status: "confirmed",
       amount: normalized.amount
     };
   }
@@ -211,5 +216,40 @@ export class SettlementService {
       paymentRequirements: normalized.paymentRequirements,
       normalizedRequest: normalized
     });
+  }
+
+  private async recordFailedSettlement(
+    attempt: PaymentAttempt,
+    normalized: NormalizedVerifyPaymentRequest,
+    result: X402SettlementResult
+  ): Promise<never> {
+    const status = result.status === "timed_out" ? "timed_out" : "failed";
+    await this.settlementStore.createSettlement({
+      paymentAttemptId: attempt.id,
+      ...(result.transactionHash === undefined ? {} : { transactionHash: result.transactionHash }),
+      network: normalized.network,
+      amount: normalized.amount,
+      assetCode: normalized.asset.code,
+      assetIssuer: normalized.asset.issuer,
+      status
+    });
+    await this.attemptStore.updatePaymentAttempt(attempt.id, {
+      status,
+      failureCode: result.failureCode ?? "SETTLEMENT_FAILED",
+      failureReason: result.failureReason ?? "Stellar settlement failed."
+    });
+    throw new LumenError(
+      result.failureCode ?? "SETTLEMENT_FAILED",
+      result.failureReason ?? "Stellar settlement failed.",
+      {
+        details: {
+          status,
+          ...(result.transactionHash === undefined
+            ? {}
+            : { transactionHash: result.transactionHash }),
+          ...(result.officialContext ?? {})
+        }
+      }
+    );
   }
 }

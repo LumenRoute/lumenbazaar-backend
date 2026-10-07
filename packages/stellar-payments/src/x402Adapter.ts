@@ -1,5 +1,5 @@
 import { type AppConfig, type ErrorCode } from "@lumenbazaar/shared";
-import { type VerifyResponse } from "@x402/core/types";
+import { type SettleResponse, type VerifyResponse } from "@x402/core/types";
 import { ExactStellarScheme } from "@x402/stellar/exact/facilitator";
 
 import { type FacilitatorSignerProvider } from "./facilitatorSigner.js";
@@ -24,10 +24,19 @@ export type X402VerificationResult = {
 };
 
 export type X402SettlementResult = {
-  transactionHash: string;
-  ledger: number;
+  transactionHash?: string;
+  ledger?: number;
+  status: "confirmed" | "failed" | "timed_out";
+  failureCode?: ErrorCode;
+  failureReason?: string;
+  officialContext?: Record<string, unknown>;
   adapter: "@x402/stellar";
 };
+
+export type SettlementFinality =
+  | { status: "confirmed"; ledger: number }
+  | { status: "failed" }
+  | { status: "pending" };
 
 export type X402StellarAdapter = {
   verifyExact: (input: X402VerificationInput) => Promise<X402VerificationResult>;
@@ -39,6 +48,10 @@ type OfficialExactVerifier = {
     paymentPayload: ExactStellarPaymentPayload,
     paymentRequirements: ExactStellarPaymentRequirements
   ) => Promise<VerifyResponse>;
+  settle: (
+    paymentPayload: ExactStellarPaymentPayload,
+    paymentRequirements: ExactStellarPaymentRequirements
+  ) => Promise<SettleResponse>;
 };
 
 export type X402StellarAdapterOptions = {
@@ -47,7 +60,14 @@ export type X402StellarAdapterOptions = {
   createVerifier?: (input: {
     network: ExactStellarPaymentRequirements["network"];
     rpcUrl: string;
+    maxTransactionFeeStroops: number;
+    inclusionFeeStroops: number;
   }) => Promise<OfficialExactVerifier>;
+  resolveFinality?: (input: {
+    network: ExactStellarPaymentRequirements["network"];
+    rpcUrl: string;
+    transactionHash: string;
+  }) => Promise<SettlementFinality>;
 };
 
 export function createX402StellarAdapter(options?: X402StellarAdapterOptions): X402StellarAdapter {
@@ -68,24 +88,43 @@ export function createX402StellarAdapter(options?: X402StellarAdapterOptions): X
 function createOfficialAdapter(options: X402StellarAdapterOptions): X402StellarAdapter {
   const createVerifier =
     options.createVerifier ??
-    (async ({ rpcUrl }) => {
+    (async ({ rpcUrl, maxTransactionFeeStroops, inclusionFeeStroops }) => {
       const signer = await options.signerProvider.getSigner();
-      return new ExactStellarScheme([signer], { rpcConfig: { url: rpcUrl } });
+      return new ExactStellarScheme([signer], {
+        rpcConfig: { url: rpcUrl },
+        maxTransactionFeeStroops,
+        inclusionFeeStroops
+      });
     });
+  const resolveFinality = options.resolveFinality ?? resolveRpcFinality;
+
+  async function getVerifier(input: X402VerificationInput) {
+    const network = options.config.networks[input.normalizedRequest.network];
+    if (network === undefined) {
+      return undefined;
+    }
+    return {
+      network,
+      verifier: await createVerifier({
+        network: input.normalizedRequest.network,
+        rpcUrl: network.rpcUrl,
+        maxTransactionFeeStroops: options.config.settlement.maxTransactionFeeStroops,
+        inclusionFeeStroops: options.config.settlement.inclusionFeeStroops
+      })
+    };
+  }
 
   return {
     async verifyExact(input) {
-      const network = options.config.networks[input.normalizedRequest.network];
-      if (network === undefined) {
-        return rejectedVerification("Payment network is not configured.", "UNSUPPORTED_NETWORK");
-      }
-
       try {
-        const verifier = await createVerifier({
-          network: input.normalizedRequest.network,
-          rpcUrl: network.rpcUrl
-        });
-        const response = await verifier.verify(input.paymentPayload, input.paymentRequirements);
+        const resolved = await getVerifier(input);
+        if (resolved === undefined) {
+          return rejectedVerification("Payment network is not configured.", "UNSUPPORTED_NETWORK");
+        }
+        const response = await resolved.verifier.verify(
+          input.paymentPayload,
+          input.paymentRequirements
+        );
         return mapOfficialVerification(response);
       } catch {
         return rejectedVerification(
@@ -93,7 +132,174 @@ function createOfficialAdapter(options: X402StellarAdapterOptions): X402StellarA
           "SETTLEMENT_FAILED"
         );
       }
+    },
+    async settleExact(input) {
+      try {
+        const resolved = await getVerifier(input);
+        if (resolved === undefined) {
+          return rejectedSettlement("failed", "Payment network is not configured.", {
+            stage: "simulation",
+            errorReason: "invalid_network"
+          });
+        }
+        const response = await resolved.verifier.settle(
+          input.paymentPayload,
+          input.paymentRequirements
+        );
+        return await mapOfficialSettlement(response, {
+          network: input.normalizedRequest.network,
+          rpcUrl: resolved.network.rpcUrl,
+          resolveFinality
+        });
+      } catch {
+        return rejectedSettlement("failed", "Official Stellar settlement is unavailable.", {
+          stage: "submission",
+          errorReason: "unexpected_settle_error"
+        });
+      }
     }
+  };
+}
+
+async function mapOfficialSettlement(
+  response: SettleResponse,
+  context: {
+    network: ExactStellarPaymentRequirements["network"];
+    rpcUrl: string;
+    resolveFinality: NonNullable<X402StellarAdapterOptions["resolveFinality"]>;
+  }
+): Promise<X402SettlementResult> {
+  const transactionHash = response.transaction;
+  if (
+    response.success &&
+    (response.network !== context.network || typeof response.payer !== "string")
+  ) {
+    return rejectedSettlement("failed", "Official settlement response was incompatible.", {
+      stage: "submission",
+      errorReason: "incompatible_settlement_response"
+    });
+  }
+  if (transactionHash.length > 0) {
+    try {
+      const finality = await context.resolveFinality({
+        network: context.network,
+        rpcUrl: context.rpcUrl,
+        transactionHash
+      });
+      if (finality.status === "confirmed") {
+        return {
+          adapter: "@x402/stellar",
+          status: "confirmed",
+          transactionHash,
+          ledger: finality.ledger
+        };
+      }
+      if (finality.status === "failed") {
+        return rejectedSettlement(
+          "failed",
+          "Stellar transaction failed before finality.",
+          { stage: "failed", errorReason: response.errorReason ?? "transaction_failed" },
+          transactionHash
+        );
+      }
+      return rejectedSettlement(
+        "timed_out",
+        "Stellar transaction finality timed out.",
+        { stage: "timeout", errorReason: response.errorReason ?? "transaction_pending" },
+        transactionHash
+      );
+    } catch {
+      return rejectedSettlement(
+        "timed_out",
+        "Stellar transaction finality could not be confirmed.",
+        { stage: "timeout", errorReason: "finality_unavailable" },
+        transactionHash
+      );
+    }
+  }
+
+  if (response.success) {
+    return rejectedSettlement("failed", "Official settlement response was incompatible.", {
+      stage: "submission",
+      errorReason: "missing_transaction_hash"
+    });
+  }
+
+  const errorReason = response.errorReason ?? "settlement_failed";
+  return rejectedSettlement("failed", settlementFailureMessage(errorReason), {
+    stage: settlementFailureStage(errorReason),
+    errorReason
+  });
+}
+
+async function resolveRpcFinality(input: {
+  rpcUrl: string;
+  transactionHash: string;
+}): Promise<SettlementFinality> {
+  const response = await fetch(input.rpcUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "getTransaction",
+      params: { hash: input.transactionHash }
+    }),
+    signal: AbortSignal.timeout(5_000)
+  });
+  if (!response.ok) {
+    throw new Error("Stellar RPC finality request failed.");
+  }
+  const payload = (await response.json()) as {
+    error?: unknown;
+    result?: { status?: string; ledger?: number };
+  };
+  if (payload.error !== undefined || payload.result === undefined) {
+    throw new Error("Stellar RPC finality response was invalid.");
+  }
+  if (payload.result.status === "SUCCESS" && Number.isInteger(payload.result.ledger)) {
+    return { status: "confirmed", ledger: payload.result.ledger as number };
+  }
+  if (payload.result.status === "FAILED") {
+    return { status: "failed" };
+  }
+  return { status: "pending" };
+}
+
+function settlementFailureStage(reason: string) {
+  if (reason.includes("verification") || reason.includes("simulation") || reason.includes("fee")) {
+    return "simulation";
+  }
+  if (reason.includes("submission") || reason.includes("signing") || reason.includes("signer")) {
+    return "submission";
+  }
+  return "failed";
+}
+
+function settlementFailureMessage(reason: string) {
+  const stage = settlementFailureStage(reason);
+  if (stage === "simulation") {
+    return "Fresh Stellar simulation rejected the settlement.";
+  }
+  if (stage === "submission") {
+    return "Stellar transaction submission failed.";
+  }
+  return "Stellar settlement failed.";
+}
+
+function rejectedSettlement(
+  status: "failed" | "timed_out",
+  failureReason: string,
+  officialContext: Record<string, unknown>,
+  transactionHash?: string
+): X402SettlementResult {
+  return {
+    adapter: "@x402/stellar",
+    status,
+    failureCode: "SETTLEMENT_FAILED",
+    failureReason,
+    officialContext,
+    ...(transactionHash === undefined ? {} : { transactionHash })
   };
 }
 

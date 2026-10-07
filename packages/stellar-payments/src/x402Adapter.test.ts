@@ -43,7 +43,7 @@ describe("default x402 Stellar adapter", () => {
 describe("official x402 Stellar adapter", () => {
   it("passes the configured network RPC and accepts only an official valid result", async () => {
     const verify = vi.fn().mockResolvedValue({ isValid: true, payer: "GTEST" });
-    const createVerifier = vi.fn().mockResolvedValue({ verify });
+    const createVerifier = vi.fn().mockResolvedValue({ verify, settle: vi.fn() });
     const adapter = createX402StellarAdapter({ config, signerProvider, createVerifier });
 
     await expect(adapter.verifyExact(verificationInput)).resolves.toEqual({
@@ -52,7 +52,9 @@ describe("official x402 Stellar adapter", () => {
     });
     expect(createVerifier).toHaveBeenCalledWith({
       network: "stellar:testnet",
-      rpcUrl: config.networks["stellar:testnet"].rpcUrl
+      rpcUrl: config.networks["stellar:testnet"].rpcUrl,
+      maxTransactionFeeStroops: 50_000,
+      inclusionFeeStroops: 100
     });
     expect(verify).toHaveBeenCalledWith(testPaymentPayload, testPaymentRequirement);
   });
@@ -75,6 +77,9 @@ describe("official x402 Stellar adapter", () => {
       createVerifier: async () => ({
         async verify() {
           return { isValid: false, invalidReason };
+        },
+        async settle() {
+          throw new Error("not used");
         }
       })
     });
@@ -94,6 +99,9 @@ describe("official x402 Stellar adapter", () => {
       createVerifier: async () => ({
         async verify() {
           throw new Error("secret-bearing upstream error");
+        },
+        async settle() {
+          throw new Error("not used");
         }
       })
     });
@@ -103,6 +111,9 @@ describe("official x402 Stellar adapter", () => {
       createVerifier: async () => ({
         async verify() {
           return { isValid: true } as never;
+        },
+        async settle() {
+          throw new Error("not used");
         }
       })
     });
@@ -115,4 +126,93 @@ describe("official x402 Stellar adapter", () => {
       failureCode: "SETTLEMENT_FAILED"
     });
   });
+
+  it("settles through the official verifier and requires independent RPC finality", async () => {
+    const settle = vi.fn().mockResolvedValue({
+      success: true,
+      transaction: "tx_confirmed",
+      network: "stellar:testnet",
+      payer: "GTEST"
+    });
+    const resolveFinality = vi.fn().mockResolvedValue({ status: "confirmed", ledger: 456 });
+    const adapter = createX402StellarAdapter({
+      config,
+      signerProvider,
+      createVerifier: async () => ({ verify: vi.fn(), settle }),
+      resolveFinality
+    });
+
+    await expect(adapter.settleExact?.(verificationInput)).resolves.toEqual({
+      adapter: "@x402/stellar",
+      status: "confirmed",
+      transactionHash: "tx_confirmed",
+      ledger: 456
+    });
+    expect(settle).toHaveBeenCalledWith(testPaymentPayload, testPaymentRequirement);
+    expect(resolveFinality).toHaveBeenCalledWith({
+      network: "stellar:testnet",
+      rpcUrl: config.networks["stellar:testnet"].rpcUrl,
+      transactionHash: "tx_confirmed"
+    });
+  });
+
+  it.each([
+    ["invalid_exact_stellar_payload_simulation_failed", "simulation"],
+    ["invalid_exact_stellar_payload_fee_exceeds_maximum", "simulation"],
+    ["settle_exact_stellar_transaction_submission_failed", "submission"]
+  ])("classifies official %s settlement failures as %s", async (errorReason, stage) => {
+    const adapter = createX402StellarAdapter({
+      config,
+      signerProvider,
+      createVerifier: async () => ({
+        verify: vi.fn(),
+        async settle() {
+          return {
+            success: false,
+            transaction: "",
+            network: "stellar:testnet",
+            errorReason
+          };
+        }
+      }),
+      resolveFinality: vi.fn()
+    });
+
+    await expect(adapter.settleExact?.(verificationInput)).resolves.toMatchObject({
+      status: "failed",
+      failureCode: "SETTLEMENT_FAILED",
+      officialContext: { stage, errorReason }
+    });
+  });
+
+  it.each([
+    ["pending", "timed_out", "timeout"],
+    ["failed", "failed", "failed"]
+  ] as const)(
+    "maps %s RPC finality to %s settlement state",
+    async (finalityStatus, settlementStatus, stage) => {
+      const adapter = createX402StellarAdapter({
+        config,
+        signerProvider,
+        createVerifier: async () => ({
+          verify: vi.fn(),
+          async settle() {
+            return {
+              success: true,
+              transaction: "tx_unconfirmed",
+              network: "stellar:testnet",
+              payer: "GTEST"
+            };
+          }
+        }),
+        resolveFinality: async () => ({ status: finalityStatus })
+      });
+
+      await expect(adapter.settleExact?.(verificationInput)).resolves.toMatchObject({
+        status: settlementStatus,
+        transactionHash: "tx_unconfirmed",
+        officialContext: { stage }
+      });
+    }
+  );
 });
