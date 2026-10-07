@@ -3,11 +3,12 @@ import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 
-import { type AppConfig, loadConfig } from "@lumenbazaar/shared";
+import { type AppConfig, listConfiguredNetworks, loadConfig } from "@lumenbazaar/shared";
 import {
   PaymentSessionService,
   PaymentVerificationService,
   SettlementService,
+  createX402StellarAdapter,
   type FacilitatorSignerProvider,
   type ReceiptService
 } from "@lumenbazaar/stellar-payments";
@@ -67,8 +68,16 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     logger: options.logger ?? config.nodeEnv !== "test",
     trustProxy: false
   });
+  const runtimeAdapter =
+    options.signerProvider === undefined
+      ? undefined
+      : createX402StellarAdapter({ config, signerProvider: options.signerProvider });
   const paymentCapabilities = options.paymentCapabilities ?? {
-    exact: false,
+    exact:
+      runtimeAdapter !== undefined &&
+      listConfiguredNetworks(config).every((network) =>
+        network.assets.some((asset) => asset.contractId !== undefined)
+      ),
     upto: false
   };
   const readinessService =
@@ -100,7 +109,11 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     readiness: readinessService
   });
   const verificationService =
-    options.verificationService ?? new PaymentVerificationService(config, { auditLogService });
+    options.verificationService ??
+    new PaymentVerificationService(config, {
+      auditLogService,
+      ...(runtimeAdapter === undefined ? {} : { adapter: runtimeAdapter })
+    });
   const settlementService =
     options.settlementService ??
     new SettlementService(config, {
