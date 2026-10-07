@@ -25,6 +25,7 @@ import { registerPaymentSessionRoutes } from "./routes/paymentSessions.js";
 import { registerResourceRoutes } from "./routes/resources.js";
 import { registerSellerRoutes } from "./routes/sellers.js";
 import { AuditLogService } from "./services/audit.js";
+import { createCatalogPersistence } from "./services/catalogPersistence.js";
 import { CatalogService } from "./services/cataloging.js";
 import { CatalogValidationService } from "./services/catalogValidation.js";
 import { ConformanceRunService, createServiceConformanceRunner } from "./services/conformance.js";
@@ -74,6 +75,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   app.addHook("onClose", async () => paymentPersistence.close());
   const paymentReconciliation = createRuntimePaymentReconciliation(config);
   app.addHook("onClose", async () => paymentReconciliation.close());
+  const catalogPersistence = createCatalogPersistence(config);
+  app.addHook("onClose", async () => catalogPersistence.close());
   const runtimeAdapter =
     options.signerProvider === undefined
       ? undefined
@@ -147,15 +150,29 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   const routeReceiptService = options.receiptService ?? settlementService.getReceiptService();
   const paymentSessionService =
     options.paymentSessionService ?? new PaymentSessionService(config, { auditLogService });
-  const sellerService = options.sellerService ?? new SellerService(undefined, auditLogService);
-  const resourceService = options.resourceService ?? new ResourceService(config, sellerService);
+  const sellerService =
+    options.sellerService ?? new SellerService(catalogPersistence.sellerStore, auditLogService);
+  const resourceService =
+    options.resourceService ??
+    new ResourceService(
+      config,
+      sellerService,
+      catalogPersistence.resourceStore,
+      catalogPersistence.indexingQueue
+    );
   const catalogValidationService =
     options.catalogValidationService ?? new CatalogValidationService(config, sellerService);
   const catalogService =
     options.catalogService ??
-    new CatalogService(catalogValidationService, resourceService, { auditLogService });
+    new CatalogService(catalogValidationService, resourceService, {
+      auditLogService,
+      eventStore: catalogPersistence.eventStore,
+      indexingQueue: catalogPersistence.indexingQueue
+    });
   const discoveryService = options.discoveryService ?? new DiscoveryService(resourceService);
-  const searchService = options.searchService ?? new SearchService(resourceService, metricsService);
+  const searchService =
+    options.searchService ??
+    new SearchService(resourceService, metricsService, catalogPersistence.searchDocumentStore);
   const conformanceService =
     options.conformanceService ??
     new ConformanceRunService(

@@ -1,4 +1,5 @@
 import Fastify, { type FastifyRequest } from "fastify";
+import { pathToFileURL } from "node:url";
 import { z } from "zod";
 
 import {
@@ -284,7 +285,11 @@ function atomicToDecimal(amount: string) {
   return fraction.length === 0 ? whole : `${whole}.${fraction}`;
 }
 
-if (process.env.NODE_ENV !== "test") {
+if (
+  process.env.NODE_ENV !== "test" &&
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   startRagExample().catch((error) => {
     console.error(error);
     process.exit(1);

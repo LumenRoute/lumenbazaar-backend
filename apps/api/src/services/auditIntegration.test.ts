@@ -56,6 +56,8 @@ describe("API audit integrations", () => {
       walletAddress: localIssuerPublicKey,
       domain: "seller.example"
     });
+    const challenge = await sellerService.verifyDomain(seller.id, {});
+    await sellerService.verifyDomain(seller.id, { evidence: challenge.challenge });
 
     await catalogService.catalog({
       sellerId: seller.id,

@@ -1,4 +1,5 @@
 import Fastify, { type FastifyRequest } from "fastify";
+import { pathToFileURL } from "node:url";
 import { z } from "zod";
 
 import { type PaymentPayload } from "@lumenbazaar/buyer-sdk";
@@ -243,7 +244,11 @@ function hasPaymentHeader(request: FastifyRequest) {
   return typeof request.headers["payment-signature"] === "string";
 }
 
-if (process.env.NODE_ENV !== "test") {
+if (
+  process.env.NODE_ENV !== "test" &&
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   startPaidMcpToolExample().catch((error) => {
     console.error(error);
     process.exit(1);

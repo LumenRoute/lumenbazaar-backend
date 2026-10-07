@@ -89,4 +89,56 @@ describe("ResourceService", () => {
       code: "UNSUPPORTED_ASSET"
     });
   });
+
+  it.each([
+    "http://seller.example/weather/Lagos",
+    "https://evil.example/weather/Lagos",
+    "https://127.0.0.1/weather/Lagos",
+    "https://seller.example/admin/Lagos",
+    "https://seller.example/weather/Lagos?target=https://internal.example"
+  ])("rejects unsafe or template-conflicting resource target %s", async (url) => {
+    const sellerService = new SellerService();
+    const resourceService = new ResourceService(loadConfig({}), sellerService);
+    const seller = await sellerService.createSeller({
+      displayName: "Weather Seller",
+      walletAddress: localIssuerPublicKey,
+      domain: "seller.example"
+    });
+
+    await expect(
+      resourceService.createResource({ ...resourceInput(seller.id), url })
+    ).rejects.toMatchObject({
+      code: expect.stringMatching(/CATALOG_VALIDATION_FAILED|ROUTE_TEMPLATE_INVALID/u)
+    });
+  });
+
+  it("accepts safe MCP tool targets and rejects tool-name mismatches", async () => {
+    const sellerService = new SellerService();
+    const resourceService = new ResourceService(loadConfig({}), sellerService);
+    const seller = await sellerService.createSeller({
+      displayName: "MCP Seller",
+      walletAddress: localIssuerPublicKey,
+      domain: "seller.example"
+    });
+    const input = {
+      ...resourceInput(seller.id),
+      type: "mcp" as const,
+      url: "https://seller.example/tools/quote_price",
+      routeTemplate: "mcp://catalog/quote_price",
+      extensions: {
+        mcp: {
+          serverName: "catalog",
+          toolName: "quote_price"
+        }
+      }
+    };
+
+    await expect(resourceService.createResource(input)).resolves.toMatchObject({
+      type: "mcp",
+      routeTemplate: "mcp://catalog/quote_price"
+    });
+    await expect(
+      resourceService.createResource({ ...input, url: "https://seller.example/tools/admin" })
+    ).rejects.toMatchObject({ code: "ROUTE_TEMPLATE_INVALID" });
+  });
 });

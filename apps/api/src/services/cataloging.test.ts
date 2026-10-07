@@ -47,6 +47,8 @@ describe("CatalogService", () => {
       walletAddress: localIssuerPublicKey,
       domain: "seller.example"
     });
+    const challenge = await sellerService.verifyDomain(seller.id, {});
+    await sellerService.verifyDomain(seller.id, { evidence: challenge.challenge });
     const config = loadConfig({});
     const resourceService = new ResourceService(config, sellerService);
     const validationService = new CatalogValidationService(config, sellerService);

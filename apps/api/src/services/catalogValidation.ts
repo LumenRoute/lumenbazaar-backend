@@ -14,6 +14,7 @@ import {
 } from "@lumenbazaar/stellar-payments";
 
 import { parseDiscoveryMetadata } from "./discoveryMetadata.js";
+import { assertCatalogJsonSafe, assertSafeResourceTarget } from "./resources.js";
 import { type SellerService } from "./sellers.js";
 
 export type CatalogValidationIssue = {
@@ -46,30 +47,30 @@ export class CatalogValidationService {
     const seller = await this.findSeller(metadata.sellerId, errors);
 
     if (seller !== undefined) {
-      const url = new URL(metadata.resource.url);
-
-      if (!urlHostBelongsToDomain(url.hostname, seller.domain)) {
-        errors.push(
-          issue(
-            "CATALOG_VALIDATION_FAILED",
-            "Resource URL host does not belong to the seller domain.",
-            ["resource", "url"]
-          )
+      try {
+        assertSafeResourceTarget(
+          metadata.resource.url,
+          metadata.resource.type,
+          metadata.resource.routeTemplate,
+          seller.domain
         );
+      } catch (error) {
+        pushLumenError(error, errors, ["resource", "url"]);
       }
 
-      if (metadata.resource.extensions.trusted === true && seller.domainVerifiedAt === null) {
+      if (seller.domainVerifiedAt === null) {
         errors.push(
           issue(
             "SELLER_DOMAIN_UNVERIFIED",
-            "Trusted catalog metadata requires verified seller domain ownership.",
-            ["resource", "extensions", "trusted"]
+            "Catalog publication requires verified seller domain ownership.",
+            ["sellerId"]
           )
         );
       }
     }
 
     this.validateRoute(
+      metadata.resource.type,
       metadata.resource.routeTemplate,
       metadata.resource.inputSchema as JsonObject,
       errors
@@ -78,6 +79,8 @@ export class CatalogValidationService {
     this.validateSchemas(
       metadata.resource.inputSchema as JsonObject,
       metadata.resource.outputSchema as JsonObject,
+      metadata.resource.extensions as JsonObject,
+      errors,
       warnings
     );
 
@@ -98,12 +101,22 @@ export class CatalogValidationService {
   }
 
   private validateRoute(
+    type: "http" | "mcp",
     routeTemplate: string,
     inputSchema: JsonObject,
     errors: CatalogValidationIssue[]
   ) {
     try {
-      validateRouteTemplate(routeTemplate, inputSchema);
+      if (type === "mcp") {
+        if (!/^mcp:\/\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_-]+$/u.test(routeTemplate)) {
+          throw new LumenError(
+            "ROUTE_TEMPLATE_INVALID",
+            "MCP route template must use mcp://server/tool format."
+          );
+        }
+      } else {
+        validateRouteTemplate(routeTemplate, inputSchema);
+      }
     } catch (error) {
       pushLumenError(error, errors, ["resource", "routeTemplate"]);
     }
@@ -136,8 +149,22 @@ export class CatalogValidationService {
   private validateSchemas(
     inputSchema: JsonObject,
     outputSchema: JsonObject,
+    extensions: JsonObject,
+    errors: CatalogValidationIssue[],
     warnings: CatalogValidationIssue[]
   ) {
+    for (const [value, label, maxBytes, path] of [
+      [inputSchema, "Input schema", 64 * 1024, ["resource", "inputSchema"]],
+      [outputSchema, "Output schema", 64 * 1024, ["resource", "outputSchema"]],
+      [extensions, "Resource extensions", 32 * 1024, ["resource", "extensions"]]
+    ] as const) {
+      try {
+        assertCatalogJsonSafe(value, label, maxBytes);
+      } catch (error) {
+        pushLumenError(error, errors, [...path]);
+      }
+    }
+
     if (inputSchema.type !== "object") {
       warnings.push(issue("CATALOG_VALIDATION_FAILED", "Input schema should describe an object."));
     }
@@ -186,8 +213,4 @@ function issue(code: ErrorCode, message: string, path?: string[]): CatalogValida
     message,
     ...(path === undefined ? {} : { path })
   };
-}
-
-function urlHostBelongsToDomain(hostname: string, domain: string) {
-  return hostname === domain || hostname.endsWith(`.${domain}`);
 }

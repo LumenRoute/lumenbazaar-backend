@@ -26,6 +26,7 @@
     "prisma:validate": "node scripts/prisma.mjs validate",
     "deploy:testnet:check": "tsx scripts/deployment-check.ts --env-file config/testnet.release.env",
     "deploy:testnet:check:example": "tsx scripts/deployment-check.ts --env-file .env.testnet.example --allow-placeholders",
+    "catalog:testnet:seed": "tsx scripts/catalog-testnet-resources.ts",
     "start": "tsx apps/api/src/main.ts",
     "start:api": "tsx apps/api/src/main.ts",
     "start:mcp": "tsx apps/mcp-server/src/main.ts",

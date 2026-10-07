@@ -123,3 +123,35 @@ curl "$API_PUBLIC_URL/metrics"
 The testnet API serves discovery search from the resource catalog and search index. No separate
 search container is required for this backend deployment. Run the worker beside the API so
 `resource-indexing` and `search-sync` queues continue to refresh indexed metadata.
+
+## Testnet Example Catalog
+
+Deploy the weather, RAG, and MCP example applications with these start commands:
+
+```bash
+pnpm --filter @lumenbazaar/example-paid-weather-api start
+pnpm --filter @lumenbazaar/example-paid-rag-api start
+pnpm --filter @lumenbazaar/example-paid-mcp-tool start
+```
+
+Create one seller record for each deployment hostname and complete its domain challenge. Catalog
+publication rejects unverified sellers, non-HTTPS targets, IP or local hostnames, URLs outside the
+seller domain, route mismatches, and oversized or deeply nested schemas. Once the sellers and
+public URLs exist, validate, publish, inspect, browse, and search all three records in one gate:
+
+```bash
+API_BASE_URL="$API_PUBLIC_URL" \
+WEATHER_RESOURCE_BASE_URL="$WEATHER_PUBLIC_URL" \
+WEATHER_SELLER_ID="$WEATHER_SELLER_ID" \
+RAG_RESOURCE_BASE_URL="$RAG_PUBLIC_URL" \
+RAG_SELLER_ID="$RAG_SELLER_ID" \
+MCP_RESOURCE_BASE_URL="$MCP_RESOURCE_PUBLIC_URL" \
+MCP_SELLER_ID="$MCP_SELLER_ID" \
+pnpm catalog:testnet:seed
+```
+
+The command exits nonzero unless every metadata document validates, all three resources are
+cataloged and inspectable, and both browse and search return the new durable records. The paid
+weather and MCP examples also expose clean buyer SDK calls for the official exact verification,
+paid retry, settlement, and receipt sequence. Do not record the phase as live evidence until one
+of those calls completes against the public testnet services without fixture substitution.

@@ -326,6 +326,8 @@ describe("API server base", () => {
       walletAddress: localIssuerPublicKey,
       domain: "seller.example"
     });
+    const challenge = await sellerService.verifyDomain(seller.id, {});
+    await sellerService.verifyDomain(seller.id, { evidence: challenge.challenge });
 
     const response = await app.inject({
       method: "POST",
@@ -353,6 +355,8 @@ describe("API server base", () => {
       walletAddress: localIssuerPublicKey,
       domain: "seller.example"
     });
+    const challenge = await sellerService.verifyDomain(seller.id, {});
+    await sellerService.verifyDomain(seller.id, { evidence: challenge.challenge });
 
     const response = await app.inject({
       method: "POST",

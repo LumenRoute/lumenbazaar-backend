@@ -1,4 +1,5 @@
 import Fastify, { type FastifyRequest } from "fastify";
+import { pathToFileURL } from "node:url";
 
 import {
   createBudgetManager,
@@ -219,7 +220,11 @@ function forecastForCity(city: string): WeatherForecast {
   };
 }
 
-if (process.env.NODE_ENV !== "test") {
+if (
+  process.env.NODE_ENV !== "test" &&
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   startWeatherExample().catch((error) => {
     console.error(error);
     process.exit(1);
