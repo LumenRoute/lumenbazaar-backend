@@ -10,13 +10,11 @@ import {
 
 import { parseParams } from "../http/validation.js";
 import { type MetricsService } from "../services/metrics.js";
+import { type ReadinessService } from "../services/readiness.js";
 
 export type FacilitatorRouteOptions = {
-  capabilities: {
-    exact: boolean;
-    upto: boolean;
-  };
   config: AppConfig;
+  readiness: ReadinessService;
   verificationService?: PaymentVerificationService;
   settlementService?: SettlementService;
   receiptService?: ReceiptService;
@@ -34,9 +32,10 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
   const receiptService = options.receiptService ?? settlementService.getReceiptService();
 
   app.get("/v1/supported", async () => {
+    const capabilities = (await options.readiness.evaluate()).capabilities;
     const networks = listConfiguredNetworks(options.config);
     const uptoContracts = networks.flatMap((network) =>
-      options.capabilities.upto &&
+      capabilities.upto &&
       options.config.features.uptoScheme &&
       network.uptoSessionContractId !== undefined
         ? [
@@ -47,7 +46,7 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
           ]
         : []
     );
-    const exactSchemes = options.capabilities.exact
+    const exactSchemes = capabilities.exact
       ? networks.map((network) => ({
           name: "exact",
           network: network.id,
@@ -63,7 +62,7 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
         }))
       : [];
     const uptoSchemes = networks.flatMap((network) =>
-      options.capabilities.upto &&
+      capabilities.upto &&
       options.config.features.uptoScheme &&
       network.uptoSessionContractId !== undefined
         ? [
@@ -92,7 +91,7 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
       schemes: [...exactSchemes, ...uptoSchemes],
       extensions: {
         bazaar: true,
-        upto: options.capabilities.upto && options.config.features.uptoScheme,
+        upto: capabilities.upto && options.config.features.uptoScheme,
         uptoContracts
       }
     };

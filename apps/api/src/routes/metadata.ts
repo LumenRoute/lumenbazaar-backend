@@ -4,22 +4,26 @@ import { type AppConfig, listConfiguredNetworks, serviceName } from "@lumenbazaa
 
 import { apiOpenApiSpec } from "../openapi.js";
 import { type MetricsService } from "../services/metrics.js";
+import { type ReadinessService } from "../services/readiness.js";
 
 export type MetadataRouteOptions = {
   config: AppConfig;
   metrics: MetricsService;
+  readiness: ReadinessService;
 };
 
 export function registerMetadataRoutes(app: FastifyInstance, options: MetadataRouteOptions) {
   app.get("/health", async () => ({
     ok: true,
     service: serviceName,
-    app: "api",
-    dependencies: {
-      database: "configured",
-      redis: "configured"
-    }
+    app: "api"
   }));
+
+  app.get("/ready", async (_request, reply) => {
+    const report = await options.readiness.evaluate();
+    reply.code(report.ok ? 200 : 503);
+    return report;
+  });
 
   app.get("/version", async () => ({
     service: serviceName,

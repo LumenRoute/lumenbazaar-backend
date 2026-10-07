@@ -13,6 +13,7 @@ export type DeploymentCheckResult = {
   endpoints: {
     api: {
       health: string;
+      readiness: string;
       metrics: string;
       openapi: string;
       supported: string;
@@ -39,6 +40,7 @@ const requiredKeys = [
   "STELLAR_TESTNET_RPC_URL",
   "STELLAR_TESTNET_HORIZON_URL",
   "STELLAR_TESTNET_USDC_ISSUER",
+  "STELLAR_TESTNET_USDC_CONTRACT_ID",
   "FACILITATOR_ACCOUNT"
 ];
 
@@ -81,6 +83,11 @@ export function validateTestnetDeploymentEnv(
     collectPlaceholderError(env.API_PUBLIC_URL, "API_PUBLIC_URL", errors);
     collectPlaceholderError(env.MCP_PUBLIC_URL, "MCP_PUBLIC_URL", errors);
     collectPlaceholderError(env.STELLAR_TESTNET_USDC_ISSUER, "STELLAR_TESTNET_USDC_ISSUER", errors);
+    collectPlaceholderError(
+      env.STELLAR_TESTNET_USDC_CONTRACT_ID,
+      "STELLAR_TESTNET_USDC_CONTRACT_ID",
+      errors
+    );
     collectPlaceholderError(env.FACILITATOR_ACCOUNT, "FACILITATOR_ACCOUNT", errors);
   } else {
     collectPlaceholderWarning(env.API_PUBLIC_URL, "API_PUBLIC_URL", warnings);
@@ -90,11 +97,16 @@ export function validateTestnetDeploymentEnv(
       "STELLAR_TESTNET_USDC_ISSUER",
       warnings
     );
+    collectPlaceholderWarning(
+      env.STELLAR_TESTNET_USDC_CONTRACT_ID,
+      "STELLAR_TESTNET_USDC_CONTRACT_ID",
+      warnings
+    );
     collectPlaceholderWarning(env.FACILITATOR_ACCOUNT, "FACILITATOR_ACCOUNT", warnings);
   }
 
   try {
-    loadConfig(env);
+    loadConfig(env, { allowPlaceholders: options.allowPlaceholders });
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
   }
@@ -110,6 +122,7 @@ export function validateTestnetDeploymentEnv(
     endpoints: {
       api: {
         health: `${apiBaseUrl}/health`,
+        readiness: `${apiBaseUrl}/ready`,
         metrics: `${apiBaseUrl}/metrics`,
         openapi: `${apiBaseUrl}/openapi.json`,
         supported: `${apiBaseUrl}/v1/supported`
@@ -227,7 +240,10 @@ function collectPlaceholderWarning(value: string | undefined, key: string, warni
 function isPlaceholder(value: string | undefined) {
   return (
     value !== undefined &&
-    (value.includes(".example") || value.includes("example.com") || value === localIssuerPublicKey)
+    (value.includes(".example") ||
+      value.includes("example.com") ||
+      value.toLowerCase().includes("replace_me") ||
+      value === localIssuerPublicKey)
   );
 }
 

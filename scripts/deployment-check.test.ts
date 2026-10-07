@@ -16,8 +16,9 @@ const validEnv = {
   DEFAULT_ASSET_CODE: "USDC",
   STELLAR_TESTNET_RPC_URL: "https://soroban-testnet.stellar.org",
   STELLAR_TESTNET_HORIZON_URL: "https://horizon-testnet.stellar.org",
-  STELLAR_TESTNET_USDC_ISSUER: "GDZST3XVCDTUJ76ZAV2HA72KYRTYKYI6YLJVMQ5DNPMJR7BKQW5EBXM",
-  FACILITATOR_ACCOUNT: "GDZST3XVCDTUJ76ZAV2HA72KYRTYKYI6YLJVMQ5DNPMJR7BKQW5EBXM"
+  STELLAR_TESTNET_USDC_ISSUER: "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ",
+  STELLAR_TESTNET_USDC_CONTRACT_ID: "CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS",
+  FACILITATOR_ACCOUNT: "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ"
 };
 
 describe("testnet deployment check", () => {
@@ -44,6 +45,7 @@ describe("testnet deployment check", () => {
       endpoints: {
         api: {
           health: "https://api.testnet.lumenbazaar.dev/health",
+          readiness: "https://api.testnet.lumenbazaar.dev/ready",
           metrics: "https://api.testnet.lumenbazaar.dev/metrics",
           openapi: "https://api.testnet.lumenbazaar.dev/openapi.json",
           supported: "https://api.testnet.lumenbazaar.dev/v1/supported"

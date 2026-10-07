@@ -280,7 +280,15 @@ export const apiRouteContracts: RouteContract[] = [
     method: "get",
     path: "/health",
     operationId: "getHealth",
-    summary: "Return API health and dependency configuration.",
+    summary: "Return API process liveness.",
+    tags: ["metadata"],
+    response: jsonObject
+  },
+  {
+    method: "get",
+    path: "/ready",
+    operationId: "getReadiness",
+    summary: "Return dependency readiness and usable payment capabilities.",
     tags: ["metadata"],
     response: jsonObject
   },

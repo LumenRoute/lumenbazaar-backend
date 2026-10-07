@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { loadConfig, localIssuerPublicKey } from "@lumenbazaar/shared";
 
 import { buildApiApp } from "../app.js";
+import { createStaticReadinessService } from "../services/readiness.js";
 
 const contractId = "CDLZUPTOSESSIONCONTRACT000000000000000000000000000000000";
 const assetContractId = "CDLZUSDCTOKENCONTRACT0000000000000000000000000000000000";
@@ -27,13 +28,15 @@ describe("payment session routes", () => {
   });
 
   it("creates, fetches, and settles capped sessions through isolated routes", async () => {
+    const config = enabledConfig();
     const app = buildApiApp({
       logger: false,
-      config: enabledConfig(),
+      config,
       paymentCapabilities: {
         exact: false,
         upto: true
-      }
+      },
+      readinessService: createStaticReadinessService(config, { exact: false, upto: true })
     });
 
     const supported = await app.inject({ method: "GET", url: "/v1/supported" });

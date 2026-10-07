@@ -12,8 +12,9 @@ deployment owns Postgres, Redis, and the discovery search index used by the API.
 
 ## Environment
 
-Create `.env.testnet` from `.env.testnet.example` and replace every `.example` URL and placeholder
-account before deploying.
+`config/testnet.release.env` records the non-secret public release profile and Phase 10 testnet
+contract identifiers. Supply deployment secrets, including database credentials and signer access,
+through the hosting provider rather than committing them.
 
 Required settings:
 
@@ -26,18 +27,19 @@ Required settings:
 - `STELLAR_TESTNET_RPC_URL`
 - `STELLAR_TESTNET_HORIZON_URL`
 - `STELLAR_TESTNET_USDC_ISSUER`
+- `STELLAR_TESTNET_USDC_CONTRACT_ID`
 - `FACILITATOR_ACCOUNT`
 
 Validate the file before rollout:
 
 ```bash
-pnpm deploy:testnet:check --env-file .env.testnet
+pnpm deploy:testnet:check
 ```
 
-The committed example file can be checked with placeholders allowed:
+The placeholder template can be checked separately for schema completeness:
 
 ```bash
-pnpm deploy:testnet:check
+pnpm deploy:testnet:check:example
 ```
 
 To validate the Compose topology before creating `.env.testnet`, point the service env file at the
@@ -60,9 +62,15 @@ Health checks:
 
 ```bash
 curl "$API_PUBLIC_URL/health"
+curl "$API_PUBLIC_URL/ready"
 curl "$API_PUBLIC_URL/v1/supported"
-curl "https://mcp.testnet.lumenbazaar.example/health"
+curl "https://lumenbazaar-mcp.onrender.com/health"
 ```
+
+`/health` is process liveness only. `/ready` returns HTTP 503 unless Postgres, Redis, migrations,
+the active Stellar RPC and Horizon endpoints, configured assets, and any required signer are ready.
+The supported-schemes response uses the same evaluated state and cannot advertise a payment adapter
+whose dependencies are unavailable.
 
 ## Endpoint Manifest
 

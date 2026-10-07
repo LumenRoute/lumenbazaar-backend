@@ -13,6 +13,7 @@ import {
 import { buildApiApp } from "./app.js";
 import { parseBody } from "./http/validation.js";
 import { ResourceService } from "./services/resources.js";
+import { createStaticReadinessService } from "./services/readiness.js";
 import { SellerService } from "./services/sellers.js";
 
 describe("API server base", () => {
@@ -70,6 +71,31 @@ describe("API server base", () => {
         uptoContracts: []
       }
     });
+    await app.close();
+  });
+
+  it("keeps liveness available while readiness reports dependency failures", async () => {
+    const config = loadConfig({ LUMEN_ENV: "testnet" });
+    const readinessService = createStaticReadinessService(
+      config,
+      { exact: true, upto: false },
+      { database: { status: "unavailable", detail: "database unavailable" } }
+    );
+    const app = buildApiApp({ config, logger: false, readinessService });
+
+    const health = await app.inject({ method: "GET", url: "/health" });
+    const ready = await app.inject({ method: "GET", url: "/ready" });
+    const supported = await app.inject({ method: "GET", url: "/v1/supported" });
+
+    expect(health.statusCode).toBe(200);
+    expect(ready.statusCode).toBe(503);
+    expect(ready.json()).toMatchObject({
+      ok: false,
+      environment: "testnet",
+      checks: { database: { status: "unavailable" } },
+      capabilities: { exact: false, upto: false }
+    });
+    expect(supported.json().schemes).toEqual([]);
     await app.close();
   });
 

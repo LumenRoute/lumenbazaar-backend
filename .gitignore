@@ -5,6 +5,7 @@ coverage/
 .env.*
 !.env.example
 !.env.testnet.example
+!config/testnet.release.env
 *.log
 .DS_Store
 generated/

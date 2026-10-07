@@ -18,7 +18,46 @@
     "/health": {
       "get": {
         "operationId": "getHealth",
-        "summary": "Return API health and dependency configuration.",
+        "summary": "Return API process liveness.",
+        "tags": ["metadata"],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
+            }
+          },
+          "default": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok", "error"],
+                  "properties": {
+                    "ok": { "type": "boolean", "enum": [false] },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
+                      }
+                    },
+                    "requestId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "operationId": "getReadiness",
+        "summary": "Return dependency readiness and usable payment capabilities.",
         "tags": ["metadata"],
         "responses": {
           "200": {

@@ -36,5 +36,5 @@ jobs:
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level high
 
-      - name: Validate testnet deployment template
+      - name: Validate testnet release configuration
         run: pnpm deploy:testnet:check

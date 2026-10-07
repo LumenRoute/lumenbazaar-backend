@@ -27,6 +27,11 @@ import { ConformanceRunService, createServiceConformanceRunner } from "./service
 import { DiscoveryService } from "./services/discovery.js";
 import { createMetricsService, type MetricsService } from "./services/metrics.js";
 import { RateLimitService } from "./services/rateLimit.js";
+import {
+  createReadinessService,
+  type PaymentCapabilities,
+  type ReadinessService
+} from "./services/readiness.js";
 import { ResourceService } from "./services/resources.js";
 import { SearchService } from "./services/search.js";
 import { SellerService } from "./services/sellers.js";
@@ -48,10 +53,8 @@ export type BuildApiAppOptions = {
   auditLogService?: AuditLogService;
   rateLimitService?: RateLimitService;
   metricsService?: MetricsService;
-  paymentCapabilities?: {
-    exact: boolean;
-    upto: boolean;
-  };
+  paymentCapabilities?: PaymentCapabilities;
+  readinessService?: ReadinessService;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -65,6 +68,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     exact: false,
     upto: false
   };
+  const readinessService =
+    options.readinessService ?? createReadinessService(config, paymentCapabilities);
 
   void app.register(cors, {
     origin: config.api.corsAllowedOrigins
@@ -83,7 +88,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   registerRateLimitHook(app, { rateLimitService });
   registerMetadataRoutes(app, {
     config,
-    metrics: metricsService
+    metrics: metricsService,
+    readiness: readinessService
   });
   const verificationService =
     options.verificationService ?? new PaymentVerificationService(config, { auditLogService });
@@ -127,7 +133,7 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     settlementService,
     receiptService,
     metrics: metricsService,
-    capabilities: paymentCapabilities
+    readiness: readinessService
   });
   registerPaymentSessionRoutes(app, { paymentSessionService });
   registerSellerRoutes(app, { sellerService });
