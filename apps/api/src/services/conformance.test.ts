@@ -89,6 +89,7 @@ describe("ConformanceRunService", () => {
         return {
           transactionHash: "tx_conformance",
           ledger: 1,
+          status: "confirmed",
           adapter: "@x402/stellar"
         };
       }

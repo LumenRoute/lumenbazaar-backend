@@ -6,6 +6,7 @@ import { type CatalogValidationService } from "./catalogValidation.js";
 import { parseDiscoveryMetadata, toResourceCreateInput } from "./discoveryMetadata.js";
 import { type ResourceService } from "./resources.js";
 import { type AuditLogService } from "./audit.js";
+import { type MetricsService } from "./metrics.js";
 
 export type ResourceIndexingJob = {
   name: "resource.index";
@@ -48,12 +49,14 @@ export type CatalogServiceOptions = {
   auditLogService?: AuditLogService;
   eventStore?: CatalogEventStore;
   indexingQueue?: ResourceIndexingQueue;
+  metrics?: MetricsService;
 };
 
 export class CatalogService {
   private readonly auditLogService: AuditLogService | undefined;
   private readonly eventStore: CatalogEventStore;
   private readonly indexingQueue: ResourceIndexingQueue;
+  private readonly metrics: MetricsService | undefined;
 
   constructor(
     private readonly validationService: CatalogValidationService,
@@ -63,12 +66,14 @@ export class CatalogService {
     this.auditLogService = options.auditLogService;
     this.eventStore = options.eventStore ?? new InMemoryCatalogEventStore();
     this.indexingQueue = options.indexingQueue ?? new InMemoryResourceIndexingQueue();
+    this.metrics = options.metrics;
   }
 
   async catalog(input: unknown) {
     const validation = await this.validationService.validate(input);
 
     if (!validation.ok) {
+      this.metrics?.recordCatalog(discoveryType(input), "rejected");
       throw new LumenError("CATALOG_VALIDATION_FAILED", "Catalog validation failed.", {
         details: {
           errors: validation.errors
@@ -118,6 +123,7 @@ export class CatalogService {
         versionId: version.id
       }
     });
+    this.metrics?.recordCatalog(resource.type, "accepted");
 
     return {
       ok: true,
@@ -127,4 +133,13 @@ export class CatalogService {
       indexingStatus: "queued" as const
     };
   }
+}
+
+function discoveryType(input: unknown): "http" | "mcp" | "unknown" {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) return "unknown";
+  const resource = (input as Record<string, unknown>).resource;
+  if (typeof resource !== "object" || resource === null || Array.isArray(resource))
+    return "unknown";
+  const type = (resource as Record<string, unknown>).type;
+  return type === "http" || type === "mcp" ? type : "unknown";
 }

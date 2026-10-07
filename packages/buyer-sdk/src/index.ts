@@ -25,16 +25,12 @@ export type { PaymentTerms, ResourceMetadata } from "./inspect.js";
 export {
   preparePaymentPayload,
   createPaymentPayloadFromResource,
-  isPaymentExpired,
-  getPaymentTimeRemaining,
   validatePaymentPayload,
   serializePaymentPayload,
   deserializePaymentPayload,
   createPaymentHeaders,
   verifyPayment,
-  settlePayment,
-  isPaymentExpiredAtLedger,
-  getPaymentLedgerTimeRemaining
+  settlePayment
 } from "./payment.js";
 export type {
   PaymentPayload,
@@ -53,6 +49,7 @@ export type {
   CallResult,
   PaidResourceFlowOptions,
   PaidResourceFlowResult,
+  ReceiptResult,
   RetryConfig
 } from "./call.js";
 

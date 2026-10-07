@@ -32,7 +32,7 @@ describe("rate limit hook", () => {
       method: "GET",
       url: "/v1/supported",
       headers: {
-        "x-api-key": "test-api-key"
+        "X-API-Key": "test-api-key"
       }
     });
     const second = await app.inject({
@@ -63,6 +63,33 @@ describe("rate limit hook", () => {
       }
     ]);
 
+    await app.close();
+  });
+
+  it("does not trust forwarded client addresses", async () => {
+    const rateLimitService = new RateLimitService({
+      rules: {
+        facilitator: {
+          limit: 1,
+          windowMs: 60_000
+        }
+      }
+    });
+    const app = buildApiApp({ logger: false, rateLimitService });
+
+    const first = await app.inject({
+      method: "GET",
+      url: "/v1/supported",
+      headers: { "x-forwarded-for": "198.51.100.10" }
+    });
+    const second = await app.inject({
+      method: "GET",
+      url: "/v1/supported",
+      headers: { "x-forwarded-for": "203.0.113.20" }
+    });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(429);
     await app.close();
   });
 });

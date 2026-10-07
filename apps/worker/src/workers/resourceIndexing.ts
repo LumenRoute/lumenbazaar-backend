@@ -1,6 +1,6 @@
 import { type Job } from "bullmq";
 
-import { getPrismaClient } from "@lumenbazaar/shared";
+import { getPrismaClient, redactSensitiveText } from "@lumenbazaar/shared";
 
 export type ResourceIndexingJobData = {
   resourceId: string;
@@ -75,7 +75,7 @@ export async function handleResourceIndexing(job: Job<ResourceIndexingJobData>) 
 
     job.log(`Resource ${resourceId} indexed successfully`);
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
     job.log(`Resource indexing failed: ${errorMsg}`);
 
     // Record indexing failure

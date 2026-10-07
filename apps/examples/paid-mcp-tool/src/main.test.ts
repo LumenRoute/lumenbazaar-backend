@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { testPaymentPayload } from "@lumenbazaar/testkit";
+
 import {
   callPaidMcpToolThroughLumenBazaar,
   createPaidMcpToolApp,
@@ -38,9 +40,7 @@ describe("paid MCP tool example", () => {
       method: "POST",
       url: `/tools/${paidMcpToolName}`,
       headers: {
-        "x-payment-required": JSON.stringify({
-          scheme: "exact"
-        })
+        "payment-signature": Buffer.from(JSON.stringify(testPaymentPayload)).toString("base64")
       },
       payload: {
         sku: "LBZ-PRO",
@@ -63,7 +63,8 @@ describe("paid MCP tool example", () => {
     });
     expect(unpaid.statusCode).toBe(402);
     expect(unpaid.json()).toMatchObject({
-      paymentRequired: paidMcpPaymentRequirement
+      x402Version: 2,
+      accepts: [paidMcpPaymentRequirement]
     });
     expect(paid.statusCode).toBe(200);
     expect(paid.json()).toMatchObject({
@@ -136,12 +137,16 @@ describe("paid MCP tool example", () => {
 
       if (url === "https://api.example.test/v1/verify") {
         return Response.json({
-          ok: true,
-          paymentAttemptId: "attempt_mcp_tool",
-          paymentHash: "hash_mcp_tool",
-          network: "stellar:testnet",
-          status: "verified",
-          adapter: "@x402/stellar"
+          isValid: true,
+          extra: {
+            lumenbazaar: {
+              paymentAttemptId: "attempt_mcp_tool",
+              paymentHash: "hash_mcp_tool",
+              network: "stellar:testnet",
+              status: "verified",
+              adapter: "@x402/stellar"
+            }
+          }
         });
       }
 
@@ -156,12 +161,19 @@ describe("paid MCP tool example", () => {
 
       if (url === "https://api.example.test/v1/settle") {
         return Response.json({
-          receiptId: "receipt_mcp_tool",
-          settlementId: "settlement_mcp_tool",
-          transactionHash: "tx_mcp_tool",
-          ledger: 56789,
+          success: true,
+          amount: "300000",
           network: "stellar:testnet",
-          status: "settled"
+          transaction: "tx_mcp_tool",
+          extra: {
+            lumenbazaar: {
+              receiptId: "receipt_mcp_tool",
+              settlementId: "settlement_mcp_tool",
+              transactionHash: "tx_mcp_tool",
+              ledger: 56789,
+              status: "settled"
+            }
+          }
         });
       }
 
@@ -182,13 +194,14 @@ describe("paid MCP tool example", () => {
     await expect(
       callPaidMcpToolThroughLumenBazaar({
         apiUrl: "https://api.example.test",
-        authorization: {
-          wallet: "buyer_testnet"
-        },
         input: paidMcpToolRequestSchema.parse({
           sku: "LBZ-PRO",
           quantity: 3
         }),
+        paymentPayload: {
+          ...testPaymentPayload,
+          accepted: paidMcpPaymentRequirement
+        },
         resourceId: "resource_mcp_tool",
         serverBaseUrl: "https://mcp.example.test"
       })
@@ -207,7 +220,12 @@ describe("paid MCP tool example", () => {
         status: "finalized"
       },
       verification: {
-        paymentAttemptId: "attempt_mcp_tool"
+        isValid: true,
+        extra: {
+          lumenbazaar: {
+            paymentAttemptId: "attempt_mcp_tool"
+          }
+        }
       }
     });
   });

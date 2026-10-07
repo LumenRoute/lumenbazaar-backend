@@ -110,45 +110,124 @@ const resource: SchemaObject = {
   }
 };
 
-const paymentPayload: SchemaObject = {
+const paymentRequirements: SchemaObject = {
   type: "object",
-  required: ["scheme", "network", "asset", "amount", "payTo"],
+  additionalProperties: false,
+  required: ["scheme", "network", "asset", "amount", "payTo", "maxTimeoutSeconds", "extra"],
   properties: {
     scheme: { type: "string", enum: ["exact"] },
     network: { type: "string", enum: ["stellar:testnet", "stellar:pubnet"] },
-    asset: assetSchema,
-    amount: { type: "string" },
+    asset: { type: "string", description: "SEP-41 token contract ID." },
+    amount: {
+      type: "string",
+      pattern: "^[1-9]\\d*$",
+      description: "Amount in the token's atomic units."
+    },
     payTo: { type: "string" },
-    expiresAtLedger: { type: "integer" },
-    authorization: jsonObject,
-    paymentHash: { type: "string" }
+    maxTimeoutSeconds: { type: "integer", minimum: 1 },
+    extra: jsonObject
   }
 };
 
-const paymentRequirements: SchemaObject = {
+const paymentPayload: SchemaObject = {
   type: "object",
-  required: ["scheme", "network", "amount", "payTo"],
+  additionalProperties: false,
+  required: ["x402Version", "accepted", "payload"],
   properties: {
-    scheme: { type: "string", enum: ["exact"] },
-    network: { type: "string", enum: ["stellar:testnet", "stellar:pubnet"] },
-    asset: assetSchema,
-    amount: { type: "string" },
-    payTo: { type: "string" }
+    x402Version: { type: "integer", enum: [2] },
+    resource: {
+      type: "object",
+      required: ["url"],
+      properties: {
+        url: { type: "string", format: "uri" },
+        description: { type: "string" },
+        mimeType: { type: "string" }
+      }
+    },
+    accepted: paymentRequirements,
+    payload: {
+      type: "object",
+      additionalProperties: false,
+      required: ["transaction"],
+      properties: {
+        transaction: {
+          type: "string",
+          contentEncoding: "base64",
+          description: "Wallet-signed Stellar transaction envelope XDR."
+        }
+      }
+    },
+    extensions: jsonObject
   }
 };
 
 const verificationRequestProperties: Record<string, unknown> = {
+  x402Version: { type: "integer", enum: [2] },
   paymentPayload,
-  paymentRequirements,
-  resourceId: { type: "string" },
-  sellerId: { type: "string" },
-  currentLedger: { type: "integer" }
+  paymentRequirements
 };
 
 const verificationRequest: SchemaObject = {
   type: "object",
-  required: ["paymentPayload", "paymentRequirements"],
+  additionalProperties: false,
+  required: ["x402Version", "paymentPayload", "paymentRequirements"],
   properties: verificationRequestProperties
+};
+
+const verificationResponse: SchemaObject = {
+  type: "object",
+  required: ["isValid"],
+  properties: {
+    isValid: { type: "boolean" },
+    invalidReason: { type: "string" },
+    invalidMessage: { type: "string" },
+    payer: { type: "string" },
+    extensions: jsonObject,
+    extensionResponses: jsonObject,
+    extra: jsonObject
+  }
+};
+
+const settlementResponse: SchemaObject = {
+  type: "object",
+  required: ["success", "transaction", "network"],
+  properties: {
+    success: { type: "boolean" },
+    errorReason: { type: "string" },
+    errorMessage: { type: "string" },
+    payer: { type: "string" },
+    transaction: { type: "string" },
+    network: { type: "string", enum: ["stellar:testnet", "stellar:pubnet"] },
+    amount: { type: "string", pattern: "^[1-9]\\d*$" },
+    extensions: jsonObject,
+    extensionResponses: jsonObject,
+    extra: jsonObject
+  }
+};
+
+const supportedResponse: SchemaObject = {
+  type: "object",
+  required: ["kinds", "extensions", "signers"],
+  properties: {
+    kinds: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["x402Version", "scheme", "network"],
+        properties: {
+          x402Version: { type: "integer", enum: [2] },
+          scheme: { type: "string" },
+          network: { type: "string" },
+          extra: jsonObject
+        }
+      }
+    },
+    extensions: { type: "array", items: { type: "string" } },
+    signers: {
+      type: "object",
+      additionalProperties: { type: "array", items: { type: "string" } }
+    }
+  }
 };
 
 const paymentSessionRequired = [
@@ -280,7 +359,15 @@ export const apiRouteContracts: RouteContract[] = [
     method: "get",
     path: "/health",
     operationId: "getHealth",
-    summary: "Return API health and dependency configuration.",
+    summary: "Return API process liveness.",
+    tags: ["metadata"],
+    response: jsonObject
+  },
+  {
+    method: "get",
+    path: "/ready",
+    operationId: "getReadiness",
+    summary: "Return dependency readiness and usable payment capabilities.",
     tags: ["metadata"],
     response: jsonObject
   },
@@ -306,7 +393,7 @@ export const apiRouteContracts: RouteContract[] = [
     operationId: "listSupportedPaymentSchemes",
     summary: "List supported x402 payment schemes.",
     tags: ["facilitator"],
-    response: jsonObject
+    response: supportedResponse
   },
   {
     method: "post",
@@ -315,7 +402,7 @@ export const apiRouteContracts: RouteContract[] = [
     summary: "Verify an exact Stellar x402 payment payload.",
     tags: ["facilitator"],
     requestBody: verificationRequest,
-    response: jsonObject
+    response: verificationResponse
   },
   {
     method: "post",
@@ -325,13 +412,11 @@ export const apiRouteContracts: RouteContract[] = [
     tags: ["facilitator"],
     requestBody: {
       type: "object",
-      required: ["paymentAttemptId", "paymentPayload", "paymentRequirements"],
-      properties: {
-        paymentAttemptId: { type: "string" },
-        ...verificationRequestProperties
-      }
+      additionalProperties: false,
+      required: ["x402Version", "paymentPayload", "paymentRequirements"],
+      properties: verificationRequestProperties
     },
-    response: jsonObject
+    response: settlementResponse
   },
   {
     method: "get",

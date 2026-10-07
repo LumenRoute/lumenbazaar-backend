@@ -15,6 +15,14 @@ describe("MetricsService", () => {
     metrics.recordSettlementResult("stellar:testnet", "settled");
     metrics.recordSettlementResult("stellar:testnet", "failed");
     metrics.setQueueDepth("settlement-confirmation", 4);
+    metrics.recordVerification("stellar:testnet", "accepted");
+    metrics.recordReplayRejection("stellar:testnet");
+    metrics.observeFinality("stellar:testnet", 750, "confirmed");
+    metrics.recordReconciliation("stellar:testnet", "needs_review");
+    metrics.recordCatalog("http", "accepted");
+    metrics.setDependencyStatus("postgres", true);
+    metrics.setStuckSettlements("stellar:testnet", 2);
+    metrics.setReconciliationBacklog("stellar:testnet", 1);
 
     const output = await metrics.collect();
 
@@ -25,6 +33,14 @@ describe("MetricsService", () => {
     expect(output).toContain("lumenbazaar_settlement_success_rate");
     expect(output).toContain("lumenbazaar_queue_depth");
     expect(output).toContain("lumenbazaar_search_latency_seconds");
+    expect(output).toContain("lumenbazaar_verifications_total");
+    expect(output).toContain("lumenbazaar_replay_rejections_total");
+    expect(output).toContain("lumenbazaar_finality_seconds");
+    expect(output).toContain("lumenbazaar_reconciliation_total");
+    expect(output).toContain("lumenbazaar_catalog_total");
+    expect(output).toContain('lumenbazaar_dependency_up{dependency="postgres"} 1');
+    expect(output).toContain('lumenbazaar_stuck_settlements{network="stellar:testnet"} 2');
+    expect(output).toContain('lumenbazaar_reconciliation_backlog{network="stellar:testnet"} 1');
     expect(output).toContain('lumenbazaar_settlement_success_rate{network="stellar:testnet"} 0.5');
     expect(output).toContain('lumenbazaar_queue_depth{queue="settlement-confirmation"} 4');
   });
@@ -37,7 +53,15 @@ describe("MetricsService", () => {
       observeSearchLatency: vi.fn(),
       recordRpcError: vi.fn(),
       recordSettlementResult: vi.fn(),
-      setQueueDepth: vi.fn()
+      setQueueDepth: vi.fn(),
+      observeFinality: vi.fn(),
+      recordVerification: vi.fn(),
+      recordReplayRejection: vi.fn(),
+      recordReconciliation: vi.fn(),
+      recordCatalog: vi.fn(),
+      setDependencyStatus: vi.fn(),
+      setStuckSettlements: vi.fn(),
+      setReconciliationBacklog: vi.fn()
     };
     const resourceService = {
       async listResources() {

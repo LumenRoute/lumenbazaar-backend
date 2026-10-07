@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { loadConfig, localIssuerPublicKey } from "@lumenbazaar/shared";
+import { loadConfig } from "@lumenbazaar/shared";
+import { createTestPaymentRequest, testPaymentConfigEnv } from "@lumenbazaar/testkit";
 import {
   InMemoryPaymentAttemptStore,
   PaymentVerificationService,
@@ -14,7 +15,7 @@ import { type MetricsService } from "../services/metrics.js";
 describe("facilitator metrics", () => {
   it("records verify and settle latency plus settlement success rate inputs", async () => {
     const metrics = fakeMetrics();
-    const config = loadConfig({});
+    const config = loadConfig(testPaymentConfigEnv);
     const adapter: X402StellarAdapter = {
       async verifyExact() {
         return {
@@ -26,6 +27,7 @@ describe("facilitator metrics", () => {
         return {
           transactionHash: "tx_metrics",
           ledger: 654,
+          status: "confirmed",
           adapter: "@x402/stellar"
         };
       }
@@ -40,7 +42,7 @@ describe("facilitator metrics", () => {
       settlementService
     });
     const settleRequest = exactPaymentRequest("settle_metrics");
-    const verified = await verificationService.verify(settleRequest);
+    await verificationService.verify(settleRequest);
 
     await app.inject({
       method: "POST",
@@ -50,10 +52,7 @@ describe("facilitator metrics", () => {
     await app.inject({
       method: "POST",
       url: "/v1/settle",
-      payload: {
-        paymentAttemptId: verified.paymentAttemptId,
-        ...settleRequest
-      }
+      payload: settleRequest
     });
 
     expect(metrics.observeVerifyLatency).toHaveBeenCalledWith(
@@ -65,6 +64,12 @@ describe("facilitator metrics", () => {
       expect.any(Number)
     );
     expect(metrics.recordSettlementResult).toHaveBeenCalledWith("stellar:testnet", "settled");
+    expect(metrics.recordVerification).toHaveBeenCalledWith("stellar:testnet", "accepted");
+    expect(metrics.observeFinality).toHaveBeenCalledWith(
+      "stellar:testnet",
+      expect.any(Number),
+      "confirmed"
+    );
     expect(metrics.recordRpcError).not.toHaveBeenCalled();
 
     await app.close();
@@ -79,37 +84,18 @@ function fakeMetrics(): MetricsService {
     observeSearchLatency: vi.fn(),
     recordRpcError: vi.fn(),
     recordSettlementResult: vi.fn(),
-    setQueueDepth: vi.fn()
+    setQueueDepth: vi.fn(),
+    observeFinality: vi.fn(),
+    recordVerification: vi.fn(),
+    recordReplayRejection: vi.fn(),
+    recordReconciliation: vi.fn(),
+    recordCatalog: vi.fn(),
+    setDependencyStatus: vi.fn(),
+    setStuckSettlements: vi.fn(),
+    setReconciliationBacklog: vi.fn()
   };
 }
 
 function exactPaymentRequest(paymentHash: string) {
-  return {
-    paymentPayload: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey,
-      expiresAtLedger: 10,
-      authorization: {
-        signature: "sig"
-      },
-      paymentHash
-    },
-    paymentRequirements: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey
-    },
-    currentLedger: 9
-  };
+  return createTestPaymentRequest(paymentHash);
 }

@@ -4,6 +4,19 @@ import { describe, expect, it } from "vitest";
 
 const schema = readFileSync("prisma/schema.prisma", "utf8");
 const migration = readFileSync("prisma/migrations/0002_payment_records/migration.sql", "utf8");
+const durabilityMigration = readFileSync(
+  "prisma/migrations/0005_durable_payment_persistence/migration.sql",
+  "utf8"
+);
+const reconciliationMigration = readFileSync(
+  "prisma/migrations/0006_settlement_reconciliation/migration.sql",
+  "utf8"
+);
+const observabilityMigration = readFileSync(
+  "prisma/migrations/0007_observability_correlation/migration.sql",
+  "utf8"
+);
+const rollbackGuide = readFileSync("docs/migrations/0005-durable-payment-persistence.md", "utf8");
 
 describe("payment database schema", () => {
   it.each(["PaymentAttempt", "Settlement", "Receipt"])("defines the %s model", (model) => {
@@ -16,11 +29,42 @@ describe("payment database schema", () => {
     expect(schema).toContain("paymentAttemptId String         @unique");
     expect(migration).toContain('"PaymentAttempt_paymentHash_key"');
     expect(migration).toContain('"Settlement_paymentAttemptId_key"');
+    expect(schema).toContain("idempotencyKey  String      @unique");
+    expect(schema).toContain("evidenceHash     String         @unique");
+    expect(durabilityMigration).toContain('"PaymentAttempt_idempotencyKey_key"');
+    expect(durabilityMigration).toContain('"Receipt_evidenceHash_key"');
+    expect(durabilityMigration).toContain('REFERENCES "PaymentAttempt" ("id") ON DELETE RESTRICT');
+  });
+
+  it("tracks reconciliation state and documents a controlled rollback", () => {
+    expect(schema).toMatch(/reconciliationState\s+String\s+@default\("not_required"\)/u);
+    expect(durabilityMigration).toContain('ADD COLUMN "reconciliationState"');
+    expect(rollbackGuide).toContain("Rollback");
+    expect(rollbackGuide).toContain("financial evidence");
+  });
+
+  it("stores bounded reconciliation attempts and operator reasons", () => {
+    expect(schema).toMatch(/reconciliationReason\s+String\?/u);
+    expect(schema).toMatch(/reconciliationAttempts\s+Int\s+@default\(0\)/u);
+    expect(schema).toMatch(/lastReconciledAt\s+DateTime\?/u);
+    expect(schema).toContain("@@index([reconciliationState, lastReconciledAt])");
+    expect(reconciliationMigration).toContain('"reconciliationReason"');
+    expect(reconciliationMigration).toContain(
+      '"Settlement_reconciliationState_lastReconciledAt_idx"'
+    );
   });
 
   it("indexes payment state by network, seller, resource, and status", () => {
     expect(schema).toContain("@@index([network, status])");
     expect(schema).toContain("@@index([sellerId, status])");
     expect(schema).toContain("@@index([resourceId, status])");
+  });
+
+  it("persists an indexed correlation identifier across payment evidence", () => {
+    for (const model of ["PaymentAttempt", "Settlement", "Receipt"]) {
+      expect(observabilityMigration).toContain(`ALTER TABLE "${model}" ADD COLUMN "correlationId"`);
+      expect(observabilityMigration).toContain(`"${model}_correlationId_idx"`);
+    }
+    expect(observabilityMigration).toContain('ALTER TABLE "AuditLog" ADD COLUMN "correlationId"');
   });
 });

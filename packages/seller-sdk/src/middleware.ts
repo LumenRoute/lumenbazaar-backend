@@ -1,36 +1,35 @@
-import { type JsonObject } from "@lumenbazaar/shared";
+import { type PaymentRequiredV2 } from "@x402/core/schemas";
 
-export type PaymentRequirement = {
-  scheme: "exact";
-  network: "stellar:testnet" | "stellar:pubnet";
-  asset: {
-    code: string;
-    issuer: string;
-  };
-  amount: string;
-  payTo: string;
+import {
+  encodePaymentRequiredV2,
+  paymentRequiredHeader,
+  type ExactStellarPaymentRequirements
+} from "@lumenbazaar/stellar-payments";
+
+export type PaymentRequirement = ExactStellarPaymentRequirements;
+
+export type PaymentResource = {
+  url: string;
+  description?: string;
+  mimeType?: string;
+  serviceName?: string;
 };
 
 export type X402PaymentHeader = {
-  "x-payment-required"?: string;
-  "x-payment-scheme"?: string;
+  "payment-required": string;
 };
 
-/**
- * Middleware Response
- * Represents a 402 Payment Required response with x402 headers
- */
 export type MiddlewareResponse = {
   status: 402;
   headers: X402PaymentHeader;
-  body?: JsonObject;
+  body: PaymentRequiredV2;
 };
 
 export type FastifyPaymentReply = {
   code?: (statusCode: number) => FastifyPaymentReply;
   header?: (name: string, value: string) => FastifyPaymentReply;
   headers?: (headers: Record<string, string>) => FastifyPaymentReply;
-  send: (body: JsonObject) => unknown;
+  send: (body: Record<string, unknown>) => unknown;
   status?: (statusCode: number) => FastifyPaymentReply;
 };
 
@@ -47,115 +46,94 @@ export type FastifyPaymentPluginHost = {
   ) => void;
 };
 
-/**
- * Create a 402 Payment Required response
- */
-export function createPaymentRequired(requirement: PaymentRequirement): MiddlewareResponse {
-  const paymentHeaderValue = JSON.stringify({
-    scheme: requirement.scheme,
-    network: requirement.network,
-    asset: requirement.asset,
-    amount: requirement.amount,
-    payTo: requirement.payTo
-  });
+const defaultResource: PaymentResource = {
+  url: "https://lumenbazaar.invalid/resource",
+  description: "Paid LumenBazaar resource"
+};
+
+export function createPaymentRequired(
+  requirement: PaymentRequirement,
+  resource: PaymentResource = defaultResource
+): MiddlewareResponse {
+  const body: PaymentRequiredV2 = {
+    x402Version: 2,
+    resource,
+    accepts: [requirement]
+  };
 
   return {
     status: 402,
     headers: {
-      "x-payment-required": paymentHeaderValue,
-      "x-payment-scheme": requirement.scheme
+      "payment-required": encodePaymentRequiredV2(body)
     },
-    body: {
-      error: "Payment Required",
-      message: "This resource requires payment to access",
-      paymentRequired: requirement
-    }
+    body
   };
 }
 
-/**
- * Fastify plugin for 402 Payment Required responses.
- */
-export function createFastifyPaymentMiddleware(requirement: PaymentRequirement) {
+export function createFastifyPaymentMiddleware(
+  requirement: PaymentRequirement,
+  resource: PaymentResource = defaultResource
+) {
   return async (fastify: FastifyPaymentPluginHost) => {
     fastify.decorate("lumenBazaar", {
       requirePayment: (
         _request: Record<string, unknown>,
         reply: FastifyPaymentReply,
         overrideRequirement: PaymentRequirement = requirement
-      ) => sendFastifyPaymentRequired(reply, overrideRequirement)
+      ) => sendFastifyPaymentRequired(reply, overrideRequirement, resource)
     });
   };
 }
 
 export function sendFastifyPaymentRequired(
   reply: FastifyPaymentReply,
-  requirement: PaymentRequirement
+  requirement: PaymentRequirement,
+  resource: PaymentResource = defaultResource
 ) {
-  const paymentResponse = createPaymentRequired(requirement);
-  const headers = {
-    "x-payment-required": paymentResponse.headers["x-payment-required"] ?? "",
-    "x-payment-scheme": paymentResponse.headers["x-payment-scheme"] ?? ""
-  };
-
-  if (reply.code !== undefined) {
-    reply.code(paymentResponse.status);
-  } else if (reply.status !== undefined) {
-    reply.status(paymentResponse.status);
-  }
-
-  if (reply.headers !== undefined) {
-    reply.headers(headers);
-  } else if (reply.header !== undefined) {
-    for (const [name, value] of Object.entries(headers)) {
-      reply.header(name, value);
-    }
-  }
-
-  return reply.send(paymentResponse.body ?? {});
+  const paymentResponse = createPaymentRequired(requirement, resource);
+  setStatus(reply, paymentResponse.status);
+  setHeaders(reply, paymentResponse.headers);
+  return reply.send(paymentResponse.body);
 }
 
-/**
- * Express Middleware for 402 Payment Required responses
- * Usage: app.use(createExpressPaymentMiddleware(requirement))
- */
-export function createExpressPaymentMiddleware(requirement: PaymentRequirement) {
+export function createExpressPaymentMiddleware(
+  requirement: PaymentRequirement,
+  resource: PaymentResource = defaultResource
+) {
   return (
     _req: Record<string, unknown>,
     res: {
       status: (code: number) => {
-        set: (headers: Record<string, string>) => {
-          json: (body: JsonObject) => void;
-        };
+        set: (headers: Record<string, string>) => { json: (body: unknown) => unknown };
       };
-    },
-    _next: () => void
+    }
   ) => {
-    const paymentResponse = createPaymentRequired(requirement);
-
-    res
-      .status(paymentResponse.status)
-      .set({
-        "x-payment-required": paymentResponse.headers["x-payment-required"] ?? "",
-        "x-payment-scheme": paymentResponse.headers["x-payment-scheme"] ?? ""
-      })
-      .json(paymentResponse.body ?? {});
+    const response = createPaymentRequired(requirement, resource);
+    return res.status(response.status).set(response.headers).json(response.body);
   };
 }
 
-/**
- * Next.js Route Handler Response for 402 Payment Required
- * Usage: return createNextPaymentResponse(requirement)
- */
-export function createNextPaymentResponse(requirement: PaymentRequirement) {
-  const paymentResponse = createPaymentRequired(requirement);
+export function createNextPaymentResponse(
+  requirement: PaymentRequirement,
+  resource: PaymentResource = defaultResource
+) {
+  return createPaymentRequired(requirement, resource);
+}
 
-  return new Response(JSON.stringify(paymentResponse.body), {
-    status: paymentResponse.status,
-    headers: {
-      "Content-Type": "application/json",
-      "x-payment-required": paymentResponse.headers["x-payment-required"] ?? "",
-      "x-payment-scheme": paymentResponse.headers["x-payment-scheme"] ?? ""
-    }
-  });
+function setStatus(reply: FastifyPaymentReply, status: number) {
+  if (reply.code !== undefined) {
+    reply.code(status);
+  } else {
+    reply.status?.(status);
+  }
+}
+
+function setHeaders(reply: FastifyPaymentReply, headers: Record<string, string>) {
+  if (reply.headers !== undefined) {
+    reply.headers(headers);
+    return;
+  }
+  for (const [name, value] of Object.entries(headers)) {
+    reply.header?.(name === "payment-required" ? paymentRequiredHeader : name, value);
+  }
 }

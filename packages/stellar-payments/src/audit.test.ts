@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { loadConfig, localIssuerPublicKey } from "@lumenbazaar/shared";
+import { loadConfig } from "@lumenbazaar/shared";
+import { createTestPaymentRequest, testPaymentConfigEnv } from "@lumenbazaar/testkit";
 
 import { InMemoryPaymentAttemptStore } from "./paymentAttemptStore.js";
 import { SettlementService } from "./settlement.js";
@@ -30,11 +31,12 @@ describe("payment audit logging", () => {
         return {
           transactionHash: "tx_audit",
           ledger: 987,
+          status: "confirmed",
           adapter: "@x402/stellar"
         };
       }
     };
-    const config = loadConfig({});
+    const config = loadConfig(testPaymentConfigEnv);
     const attemptStore = new InMemoryPaymentAttemptStore();
     const verificationOptions: PaymentVerificationServiceOptions = {
       adapter,
@@ -48,19 +50,16 @@ describe("payment audit logging", () => {
       auditLogService
     });
     const paymentRequest = exactPaymentRequest();
-    const verified = await verificationService.verify(paymentRequest);
+    await verificationService.verify(paymentRequest);
 
-    await settlementService.settle({
-      paymentAttemptId: verified.paymentAttemptId,
-      ...paymentRequest
-    });
+    await settlementService.settle(paymentRequest);
 
     expect(records.map((record) => record.action)).toEqual(["payment.verify", "payment.settle"]);
     expect(records[0]).toMatchObject({
       actorType: "facilitator",
       targetType: "payment_attempt",
       metadata: {
-        amount: "0.05",
+        amount: "500000",
         assetCode: "USDC",
         network: "stellar:testnet",
         status: "verified"
@@ -80,32 +79,5 @@ describe("payment audit logging", () => {
 });
 
 function exactPaymentRequest() {
-  return {
-    paymentPayload: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey,
-      expiresAtLedger: 10,
-      authorization: {
-        signature: "secret-signature"
-      },
-      paymentHash: "audit_payment_hash"
-    },
-    paymentRequirements: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey
-    },
-    currentLedger: 9
-  };
+  return createTestPaymentRequest("secret-signature");
 }

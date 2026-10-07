@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { loadConfig, localIssuerPublicKey } from "@lumenbazaar/shared";
 import {
+  createTestPaymentRequest,
+  testExpiredPaymentRequest,
+  testPaymentConfigEnv,
+  testSeller
+} from "@lumenbazaar/testkit";
+import {
   InMemoryPaymentAttemptStore,
   PaymentVerificationService,
   SettlementService,
@@ -13,7 +19,7 @@ import { ResourceService } from "./resources.js";
 import { SearchService } from "./search.js";
 import { SellerService } from "./sellers.js";
 
-const alternatePayTo = "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+const alternatePayTo = testSeller.walletAddress;
 
 describe("security regressions", () => {
   it("rejects forged seller metadata and route templates", async () => {
@@ -47,25 +53,32 @@ describe("security regressions", () => {
     );
   });
 
-  it("rejects replayed and expired exact payment authorizations", async () => {
-    const verification = new PaymentVerificationService(loadConfig({}), {
-      adapter: acceptingAdapter(),
+  it("returns an idempotent verification result and rejects expired authorizations", async () => {
+    const verification = new PaymentVerificationService(loadConfig(testPaymentConfigEnv), {
+      adapter: {
+        async verifyExact(input) {
+          const transaction = Buffer.from(
+            input.paymentPayload.payload.transaction,
+            "base64"
+          ).toString();
+          return transaction.includes("expired-ledger-bounds")
+            ? {
+                valid: false,
+                failureCode: "AUTH_EXPIRED",
+                failureReason: "Transaction ledger bounds have expired.",
+                adapter: "@x402/stellar"
+              }
+            : { valid: true, adapter: "@x402/stellar" };
+        }
+      },
       attemptStore: new InMemoryPaymentAttemptStore()
     });
 
-    await verification.verify(exactPaymentRequest("security_replay"));
-
-    await expect(verification.verify(exactPaymentRequest("security_replay"))).rejects.toMatchObject(
-      {
-        code: "REPLAY_DETECTED"
-      }
+    const original = await verification.verify(exactPaymentRequest("security_replay"));
+    await expect(verification.verify(exactPaymentRequest("security_replay"))).resolves.toEqual(
+      original
     );
-    await expect(
-      verification.verify({
-        ...exactPaymentRequest("security_expired"),
-        currentLedger: 10
-      })
-    ).rejects.toMatchObject({
+    await expect(verification.verify(testExpiredPaymentRequest)).rejects.toMatchObject({
       code: "AUTH_EXPIRED"
     });
   });
@@ -74,6 +87,7 @@ describe("security regressions", () => {
     const settleExact = vi.fn(async () => ({
       transactionHash: "tx_should_not_happen",
       ledger: 123,
+      status: "confirmed" as const,
       adapter: "@x402/stellar" as const
     }));
     const adapter = {
@@ -81,37 +95,44 @@ describe("security regressions", () => {
       settleExact
     };
     const attemptStore = new InMemoryPaymentAttemptStore();
-    const config = loadConfig({});
+    const config = loadConfig(testPaymentConfigEnv);
     const verification = new PaymentVerificationService(config, { adapter, attemptStore });
     const settlement = new SettlementService(config, { adapter, attemptStore });
-    const verified = await verification.verify(exactPaymentRequest("security_settlement"));
+    const original = exactPaymentRequest("security_settlement");
+    await verification.verify(original);
+
+    const wrongAssetRequirements = {
+      ...original.paymentRequirements,
+      asset: "CUNSUPPORTEDASSETCONTRACT0000000000000000000000000000000"
+    };
 
     await expect(
       settlement.settle({
-        paymentAttemptId: verified.paymentAttemptId,
-        ...exactPaymentRequest("security_settlement"),
-        paymentRequirements: {
-          ...exactPaymentRequest("security_settlement").paymentRequirements,
-          asset: {
-            code: "XLM",
-            issuer: localIssuerPublicKey
-          }
-        }
+        ...original,
+        paymentPayload: {
+          ...original.paymentPayload,
+          accepted: wrongAssetRequirements
+        },
+        paymentRequirements: wrongAssetRequirements
       })
     ).rejects.toMatchObject({
-      code: "ASSET_MISMATCH"
+      code: "UNSUPPORTED_ASSET"
     });
+    const wrongRecipientRequirements = {
+      ...original.paymentRequirements,
+      payTo: alternatePayTo
+    };
     await expect(
       settlement.settle({
-        paymentAttemptId: verified.paymentAttemptId,
-        ...exactPaymentRequest("security_settlement"),
-        paymentRequirements: {
-          ...exactPaymentRequest("security_settlement").paymentRequirements,
-          payTo: alternatePayTo
-        }
+        ...original,
+        paymentPayload: {
+          ...original.paymentPayload,
+          accepted: wrongRecipientRequirements
+        },
+        paymentRequirements: wrongRecipientRequirements
       })
     ).rejects.toMatchObject({
-      code: "RECIPIENT_MISMATCH"
+      code: "INVALID_PAYMENT_PAYLOAD"
     });
     expect(settleExact).not.toHaveBeenCalled();
   });
@@ -196,34 +217,7 @@ function metadata(sellerId: string) {
 }
 
 function exactPaymentRequest(paymentHash: string) {
-  return {
-    paymentPayload: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey,
-      expiresAtLedger: 10,
-      authorization: {
-        signature: "sig"
-      },
-      paymentHash
-    },
-    paymentRequirements: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey
-    },
-    currentLedger: 9
-  };
+  return createTestPaymentRequest(paymentHash);
 }
 
 function acceptingAdapter(): X402StellarAdapter {

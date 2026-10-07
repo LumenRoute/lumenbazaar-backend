@@ -1,15 +1,8 @@
 import { type JsonObject } from "@lumenbazaar/shared";
+import { convertToTokenAmount } from "@x402/stellar";
+import { type ExactStellarPaymentRequirements } from "@lumenbazaar/stellar-payments";
 
-export type PaymentTerms = {
-  scheme: "exact";
-  network: "stellar:testnet" | "stellar:pubnet";
-  asset: {
-    code: string;
-    issuer: string;
-  };
-  amount: string;
-  payTo: string;
-};
+export type PaymentTerms = ExactStellarPaymentRequirements;
 
 export type ResourceMetadata = {
   id: string;
@@ -44,6 +37,11 @@ export async function inspectResource(
   }
 
   const resource = (await response.json()) as Record<string, unknown>;
+  const extensions = (resource.extensions as Record<string, unknown> | undefined) ?? {};
+  const assetContractId = resource.assetContractId ?? extensions.assetContractId;
+  if (typeof assetContractId !== "string" || assetContractId.length === 0) {
+    throw new Error(`Resource ${resourceId} has no SEP-41 asset contract ID.`);
+  }
 
   const result: ResourceMetadata = {
     id: resource.id as string,
@@ -56,12 +54,14 @@ export async function inspectResource(
     paymentTerms: {
       scheme: "exact",
       network: resource.network as string as "stellar:testnet" | "stellar:pubnet",
-      asset: {
-        code: resource.assetCode as string,
-        issuer: resource.assetIssuer as string
-      },
-      amount: resource.amount as string,
-      payTo: resource.payTo as string
+      asset: assetContractId,
+      amount: convertToTokenAmount(resource.amount as string, 7),
+      payTo: resource.payTo as string,
+      maxTimeoutSeconds: 60,
+      extra: {
+        assetCode: resource.assetCode,
+        assetIssuer: resource.assetIssuer
+      }
     }
   };
 

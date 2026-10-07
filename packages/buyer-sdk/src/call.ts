@@ -2,7 +2,7 @@ import { type JsonObject } from "@lumenbazaar/shared";
 import { type BudgetManager } from "./budget.js";
 import { inspectResource, type ResourceMetadata } from "./inspect.js";
 import {
-  createPaymentPayloadFromResource,
+  createPaymentHeaders,
   settlePayment,
   type PaymentPayload,
   type SettlePaymentResult,
@@ -47,10 +47,7 @@ export type ReceiptResult = {
 
 export type PaidResourceFlowOptions = CallOptions & {
   apiUrl: string;
-  authorization?: Record<string, unknown>;
   budgetManager?: BudgetManager;
-  currentLedger?: number;
-  expiresAtLedger?: number;
   paymentPayload?: PaymentPayload;
   resourceId: string;
   resourceUrl?: string;
@@ -124,26 +121,22 @@ export async function runPaidResourceFlow(
   options: PaidResourceFlowOptions
 ): Promise<PaidResourceFlowResult> {
   const resource = await inspectResource(options.apiUrl, options.resourceId);
-  const paymentOptions = {
-    ...(options.authorization === undefined ? {} : { authorization: options.authorization }),
-    ...(options.expiresAtLedger === undefined ? {} : { expiresAtLedger: options.expiresAtLedger })
-  };
-  const paymentPayload =
-    options.paymentPayload ??
-    createPaymentPayloadFromResource(resource.paymentTerms, paymentOptions);
+  if (options.paymentPayload === undefined) {
+    throw new Error("A wallet-signed x402 v2 payment payload is required.");
+  }
+  const paymentPayload = options.paymentPayload;
 
   if (
     options.budgetManager !== undefined &&
-    !options.budgetManager.canAfford(resource.paymentTerms.amount)
+    !options.budgetManager.canAffordAtomic(resource.paymentTerms.amount)
   ) {
     throw new Error(`Amount exceeds budget: ${resource.paymentTerms.amount}`);
   }
 
   const verification = await verifyPayment(options.apiUrl, {
+    x402Version: 2,
     paymentPayload,
-    paymentRequirements: resource.paymentTerms,
-    ...(options.currentLedger === undefined ? {} : { currentLedger: options.currentLedger }),
-    resourceId: resource.id
+    paymentRequirements: resource.paymentTerms
   });
 
   const call = await callPaidResource(options.resourceUrl ?? resource.url, paymentPayload, options);
@@ -158,15 +151,13 @@ export async function runPaidResourceFlow(
   }
 
   const settlement = await settlePayment(options.apiUrl, {
-    paymentAttemptId: verification.paymentAttemptId,
+    x402Version: 2,
     paymentPayload,
-    paymentRequirements: resource.paymentTerms,
-    ...(options.currentLedger === undefined ? {} : { currentLedger: options.currentLedger }),
-    resourceId: resource.id
+    paymentRequirements: resource.paymentTerms
   });
-  const receipt = await fetchReceipt(options.apiUrl, settlement.receiptId);
+  const receipt = await fetchReceipt(options.apiUrl, settlement.extra.lumenbazaar.receiptId);
 
-  options.budgetManager?.recordSpending(resource.paymentTerms.amount);
+  options.budgetManager?.recordSpendingAtomic(resource.paymentTerms.amount);
 
   return {
     call,
@@ -197,9 +188,7 @@ async function makePaymentRequest(
       ...options.headers
     };
 
-    // Add payment payload to headers
-    headers["x-payment-required"] = JSON.stringify(paymentPayload);
-    headers["x-payment-scheme"] = paymentPayload.scheme;
+    Object.assign(headers, createPaymentHeaders(paymentPayload));
 
     const requestInit: RequestInit = {
       method: options.method ?? "POST",

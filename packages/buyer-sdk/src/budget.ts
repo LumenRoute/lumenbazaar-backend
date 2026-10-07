@@ -43,6 +43,10 @@ export class BudgetManager {
     return true;
   }
 
+  canAffordAtomic(amount: string, decimals = 7): boolean {
+    return this.canAfford(atomicToDecimal(amount, decimals));
+  }
+
   /**
    * Record a spending and update budget
    */
@@ -59,6 +63,10 @@ export class BudgetManager {
 
     this.totalSpent += parsed.amount;
     this.callCount++;
+  }
+
+  recordSpendingAtomic(amount: string, decimals = 7): void {
+    this.recordSpending(atomicToDecimal(amount, decimals));
   }
 
   /**
@@ -119,6 +127,17 @@ function stringToBigInt(amount: string): bigint {
  */
 function bigIntToString(amount: bigint): string {
   return amount.toString();
+}
+
+function atomicToDecimal(amount: string, decimals: number): string {
+  if (!/^(?:0|[1-9]\d*)$/.test(amount) || !Number.isInteger(decimals) || decimals < 0) {
+    throw new Error("Atomic amount must be a non-negative integer string");
+  }
+  if (decimals === 0) return amount;
+  const padded = amount.padStart(decimals + 1, "0");
+  const whole = padded.slice(0, -decimals);
+  const fraction = padded.slice(-decimals).replace(/0+$/, "");
+  return fraction.length === 0 ? whole : `${whole}.${fraction}`;
 }
 
 /**

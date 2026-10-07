@@ -1,0 +1,51 @@
+groups:
+  - name: lumenbazaar-payment-operations
+    rules:
+      - alert: LumenBazaarDependencyUnavailable
+        expr: lumenbazaar_dependency_up{dependency=~"postgres|redis|rpc|horizon"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          runbook: docs/operations/payment-incidents.md#dependency-outage
+      - alert: LumenBazaarSignerUnavailable
+        expr: lumenbazaar_dependency_up{dependency="signer"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          runbook: docs/operations/payment-incidents.md#signer-failure
+      - alert: LumenBazaarSettlementStuck
+        expr: lumenbazaar_stuck_settlements > 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          runbook: docs/operations/payment-incidents.md#stuck-settlement
+      - alert: LumenBazaarReconciliationNeedsReview
+        expr: lumenbazaar_reconciliation_backlog > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          runbook: docs/operations/payment-incidents.md#reconciliation-review
+      - alert: LumenBazaarReplaySpike
+        expr: sum(increase(lumenbazaar_replay_rejections_total[10m])) > 5
+        labels:
+          severity: warning
+        annotations:
+          runbook: docs/operations/payment-incidents.md#replay-spike
+      - alert: LumenBazaarVerificationRejectionRateHigh
+        expr: sum(rate(lumenbazaar_verifications_total{result=~"rejected|replay"}[5m])) / clamp_min(sum(rate(lumenbazaar_verifications_total[5m])), 0.001) > 0.20 and sum(increase(lumenbazaar_verifications_total[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          runbook: docs/operations/payment-incidents.md#verification-rejections
+      - alert: LumenBazaarSettlementQueueBacklog
+        expr: lumenbazaar_queue_depth{queue="settlement-confirmation"} > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          runbook: docs/operations/payment-incidents.md#queue-backlog

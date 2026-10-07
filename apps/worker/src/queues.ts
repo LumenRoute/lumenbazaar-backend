@@ -2,9 +2,10 @@ import { Queue, type JobsOptions } from "bullmq";
 import { Redis } from "ioredis";
 
 import { type AppConfig } from "@lumenbazaar/shared";
+import { settlementReconciliationQueueName } from "@lumenbazaar/stellar-payments";
 
 export const queueNames = {
-  settlementConfirmation: "settlement-confirmation",
+  settlementConfirmation: settlementReconciliationQueueName,
   resourceIndexing: "resource-indexing",
   searchSync: "search-sync",
   conformanceRunner: "conformance-runner",

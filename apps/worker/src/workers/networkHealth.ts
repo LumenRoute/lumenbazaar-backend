@@ -1,6 +1,6 @@
 import { type Job } from "bullmq";
 
-import { getPrismaClient } from "@lumenbazaar/shared";
+import { getPrismaClient, redactSensitiveText } from "@lumenbazaar/shared";
 import * as StellarSdk from "@stellar/stellar-sdk";
 
 export type NetworkHealthJobData = {
@@ -43,7 +43,7 @@ export async function handleNetworkHealth(job: Job<NetworkHealthJobData>) {
         job.log(`Horizon healthy - latest ledger: ${latestLedger}`);
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
+      const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
       job.log(`Horizon check failed: ${errorMsg}`);
       horizonHealthy = false;
     }
@@ -66,7 +66,7 @@ export async function handleNetworkHealth(job: Job<NetworkHealthJobData>) {
         job.log(`RPC healthy`);
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
+      const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
       job.log(`RPC check failed: ${errorMsg}`);
       rpcHealthy = false;
     }
@@ -110,7 +110,7 @@ export async function handleNetworkHealth(job: Job<NetworkHealthJobData>) {
 
     job.log(`Network status recorded: ${network} = ${status}`);
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
     job.log(`Network health check failed: ${errorMsg}`);
     throw err;
   }

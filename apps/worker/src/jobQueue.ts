@@ -1,6 +1,7 @@
 import { type Queue } from "bullmq";
 
 import { type AppConfig } from "@lumenbazaar/shared";
+import { settlementReconciliationJobId } from "@lumenbazaar/stellar-payments";
 
 import { createBullMqQueue, queueNames } from "./queues.js";
 import { type SettlementConfirmationJobData } from "./workers/settlementConfirmation.js";
@@ -18,6 +19,7 @@ export type JobQueues = {
   networkHealth: Queue;
   receiptFinalizer: Queue;
   stalePaymentCleanup: Queue;
+  deadLetter: Queue;
 };
 
 export function createJobQueues(config: AppConfig): JobQueues {
@@ -28,22 +30,25 @@ export function createJobQueues(config: AppConfig): JobQueues {
     conformanceRunner: createBullMqQueue(queueNames.conformanceRunner, config),
     networkHealth: createBullMqQueue(queueNames.networkHealth, config),
     receiptFinalizer: createBullMqQueue(queueNames.receiptFinalizer, config),
-    stalePaymentCleanup: createBullMqQueue(queueNames.stalePaymentCleanup, config)
+    stalePaymentCleanup: createBullMqQueue(queueNames.stalePaymentCleanup, config),
+    deadLetter: createBullMqQueue(queueNames.deadLetter, config)
   };
 }
 
 export async function enqueueSettlementConfirmation(
   queue: Queue,
   data: SettlementConfirmationJobData,
-  { delayMs = 5000, maxAttempts = 30 } = {}
+  { delayMs = 5000, maxAttempts = 8 } = {}
 ) {
   return queue.add("settlement-confirmation", data, {
+    jobId: settlementReconciliationJobId(data.paymentAttemptId),
+    delay: delayMs,
     attempts: maxAttempts,
     backoff: {
       type: "exponential",
       delay: delayMs
     },
-    removeOnComplete: true,
+    removeOnComplete: 1000,
     removeOnFail: false
   });
 }

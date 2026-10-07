@@ -17,8 +17,23 @@ export type JsonObject = {
 export type ResourceType = "http" | "mcp";
 export type ResourceStatus = "draft" | "active" | "inactive";
 export type PaymentScheme = "exact" | "upto";
-export type PaymentStatus = "received" | "verified" | "settled" | "failed";
-export type SettlementStatus = "pending" | "settled" | "failed";
+export type PaymentStatus =
+  | "received"
+  | "verified"
+  | "settling"
+  | "submitted"
+  | "confirmed"
+  | "settled"
+  | "expired"
+  | "timed_out"
+  | "failed";
+export type SettlementStatus =
+  | "pending"
+  | "submitted"
+  | "confirmed"
+  | "settled"
+  | "timed_out"
+  | "failed";
 export type ReceiptStatus = "pending" | "finalized" | "failed";
 export type PaymentSessionStatus = "open" | "settled" | "cancelled" | "expired";
 export type CatalogEventType = "validated" | "cataloged" | "updated" | "deleted";
@@ -118,9 +133,11 @@ export type SearchDocument = {
 
 export type PaymentAttempt = {
   id: string;
+  correlationId: string;
   resourceId: string | null;
   sellerId: string | null;
   paymentHash: string;
+  idempotencyKey: string;
   network: NetworkId;
   assetCode: string;
   assetIssuer: string;
@@ -136,6 +153,7 @@ export type PaymentAttempt = {
 
 export type Settlement = {
   id: string;
+  correlationId: string;
   paymentAttemptId: string;
   transactionHash: string | null;
   ledger: number | null;
@@ -144,12 +162,17 @@ export type Settlement = {
   assetCode: string;
   assetIssuer: string;
   status: SettlementStatus;
+  reconciliationState: "not_required" | "pending" | "reconciled" | "needs_review";
+  reconciliationReason: string | null;
+  reconciliationAttempts: number;
+  lastReconciledAt: string | null;
   settledAt: string | null;
   createdAt: string;
 };
 
 export type Receipt = {
   id: string;
+  correlationId: string;
   paymentAttemptId: string;
   resourceId: string | null;
   sellerId: string | null;
@@ -163,6 +186,7 @@ export type Receipt = {
   settledAt: string | null;
   failureCode: string | null;
   failureReason: string | null;
+  evidenceHash: string;
   createdAt: string;
   updatedAt: string;
 };

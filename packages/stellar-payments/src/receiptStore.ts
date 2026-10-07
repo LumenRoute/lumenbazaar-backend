@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import { type Receipt } from "@lumenbazaar/shared";
+import { createCorrelationId, getCorrelationId, type Receipt } from "@lumenbazaar/shared";
 
-export type CreateReceiptInput = Omit<Receipt, "id" | "createdAt" | "updatedAt">;
+export type CreateReceiptInput = Omit<
+  Receipt,
+  "id" | "correlationId" | "createdAt" | "updatedAt"
+> & { correlationId?: string };
 
 export type ReceiptStore = {
   createReceipt: (input: CreateReceiptInput) => Promise<Receipt>;
@@ -18,6 +21,7 @@ export class InMemoryReceiptStore implements ReceiptStore {
     const now = new Date().toISOString();
     const receipt: Receipt = {
       id: `receipt_${randomUUID().replaceAll("-", "").slice(0, 24)}`,
+      correlationId: input.correlationId ?? getCorrelationId() ?? createCorrelationId(),
       ...input,
       createdAt: now,
       updatedAt: now

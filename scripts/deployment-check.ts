@@ -13,13 +13,19 @@ export type DeploymentCheckResult = {
   endpoints: {
     api: {
       health: string;
+      readiness: string;
       metrics: string;
       openapi: string;
       supported: string;
+      version: string;
     };
     mcp: {
       health: string;
+      metrics: string;
+      readiness: string;
+      schema: string;
       streamableHttp: string;
+      version: string;
     };
   };
   errors: string[];
@@ -34,12 +40,19 @@ const requiredKeys = [
   "LUMEN_ENV",
   "API_PUBLIC_URL",
   "MCP_PUBLIC_URL",
+  "MCP_TRUST_PROXY",
   "DATABASE_URL",
   "REDIS_URL",
   "STELLAR_TESTNET_RPC_URL",
   "STELLAR_TESTNET_HORIZON_URL",
   "STELLAR_TESTNET_USDC_ISSUER",
-  "FACILITATOR_ACCOUNT"
+  "STELLAR_TESTNET_USDC_CONTRACT_ID",
+  "FACILITATOR_ACCOUNT",
+  "FACILITATOR_SIGNER_PROVIDER",
+  "FACILITATOR_SIGNER_NETWORK",
+  "FACILITATOR_SIGNING_KEY_VERSION",
+  "STELLAR_MAX_TRANSACTION_FEE_STROOPS",
+  "STELLAR_INCLUSION_FEE_STROOPS"
 ];
 
 export async function runDeploymentCheck(
@@ -70,6 +83,38 @@ export function validateTestnetDeploymentEnv(
     errors.push("LUMEN_ENV must be testnet for testnet deployment.");
   }
 
+  if (env.MCP_TRUST_PROXY !== "true" && env.MCP_TRUST_PROXY !== "false") {
+    errors.push("MCP_TRUST_PROXY must be true or false for testnet deployment.");
+  }
+
+  if (env.FACILITATOR_SIGNER_PROVIDER !== "environment") {
+    errors.push("FACILITATOR_SIGNER_PROVIDER must be environment for testnet deployment.");
+  }
+
+  if (env.FACILITATOR_SIGNER_NETWORK !== "stellar:testnet") {
+    errors.push("FACILITATOR_SIGNER_NETWORK must be stellar:testnet for testnet deployment.");
+  }
+
+  collectPositiveIntegerError(
+    env.STELLAR_MAX_TRANSACTION_FEE_STROOPS,
+    "STELLAR_MAX_TRANSACTION_FEE_STROOPS",
+    errors
+  );
+  collectPositiveIntegerError(
+    env.STELLAR_INCLUSION_FEE_STROOPS,
+    "STELLAR_INCLUSION_FEE_STROOPS",
+    errors
+  );
+  if (
+    /^\d+$/.test(env.STELLAR_INCLUSION_FEE_STROOPS ?? "") &&
+    /^\d+$/.test(env.STELLAR_MAX_TRANSACTION_FEE_STROOPS ?? "") &&
+    Number(env.STELLAR_INCLUSION_FEE_STROOPS) > Number(env.STELLAR_MAX_TRANSACTION_FEE_STROOPS)
+  ) {
+    errors.push(
+      "STELLAR_INCLUSION_FEE_STROOPS must not exceed STELLAR_MAX_TRANSACTION_FEE_STROOPS."
+    );
+  }
+
   collectUrlError(env.API_PUBLIC_URL, "API_PUBLIC_URL", errors);
   collectUrlError(env.MCP_PUBLIC_URL, "MCP_PUBLIC_URL", errors);
   collectUrlError(env.DATABASE_URL, "DATABASE_URL", errors);
@@ -81,6 +126,11 @@ export function validateTestnetDeploymentEnv(
     collectPlaceholderError(env.API_PUBLIC_URL, "API_PUBLIC_URL", errors);
     collectPlaceholderError(env.MCP_PUBLIC_URL, "MCP_PUBLIC_URL", errors);
     collectPlaceholderError(env.STELLAR_TESTNET_USDC_ISSUER, "STELLAR_TESTNET_USDC_ISSUER", errors);
+    collectPlaceholderError(
+      env.STELLAR_TESTNET_USDC_CONTRACT_ID,
+      "STELLAR_TESTNET_USDC_CONTRACT_ID",
+      errors
+    );
     collectPlaceholderError(env.FACILITATOR_ACCOUNT, "FACILITATOR_ACCOUNT", errors);
   } else {
     collectPlaceholderWarning(env.API_PUBLIC_URL, "API_PUBLIC_URL", warnings);
@@ -90,11 +140,16 @@ export function validateTestnetDeploymentEnv(
       "STELLAR_TESTNET_USDC_ISSUER",
       warnings
     );
+    collectPlaceholderWarning(
+      env.STELLAR_TESTNET_USDC_CONTRACT_ID,
+      "STELLAR_TESTNET_USDC_CONTRACT_ID",
+      warnings
+    );
     collectPlaceholderWarning(env.FACILITATOR_ACCOUNT, "FACILITATOR_ACCOUNT", warnings);
   }
 
   try {
-    loadConfig(env);
+    loadConfig(env, { allowPlaceholders: options.allowPlaceholders });
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
   }
@@ -103,26 +158,43 @@ export function validateTestnetDeploymentEnv(
     env.API_PUBLIC_URL ?? "https://api.testnet.lumenbazaar.example"
   );
   const mcpUrl = env.MCP_PUBLIC_URL ?? "https://mcp.testnet.lumenbazaar.example/mcp";
-  const mcpHealthUrl = new URL(mcpUrl);
-  mcpHealthUrl.pathname = "/health";
+  const mcpEndpoint = (pathname: string) => {
+    const url = new URL(mcpUrl);
+    url.pathname = pathname;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  };
 
   return {
     endpoints: {
       api: {
         health: `${apiBaseUrl}/health`,
+        readiness: `${apiBaseUrl}/ready`,
         metrics: `${apiBaseUrl}/metrics`,
         openapi: `${apiBaseUrl}/openapi.json`,
-        supported: `${apiBaseUrl}/v1/supported`
+        supported: `${apiBaseUrl}/v1/supported`,
+        version: `${apiBaseUrl}/version`
       },
       mcp: {
-        health: mcpHealthUrl.toString(),
-        streamableHttp: mcpUrl
+        health: mcpEndpoint("/health"),
+        metrics: mcpEndpoint("/metrics"),
+        readiness: mcpEndpoint("/ready"),
+        schema: mcpEndpoint("/schema"),
+        streamableHttp: mcpUrl,
+        version: mcpEndpoint("/version")
       }
     },
     errors,
     ok: errors.length === 0,
     warnings
   };
+}
+
+function collectPositiveIntegerError(value: string | undefined, key: string, errors: string[]) {
+  if (value === undefined || !/^\d+$/.test(value) || Number(value) <= 0) {
+    errors.push(`${key} must be a positive integer.`);
+  }
 }
 
 export function parseEnvFile(content: string): EnvMap {
@@ -227,7 +299,10 @@ function collectPlaceholderWarning(value: string | undefined, key: string, warni
 function isPlaceholder(value: string | undefined) {
   return (
     value !== undefined &&
-    (value.includes(".example") || value.includes("example.com") || value === localIssuerPublicKey)
+    (value.includes(".example") ||
+      value.includes("example.com") ||
+      value.toLowerCase().includes("replace_me") ||
+      value === localIssuerPublicKey)
   );
 }
 

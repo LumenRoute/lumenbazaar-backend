@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { loadConfig, localIssuerPublicKey } from "@lumenbazaar/shared";
+import { loadConfig } from "@lumenbazaar/shared";
+import { createTestPaymentRequest, testPaymentConfigEnv } from "@lumenbazaar/testkit";
 
 import {
   InMemoryPaymentAttemptStore,
@@ -18,37 +19,13 @@ const acceptingAdapter: X402StellarAdapter = {
 };
 
 function request() {
-  return {
-    resourceId: "resource_1",
-    sellerId: "seller_1",
-    paymentPayload: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey,
-      expiresAtLedger: 100,
-      authorization: {
-        signature: "sig"
-      }
-    },
-    paymentRequirements: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      amount: "0.05",
-      payTo: localIssuerPublicKey
-    },
-    currentLedger: 99
-  };
+  return createTestPaymentRequest("replay-protection");
 }
 
 describe("replay protection", () => {
-  it("stores verified payment attempts and rejects duplicate hashes", async () => {
+  it("stores one verified attempt and reuses it for duplicate hashes", async () => {
     const attemptStore = new InMemoryPaymentAttemptStore();
-    const service = new PaymentVerificationService(loadConfig({}), {
+    const service = new PaymentVerificationService(loadConfig(testPaymentConfigEnv), {
       adapter: acceptingAdapter,
       attemptStore
     });
@@ -58,12 +35,8 @@ describe("replay protection", () => {
 
     expect(stored).toMatchObject({
       paymentHash: first.paymentHash,
-      resourceId: "resource_1",
-      sellerId: "seller_1",
       status: "verified"
     });
-    await expect(service.verify(request())).rejects.toMatchObject({
-      code: "REPLAY_DETECTED"
-    });
+    await expect(service.verify(request())).resolves.toEqual(first);
   });
 });

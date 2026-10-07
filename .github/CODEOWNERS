@@ -2,5 +2,10 @@
 
 /packages/stellar-payments/ @Hallab7
 /apps/api/src/routes/facilitator.ts @Hallab7
+/apps/worker/ @Hallab7
+/apps/mcp-server/ @Hallab7
 /prisma/ @Hallab7
+/config/ @Hallab7
+/scripts/deployment-check.ts @Hallab7
+/scripts/testnet-exact-gate.ts @Hallab7
 /.github/ @Hallab7

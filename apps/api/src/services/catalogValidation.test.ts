@@ -45,6 +45,8 @@ describe("CatalogValidationService", () => {
       walletAddress: localIssuerPublicKey,
       domain: "seller.example"
     });
+    const challenge = await sellerService.verifyDomain(seller.id, {});
+    await sellerService.verifyDomain(seller.id, { evidence: challenge.challenge });
     const service = new CatalogValidationService(loadConfig({}), sellerService);
 
     await expect(service.validate(metadata(seller.id))).resolves.toEqual({
@@ -52,6 +54,29 @@ describe("CatalogValidationService", () => {
       warnings: [],
       errors: []
     });
+  });
+
+  it("rejects unverified sellers and abusive schema complexity", async () => {
+    const sellerService = new SellerService();
+    const seller = await sellerService.createSeller({
+      displayName: "Weather Seller",
+      walletAddress: localIssuerPublicKey,
+      domain: "seller.example"
+    });
+    const service = new CatalogValidationService(loadConfig({}), sellerService);
+    let nested: Record<string, unknown> = { type: "string" };
+    for (let index = 0; index < 14; index += 1) {
+      nested = { nested };
+    }
+    const result = await service.validate({
+      ...metadata(seller.id),
+      resource: { ...metadata(seller.id).resource, inputSchema: nested }
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map((error) => error.code)).toEqual(
+      expect.arrayContaining(["SELLER_DOMAIN_UNVERIFIED", "CATALOG_VALIDATION_FAILED"])
+    );
   });
 
   it("returns stable reasons for unsafe metadata", async () => {

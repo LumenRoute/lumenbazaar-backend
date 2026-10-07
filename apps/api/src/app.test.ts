@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { LumenError, loadConfig, localIssuerPublicKey } from "@lumenbazaar/shared";
+import { createTestPaymentRequest, testPaymentConfigEnv } from "@lumenbazaar/testkit";
 import {
   InMemoryPaymentAttemptStore,
   PaymentVerificationService,
@@ -13,6 +14,7 @@ import {
 import { buildApiApp } from "./app.js";
 import { parseBody } from "./http/validation.js";
 import { ResourceService } from "./services/resources.js";
+import { createStaticReadinessService } from "./services/readiness.js";
 import { SellerService } from "./services/sellers.js";
 
 describe("API server base", () => {
@@ -23,6 +25,7 @@ describe("API server base", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["x-request-id"]).toBeDefined();
+    expect(response.headers["x-correlation-id"]).toBe(response.headers["x-request-id"]);
     expect(response.json()).toMatchObject({
       ok: true,
       service: "lumenbazaar-backend",
@@ -41,7 +44,8 @@ describe("API server base", () => {
 
     expect(version.json()).toMatchObject({
       service: "lumenbazaar-backend",
-      version: "0.1.0"
+      version: "0.1.0",
+      commit: expect.any(String)
     });
     expect(openapi.json()).toMatchObject({
       openapi: "3.1.0",
@@ -63,13 +67,35 @@ describe("API server base", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
-      schemes: [],
-      extensions: {
-        bazaar: true,
-        upto: false,
-        uptoContracts: []
-      }
+      kinds: [],
+      extensions: ["bazaar"],
+      signers: {}
     });
+    await app.close();
+  });
+
+  it("keeps liveness available while readiness reports dependency failures", async () => {
+    const config = loadConfig({ LUMEN_ENV: "testnet" });
+    const readinessService = createStaticReadinessService(
+      config,
+      { exact: true, upto: false },
+      { database: { status: "unavailable", detail: "database unavailable" } }
+    );
+    const app = buildApiApp({ config, logger: false, readinessService });
+
+    const health = await app.inject({ method: "GET", url: "/health" });
+    const ready = await app.inject({ method: "GET", url: "/ready" });
+    const supported = await app.inject({ method: "GET", url: "/v1/supported" });
+
+    expect(health.statusCode).toBe(200);
+    expect(ready.statusCode).toBe(503);
+    expect(ready.json()).toMatchObject({
+      ok: false,
+      environment: "testnet",
+      checks: { database: { status: "unavailable" } },
+      capabilities: { exact: false, upto: false }
+    });
+    expect(supported.json().kinds).toEqual([]);
     await app.close();
   });
 
@@ -103,7 +129,7 @@ describe("API server base", () => {
         };
       }
     };
-    const config = loadConfig({});
+    const config = loadConfig(testPaymentConfigEnv);
     const app = buildApiApp({
       logger: false,
       verificationService: new PaymentVerificationService(config, { adapter })
@@ -117,11 +143,28 @@ describe("API server base", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      network: "stellar:testnet",
-      status: "verified",
-      adapter: "@x402/stellar"
+      isValid: true,
+      extra: {
+        lumenbazaar: {
+          network: "stellar:testnet",
+          status: "verified",
+          adapter: "@x402/stellar"
+        }
+      }
     });
-    expect(response.json().paymentHash).toHaveLength(64);
+    expect(response.json().extra.lumenbazaar.paymentHash).toHaveLength(64);
+    expect(response.json().extra.lumenbazaar.correlationId).toBe(
+      response.headers["x-correlation-id"]
+    );
+    const repeated = await app.inject({
+      method: "POST",
+      url: "/v1/verify",
+      payload: exactPaymentRequest()
+    });
+    expect(repeated.headers["x-correlation-id"]).toBe(
+      response.json().extra.lumenbazaar.correlationId
+    );
+    expect(repeated.headers["x-correlation-id"]).not.toBe(repeated.headers["x-request-id"]);
     await app.close();
   });
 
@@ -137,11 +180,12 @@ describe("API server base", () => {
         return {
           transactionHash: "tx_api_settle",
           ledger: 456,
+          status: "confirmed",
           adapter: "@x402/stellar"
         };
       }
     };
-    const config = loadConfig({});
+    const config = loadConfig(testPaymentConfigEnv);
     const attemptStore = new InMemoryPaymentAttemptStore();
     const verificationService = new PaymentVerificationService(config, { adapter, attemptStore });
     const receiptService = new ReceiptService();
@@ -161,27 +205,36 @@ describe("API server base", () => {
     const response = await app.inject({
       method: "POST",
       url: "/v1/settle",
-      payload: {
-        paymentAttemptId: verified.paymentAttemptId,
-        ...exactPaymentRequest()
-      }
+      payload: exactPaymentRequest()
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.headers["x-correlation-id"]).toBe(verified.correlationId);
     expect(response.json()).toMatchObject({
-      transactionHash: "tx_api_settle",
-      receiptId: expect.stringMatching(/^receipt_/),
-      ledger: 456,
-      status: "settled"
+      success: true,
+      transaction: "tx_api_settle",
+      network: "stellar:testnet",
+      extra: {
+        lumenbazaar: {
+          transactionHash: "tx_api_settle",
+          receiptId: expect.stringMatching(/^receipt_/),
+          ledger: 456,
+          status: "confirmed"
+        }
+      }
     });
+
+    const receiptId = response.json().extra.lumenbazaar.receiptId;
 
     const receipt = await app.inject({
       method: "GET",
-      url: `/v1/receipts/${response.json().receiptId}`
+      url: `/v1/receipts/${receiptId}`
     });
 
     expect(receipt.statusCode).toBe(200);
+    expect(receipt.headers["x-correlation-id"]).toBe(verified.correlationId);
     expect(receipt.json()).toMatchObject({
+      correlationId: verified.correlationId,
       paymentAttemptId: verified.paymentAttemptId,
       transactionHash: "tx_api_settle",
       status: "finalized"
@@ -290,6 +343,8 @@ describe("API server base", () => {
       walletAddress: localIssuerPublicKey,
       domain: "seller.example"
     });
+    const challenge = await sellerService.verifyDomain(seller.id, {});
+    await sellerService.verifyDomain(seller.id, { evidence: challenge.challenge });
 
     const response = await app.inject({
       method: "POST",
@@ -317,6 +372,8 @@ describe("API server base", () => {
       walletAddress: localIssuerPublicKey,
       domain: "seller.example"
     });
+    const challenge = await sellerService.verifyDomain(seller.id, {});
+    await sellerService.verifyDomain(seller.id, { evidence: challenge.challenge });
 
     const response = await app.inject({
       method: "POST",
@@ -445,29 +502,7 @@ describe("API server base", () => {
 });
 
 function exactPaymentRequest() {
-  return {
-    paymentPayload: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey,
-      expiresAtLedger: 10,
-      authorization: {
-        signature: "sig"
-      }
-    },
-    paymentRequirements: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      amount: "0.05",
-      payTo: localIssuerPublicKey
-    },
-    currentLedger: 9
-  };
+  return createTestPaymentRequest("api");
 }
 
 function resourcePayload(sellerId: string) {

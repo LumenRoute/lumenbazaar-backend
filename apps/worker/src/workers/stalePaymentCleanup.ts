@@ -1,6 +1,8 @@
 import { type Job } from "bullmq";
 
-import { getPrismaClient } from "@lumenbazaar/shared";
+import { type PrismaClient } from "@prisma/client";
+
+import { getPrismaClient, redactSensitiveText } from "@lumenbazaar/shared";
 
 export type StalePaymentCleanupJobData = {
   action: "cleanup_expired" | "cleanup_failed" | "archive";
@@ -11,11 +13,13 @@ export type StalePaymentCleanupJobData = {
  * Stale Payment Cleanup Worker
  * Cleans up old, expired, and failed payment records
  */
-export async function handleStalePaymentCleanup(job: Job<StalePaymentCleanupJobData>) {
+export async function handleStalePaymentCleanup(
+  job: Job<StalePaymentCleanupJobData>,
+  db: PrismaClient = getPrismaClient()
+) {
   const { action, maxAgeMs = 7 * 24 * 60 * 60 * 1000 } = job.data; // Default 7 days
 
   try {
-    const db = getPrismaClient();
     const cutoffDate = new Date(Date.now() - maxAgeMs);
 
     if (action === "cleanup_expired") {
@@ -38,14 +42,14 @@ export async function handleStalePaymentCleanup(job: Job<StalePaymentCleanupJobD
             where: { id: attempt.id },
             data: {
               status: "expired",
-              failureCode: "PAYMENT_EXPIRED",
+              failureCode: "AUTH_EXPIRED",
               failureReason: `Payment expired after ${maxAgeMs}ms`
             }
           });
 
           expiredCount++;
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
+          const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
           job.log(`Failed to expire payment ${attempt.id}: ${errorMsg}`);
         }
       }
@@ -63,33 +67,31 @@ export async function handleStalePaymentCleanup(job: Job<StalePaymentCleanupJobD
         take: 1000
       });
 
-      let deletedCount = 0;
+      let retainedCount = 0;
       for (const attempt of failedAttempts) {
         try {
-          // Delete associated settlement records
-          await db.settlement.deleteMany({
-            where: { paymentAttemptId: attempt.id }
+          await db.auditLog.create({
+            data: {
+              actorType: "system",
+              action: "payment.retention.reviewed",
+              targetType: "payment_attempt",
+              targetId: attempt.id,
+              metadata: {
+                retained: true,
+                reason: "financial_evidence",
+                status: attempt.status
+              }
+            }
           });
-
-          // Delete associated receipt records
-          await db.receipt.deleteMany({
-            where: { paymentAttemptId: attempt.id }
-          });
-
-          // Delete the payment attempt
-          await db.paymentAttempt.delete({
-            where: { id: attempt.id }
-          });
-
-          deletedCount++;
-          job.log(`Deleted failed payment ${attempt.id}`);
+          retainedCount++;
+          job.log(`Retained failed payment evidence ${attempt.id}`);
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          job.log(`Failed to delete payment ${attempt.id}: ${errorMsg}`);
+          const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
+          job.log(`Failed to record retention review for ${attempt.id}: ${errorMsg}`);
         }
       }
 
-      job.log(`Deleted ${deletedCount} failed payment records`);
+      job.log(`Retained ${retainedCount} failed payment records`);
     } else if (action === "archive") {
       job.log("Archiving old settled payments for reporting");
 
@@ -128,7 +130,7 @@ export async function handleStalePaymentCleanup(job: Job<StalePaymentCleanupJobD
 
           archivedCount++;
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
+          const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
           job.log(`Failed to archive payment ${attempt.id}: ${errorMsg}`);
         }
       }
@@ -136,30 +138,9 @@ export async function handleStalePaymentCleanup(job: Job<StalePaymentCleanupJobD
       job.log(`Archived ${archivedCount} settled payment records`);
     }
 
-    // Clean up old catalog events
-    const oldCatalogEvents = await db.catalogEvent.findMany({
-      where: {
-        createdAt: { lt: cutoffDate }
-      },
-      take: 1000
-    });
-
-    let cleanedEventsCount = 0;
-    for (const event of oldCatalogEvents) {
-      try {
-        await db.catalogEvent.delete({
-          where: { id: event.id }
-        });
-        cleanedEventsCount++;
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        job.log(`Failed to delete catalog event ${event.id}: ${errorMsg}`);
-      }
-    }
-
-    job.log(`Cleaned up ${cleanedEventsCount} old catalog events`);
+    job.log("Financial and audit evidence retention rules applied");
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
     job.log(`Stale payment cleanup job failed: ${errorMsg}`);
     throw err;
   }

@@ -1,6 +1,6 @@
 import { type Job } from "bullmq";
 
-import { getPrismaClient } from "@lumenbazaar/shared";
+import { getPrismaClient, redactSensitiveText } from "@lumenbazaar/shared";
 
 export type SearchSyncJobData = {
   action: "rebuild" | "mark_stale";
@@ -60,7 +60,7 @@ export async function handleSearchSync(job: Job<SearchSyncJobData>) {
 
           indexedCount++;
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
+          const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
           job.log(`Failed to index resource ${resource.id}: ${errorMsg}`);
         }
       }
@@ -126,7 +126,7 @@ export async function handleSearchSync(job: Job<SearchSyncJobData>) {
       });
     }
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
     job.log(`Search sync job failed: ${errorMsg}`);
 
     // Record failure

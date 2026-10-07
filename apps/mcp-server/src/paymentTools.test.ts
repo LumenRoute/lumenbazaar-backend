@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBudgetManager } from "@lumenbazaar/buyer-sdk";
+import { testAssetContractId, testPaymentPayload } from "@lumenbazaar/testkit";
 
 import { McpPaymentToolService } from "./paymentTools.js";
 import { listToolDefinitions } from "./tools.js";
@@ -30,25 +31,17 @@ describe("MCP payment tools", () => {
 
     await expect(
       service.preparePayment({
-        authorization: {
-          signature: "sig"
-        },
-        expiresAtLedger: 123,
         resourceId: "resource_1"
       })
     ).resolves.toMatchObject({
       resourceId: "resource_1",
-      paymentPayload: {
-        authorization: {
-          signature: "sig"
-        },
-        expiresAtLedger: 123,
-        payTo: "GBZXN7PIRZGNMHGAIQW7QEJWW36L5CVVNRYANMDW2G3QOF2VCR4DQSQE"
-      },
       paymentRequirements: {
-        amount: "0.05",
-        scheme: "exact"
+        amount: "500000",
+        asset: testAssetContractId,
+        scheme: "exact",
+        maxTimeoutSeconds: 60
       },
+      requiresWalletSignature: true,
       budget: {
         state: {
           callCount: 0
@@ -73,8 +66,24 @@ describe("MCP payment tools", () => {
     });
 
     await expect(service.preparePayment({ resourceId: "resource_1" })).rejects.toThrow(
-      "Local budget cap exceeded"
+      "Local payment budget cap exceeded"
     );
+  });
+
+  it("rejects paid-call URL overrides that differ from the catalog record", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json(resource()))
+    );
+    const service = new McpPaymentToolService({ apiUrl: "https://api.example.test" });
+
+    await expect(
+      service.callPaidResource({
+        paymentPayload: testPaymentPayload,
+        resourceId: "resource_1",
+        resourceUrl: "https://internal.example/admin"
+      })
+    ).rejects.toThrow("cataloged resource URL");
   });
 
   it("calls paid resources through verify, resource call, settle, and receipt lookup", async () => {
@@ -85,11 +94,16 @@ describe("MCP payment tools", () => {
 
       if (url === "https://api.example.test/v1/verify" && init?.method === "POST") {
         return Response.json({
-          adapter: "@x402/stellar",
-          network: "stellar:testnet",
-          paymentAttemptId: "attempt_1",
-          paymentHash: "hash_1",
-          status: "verified"
+          isValid: true,
+          extra: {
+            lumenbazaar: {
+              adapter: "@x402/stellar",
+              network: "stellar:testnet",
+              paymentAttemptId: "attempt_1",
+              paymentHash: "hash_1",
+              status: "verified"
+            }
+          }
         });
       }
 
@@ -101,12 +115,19 @@ describe("MCP payment tools", () => {
 
       if (url === "https://api.example.test/v1/settle" && init?.method === "POST") {
         return Response.json({
-          ledger: 55,
+          success: true,
           network: "stellar:testnet",
-          receiptId: "receipt_1",
-          settlementId: "settlement_1",
-          status: "settled",
-          transactionHash: "tx_1"
+          amount: "500000",
+          transaction: "tx_1",
+          extra: {
+            lumenbazaar: {
+              ledger: 55,
+              receiptId: "receipt_1",
+              settlementId: "settlement_1",
+              status: "settled",
+              transactionHash: "tx_1"
+            }
+          }
         });
       }
 
@@ -127,9 +148,7 @@ describe("MCP payment tools", () => {
 
     await expect(
       service.callPaidResource({
-        authorization: {
-          signature: "sig"
-        },
+        paymentPayload: testPaymentPayload,
         resourceId: "resource_1",
         resourceUrl: "https://seller.example/weather",
         retryDelayMs: 0
@@ -146,8 +165,13 @@ describe("MCP payment tools", () => {
         status: "finalized"
       },
       settlement: {
-        receiptId: "receipt_1",
-        status: "settled"
+        success: true,
+        extra: {
+          lumenbazaar: {
+            receiptId: "receipt_1",
+            status: "settled"
+          }
+        }
       },
       budget: {
         state: {
@@ -194,6 +218,9 @@ function resource() {
     assetCode: "USDC",
     assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
     amount: "0.05",
-    payTo: "GBZXN7PIRZGNMHGAIQW7QEJWW36L5CVVNRYANMDW2G3QOF2VCR4DQSQE"
+    payTo: testPaymentPayload.accepted.payTo,
+    extensions: {
+      assetContractId: testAssetContractId
+    }
   };
 }

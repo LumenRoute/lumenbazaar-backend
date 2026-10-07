@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isIP } from "node:net";
 
 import { z } from "zod";
 
@@ -74,6 +75,14 @@ export type ResourceStore = {
   getLatestVersion: (resourceId: string) => Promise<ResourceVersion | undefined>;
   createSchema: (resource: Resource) => Promise<ResourceSchema>;
   createPaymentRequirement: (resource: Resource) => Promise<PaymentRequirement>;
+};
+
+export type ResourceChangeQueue = {
+  addResourceIndexingJob: (job: {
+    name: "resource.index";
+    resourceId: string;
+    versionId: string;
+  }) => Promise<void>;
 };
 
 export class InMemoryResourceStore implements ResourceStore {
@@ -227,13 +236,17 @@ export class ResourceService {
   constructor(
     private readonly config: AppConfig,
     private readonly sellerService: SellerService,
-    private readonly store: ResourceStore = new InMemoryResourceStore()
+    private readonly store: ResourceStore = new InMemoryResourceStore(),
+    private readonly indexingQueue?: ResourceChangeQueue
   ) {}
 
   async createResource(input: unknown) {
     const resource = normalizeResourceInput(createResourceSchema.parse(input), this.config);
-    await this.sellerService.getSeller(resource.sellerId);
-    return this.store.createResource(resource);
+    const seller = await this.sellerService.getSeller(resource.sellerId);
+    assertSafeResourceTarget(resource.url, resource.type, resource.routeTemplate, seller.domain);
+    const created = await this.store.createResource(resource);
+    await this.queueLatestVersion(created.id);
+    return created;
   }
 
   async listResources(input: unknown) {
@@ -256,16 +269,35 @@ export class ResourceService {
     const patch = updateResourceSchema.parse(input);
     const normalized = normalizeResourceInput(mergeResourcePatch(existing, patch), this.config);
 
-    return this.store.updateResource(resourceId, normalized);
+    const seller = await this.sellerService.getSeller(existing.sellerId);
+    assertSafeResourceTarget(
+      normalized.url,
+      normalized.type,
+      normalized.routeTemplate,
+      seller.domain
+    );
+    const updated = await this.store.updateResource(resourceId, normalized);
+    await this.queueLatestVersion(updated.id);
+    return updated;
   }
 
   async deleteResource(resourceId: string) {
-    await this.getResource(resourceId);
-    return this.store.updateResource(resourceId, { status: "inactive" });
+    return this.updateResource(resourceId, { status: "inactive" });
   }
 
   getStore() {
     return this.store;
+  }
+
+  private async queueLatestVersion(resourceId: string) {
+    const version = await this.store.getLatestVersion(resourceId);
+    if (version !== undefined) {
+      await this.indexingQueue?.addResourceIndexingJob({
+        name: "resource.index",
+        resourceId,
+        versionId: version.id
+      });
+    }
   }
 }
 
@@ -274,7 +306,14 @@ function normalizeResourceInput<T extends CreateResourceInput | (Resource & Upda
   config: AppConfig
 ): T {
   assertStellarPublicKey(input.payTo, "payTo");
-  validateRouteTemplate(input.routeTemplate, input.inputSchema as JsonObject);
+  if (input.type === "mcp") {
+    validateMcpRouteTemplate(input.routeTemplate);
+  } else {
+    validateRouteTemplate(input.routeTemplate, input.inputSchema as JsonObject);
+  }
+  assertCatalogJsonSafe(input.inputSchema as JsonObject, "Input schema", 64 * 1024);
+  assertCatalogJsonSafe(input.outputSchema as JsonObject, "Output schema", 64 * 1024);
+  assertCatalogJsonSafe(input.extensions as JsonObject, "Resource extensions", 32 * 1024);
   const amount = normalizeExactAmount(input.amount);
   const assetCode = input.assetCode.toUpperCase();
   requireSupportedAsset(config, input.network, assetCode, input.assetIssuer);
@@ -286,7 +325,7 @@ function normalizeResourceInput<T extends CreateResourceInput | (Resource & Upda
   };
 }
 
-function resourceMatchesFilters(resource: Resource, filters: ListResourceFilters) {
+export function resourceMatchesFilters(resource: Resource, filters: ListResourceFilters) {
   return (
     (filters.sellerId === undefined || resource.sellerId === filters.sellerId) &&
     (filters.status === undefined || resource.status === filters.status) &&
@@ -300,6 +339,102 @@ function resourceMatchesFilters(resource: Resource, filters: ListResourceFilters
     (filters.extension === undefined ||
       Boolean(resource.extensions[filters.extension as keyof typeof resource.extensions]))
   );
+}
+
+export function assertSafeResourceTarget(
+  urlValue: string,
+  resourceType: Resource["type"],
+  routeTemplate: string,
+  sellerDomain: string
+) {
+  const url = new URL(urlValue);
+  const hostname = url.hostname.toLowerCase();
+  const normalizedDomain = sellerDomain.toLowerCase();
+  if (url.protocol !== "https:") {
+    throw new LumenError("CATALOG_VALIDATION_FAILED", "Resource URL must use HTTPS.");
+  }
+  if (
+    url.username.length > 0 ||
+    url.password.length > 0 ||
+    url.search.length > 0 ||
+    url.hash.length > 0
+  ) {
+    throw new LumenError(
+      "CATALOG_VALIDATION_FAILED",
+      "Resource URL must not contain credentials, query parameters, or fragments."
+    );
+  }
+  if (
+    isIP(hostname) !== 0 ||
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    !(hostname === normalizedDomain || hostname.endsWith(`.${normalizedDomain}`))
+  ) {
+    throw new LumenError(
+      "CATALOG_VALIDATION_FAILED",
+      "Resource URL must use the verified seller domain and cannot target a local address."
+    );
+  }
+  const pathSegments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  if (resourceType === "mcp") {
+    const toolName = routeTemplate.split("/").at(-1);
+    if (toolName === undefined || pathSegments.at(-1) !== toolName) {
+      throw new LumenError(
+        "ROUTE_TEMPLATE_INVALID",
+        "MCP resource URL must end with the declared tool name."
+      );
+    }
+    return;
+  }
+
+  const templateSegments = routeTemplate.split("/").filter(Boolean);
+  const matches =
+    templateSegments.length === pathSegments.length &&
+    templateSegments.every((segment, index) => {
+      const value = pathSegments[index];
+      return /^\{[A-Za-z][A-Za-z0-9_]*\}$/u.test(segment)
+        ? value !== undefined && value.length > 0
+        : segment === value;
+    });
+  if (!matches) {
+    throw new LumenError(
+      "ROUTE_TEMPLATE_INVALID",
+      "Resource URL path must match the declared route template."
+    );
+  }
+}
+
+function validateMcpRouteTemplate(routeTemplate: string) {
+  if (!/^mcp:\/\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_-]+$/u.test(routeTemplate)) {
+    throw new LumenError(
+      "ROUTE_TEMPLATE_INVALID",
+      "MCP route template must use mcp://server/tool format."
+    );
+  }
+}
+
+export function assertCatalogJsonSafe(value: JsonObject, label: string, maxBytes: number) {
+  if (Buffer.byteLength(JSON.stringify(value), "utf8") > maxBytes) {
+    throw new LumenError("CATALOG_VALIDATION_FAILED", `${label} exceeds ${maxBytes} bytes.`);
+  }
+
+  let nodes = 0;
+  const visit = (current: unknown, depth: number): void => {
+    nodes += 1;
+    if (depth > 12 || nodes > 2_000) {
+      throw new LumenError(
+        "CATALOG_VALIDATION_FAILED",
+        `${label} exceeds catalog complexity limits.`
+      );
+    }
+    if (Array.isArray(current)) {
+      current.forEach((entry) => visit(entry, depth + 1));
+    } else if (typeof current === "object" && current !== null) {
+      Object.values(current).forEach((entry) => visit(entry, depth + 1));
+    }
+  };
+  visit(value, 0);
 }
 
 function mergeResourcePatch(existing: Resource, patch: UpdateResourceInput): Resource {

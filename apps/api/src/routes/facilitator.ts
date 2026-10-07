@@ -5,18 +5,18 @@ import { LumenError, type AppConfig, listConfiguredNetworks } from "@lumenbazaar
 import {
   PaymentVerificationService,
   SettlementService,
+  toLumenSettleResponse,
+  toLumenVerifyResponse,
   type ReceiptService
 } from "@lumenbazaar/stellar-payments";
 
 import { parseParams } from "../http/validation.js";
 import { type MetricsService } from "../services/metrics.js";
+import { type ReadinessService } from "../services/readiness.js";
 
 export type FacilitatorRouteOptions = {
-  capabilities: {
-    exact: boolean;
-    upto: boolean;
-  };
   config: AppConfig;
+  readiness: ReadinessService;
   verificationService?: PaymentVerificationService;
   settlementService?: SettlementService;
   receiptService?: ReceiptService;
@@ -34,53 +34,43 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
   const receiptService = options.receiptService ?? settlementService.getReceiptService();
 
   app.get("/v1/supported", async () => {
+    const capabilities = (await options.readiness.evaluate()).capabilities;
     const networks = listConfiguredNetworks(options.config);
-    const uptoContracts = networks.flatMap((network) =>
-      options.capabilities.upto &&
-      options.config.features.uptoScheme &&
-      network.uptoSessionContractId !== undefined
-        ? [
-            {
-              network: network.id,
-              contractId: network.uptoSessionContractId
-            }
-          ]
-        : []
-    );
-    const exactSchemes = options.capabilities.exact
+    const exactKinds = capabilities.exact
       ? networks.map((network) => ({
-          name: "exact",
+          x402Version: 2,
+          scheme: "exact",
           network: network.id,
-          assets: network.assets.map((asset) => ({
-            code: asset.code,
-            issuer: asset.issuer,
-            decimals: asset.decimals
-          })),
-          extensions: {
-            x402Version: "2",
-            upto: false
+          extra: {
+            areFeesSponsored: true,
+            assets: network.assets.map((asset) => ({
+              code: asset.code,
+              issuer: asset.issuer,
+              contractId: asset.contractId,
+              decimals: asset.decimals
+            }))
           }
         }))
       : [];
-    const uptoSchemes = networks.flatMap((network) =>
-      options.capabilities.upto &&
+    const uptoKinds = networks.flatMap((network) =>
+      capabilities.upto &&
       options.config.features.uptoScheme &&
       network.uptoSessionContractId !== undefined
         ? [
             {
-              name: "upto",
+              x402Version: 2,
+              scheme: "upto",
               network: network.id,
-              assets: network.assets
-                .filter((asset) => asset.contractId !== undefined)
-                .map((asset) => ({
-                  code: asset.code,
-                  issuer: asset.issuer,
-                  contractId: asset.contractId,
-                  decimals: asset.decimals
-                })),
-              extensions: {
+              extra: {
+                assets: network.assets
+                  .filter((asset) => asset.contractId !== undefined)
+                  .map((asset) => ({
+                    code: asset.code,
+                    issuer: asset.issuer,
+                    contractId: asset.contractId,
+                    decimals: asset.decimals
+                  })),
                 contractId: network.uptoSessionContractId,
-                x402Version: "2",
                 sessionEndpoint: "/v1/payment-sessions"
               }
             }
@@ -88,23 +78,31 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
         : []
     );
 
+    const kinds = [...exactKinds, ...uptoKinds];
+
     return {
-      schemes: [...exactSchemes, ...uptoSchemes],
-      extensions: {
-        bazaar: true,
-        upto: options.capabilities.upto && options.config.features.uptoScheme,
-        uptoContracts
-      }
+      kinds,
+      extensions: ["bazaar"],
+      signers: kinds.length === 0 ? {} : { "stellar:*": [options.config.facilitatorAccount] }
     };
   });
 
-  app.post("/v1/verify", async (request) => {
+  app.post("/v1/verify", async (request, reply) => {
     const startedAt = Date.now();
     const network = extractPaymentNetwork(request.body);
 
     try {
-      return await verificationService.verify(request.body);
+      const result = await verificationService.verify(request.body);
+      reply.header("x-correlation-id", result.correlationId);
+      options.metrics?.recordVerification(result.network, "accepted");
+      return toLumenVerifyResponse(result);
     } catch (error) {
+      if (error instanceof LumenError && error.code === "REPLAY_DETECTED") {
+        options.metrics?.recordVerification(network, "replay");
+        options.metrics?.recordReplayRejection(network);
+      } else {
+        options.metrics?.recordVerification(network, "rejected");
+      }
       recordRpcErrorIfNeeded(options.metrics, network, "verify", error);
       throw error;
     } finally {
@@ -112,25 +110,39 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
     }
   });
 
-  app.post("/v1/settle", async (request) => {
+  app.post("/v1/settle", async (request, reply) => {
     const startedAt = Date.now();
     const network = extractPaymentNetwork(request.body);
 
     try {
       const result = await settlementService.settle(request.body);
+      reply.header("x-correlation-id", result.correlationId);
       options.metrics?.recordSettlementResult(result.network, "settled");
-      return result;
+      options.metrics?.observeFinality(result.network, Date.now() - startedAt, "confirmed");
+      return toLumenSettleResponse(result);
     } catch (error) {
       options.metrics?.recordSettlementResult(network, "failed");
+      options.metrics?.observeFinality(network, Date.now() - startedAt, "failed");
+      if (
+        error instanceof LumenError &&
+        typeof error.details === "object" &&
+        error.details !== null &&
+        "status" in error.details &&
+        error.details.status === "timed_out"
+      ) {
+        options.metrics?.recordReconciliation(network, "pending");
+      }
       recordRpcErrorIfNeeded(options.metrics, network, "settle", error);
       throw error;
     } finally {
       options.metrics?.observeSettleLatency(network, Date.now() - startedAt);
     }
   });
-  app.get("/v1/receipts/:receiptId", async (request) => {
+  app.get("/v1/receipts/:receiptId", async (request, reply) => {
     const params = parseParams(request, z.object({ receiptId: z.string().min(1) }));
-    return receiptService.getReceipt(params.receiptId);
+    const receipt = await receiptService.getReceipt(params.receiptId);
+    reply.header("x-correlation-id", receipt.correlationId);
+    return receipt;
   });
 }
 
@@ -146,7 +158,11 @@ function extractPaymentNetwork(body: unknown): string {
     paymentPayload !== null &&
     !Array.isArray(paymentPayload)
   ) {
-    const network = (paymentPayload as Record<string, unknown>).network;
+    const accepted = (paymentPayload as Record<string, unknown>).accepted;
+    const network =
+      typeof accepted === "object" && accepted !== null && !Array.isArray(accepted)
+        ? (accepted as Record<string, unknown>).network
+        : undefined;
 
     if (typeof network === "string") {
       return network;

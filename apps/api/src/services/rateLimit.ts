@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { Redis } from "ioredis";
+
+import { type AppConfig } from "@lumenbazaar/shared";
+
 export type RateLimitScope = "discovery" | "facilitator" | "seller";
 
 export type RateLimitRule = {
@@ -43,6 +47,60 @@ type RateLimitBucket = {
   resetAt: number;
 };
 
+export type RateLimitCounterStore = {
+  consume: (key: string, windowMs: number) => Promise<RateLimitBucket>;
+};
+
+export class InMemoryRateLimitCounterStore implements RateLimitCounterStore {
+  private readonly buckets = new Map<string, RateLimitBucket>();
+
+  async consume(key: string, windowMs: number) {
+    const now = Date.now();
+    const existing = this.buckets.get(key);
+    const bucket =
+      existing === undefined || existing.resetAt <= now
+        ? { count: 1, resetAt: now + windowMs }
+        : { count: existing.count + 1, resetAt: existing.resetAt };
+    this.buckets.set(key, bucket);
+    return bucket;
+  }
+}
+
+const consumeRateLimitScript = `
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+local ttl = redis.call("PTTL", KEYS[1])
+if ttl < 0 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+  ttl = tonumber(ARGV[1])
+end
+return { count, ttl }
+`;
+
+export class RedisRateLimitCounterStore implements RateLimitCounterStore {
+  constructor(private readonly client: Redis) {}
+
+  async consume(key: string, windowMs: number) {
+    const result = await this.client.eval(
+      consumeRateLimitScript,
+      1,
+      `lumenbazaar:rate-limit:${key}`,
+      windowMs
+    );
+    if (!Array.isArray(result) || result.length !== 2) {
+      throw new Error("Redis returned an invalid rate-limit result.");
+    }
+    const count = Number(result[0]);
+    const ttl = Number(result[1]);
+    if (!Number.isSafeInteger(count) || !Number.isSafeInteger(ttl) || ttl < 0) {
+      throw new Error("Redis returned an invalid rate-limit counter.");
+    }
+    return { count, resetAt: Date.now() + ttl };
+  }
+}
+
 export class InMemoryRateLimitEventStore implements RateLimitEventStore {
   private readonly events: RateLimitEvent[] = [];
 
@@ -63,17 +121,19 @@ export class InMemoryRateLimitEventStore implements RateLimitEventStore {
 }
 
 export class RateLimitService {
-  private readonly buckets = new Map<string, RateLimitBucket>();
+  private readonly counterStore: RateLimitCounterStore;
   private readonly eventStore: RateLimitEventStore;
   private readonly rules: Record<RateLimitScope, RateLimitRule>;
 
   constructor(
     options: {
       eventStore?: RateLimitEventStore;
+      counterStore?: RateLimitCounterStore;
       rules?: Partial<Record<RateLimitScope, RateLimitRule>>;
     } = {}
   ) {
     this.eventStore = options.eventStore ?? new InMemoryRateLimitEventStore();
+    this.counterStore = options.counterStore ?? new InMemoryRateLimitCounterStore();
     this.rules = {
       discovery: {
         limit: 120,
@@ -93,17 +153,9 @@ export class RateLimitService {
 
   async consume(request: RateLimitRequest): Promise<RateLimitResult> {
     const rule = this.rules[request.scope];
-    const now = Date.now();
     const key = hashRateLimitKey(`${request.scope}:${request.key}`);
     const bucketKey = `${request.scope}:${key}`;
-    const existing = this.buckets.get(bucketKey);
-    const bucket =
-      existing === undefined || existing.resetAt <= now
-        ? { count: 0, resetAt: now + rule.windowMs }
-        : existing;
-
-    bucket.count += 1;
-    this.buckets.set(bucketKey, bucket);
+    const bucket = await this.counterStore.consume(bucketKey, rule.windowMs);
 
     const remaining = Math.max(0, rule.limit - bucket.count);
     const result: RateLimitResult = {
@@ -138,6 +190,35 @@ export function createRateLimitService(
   rules?: Partial<Record<RateLimitScope, RateLimitRule>>
 ): RateLimitService {
   return rules === undefined ? new RateLimitService() : new RateLimitService({ rules });
+}
+
+export function createRuntimeRateLimitService(config: AppConfig) {
+  if (
+    process.env.VITEST !== undefined ||
+    process.env.NODE_ENV === "test" ||
+    config.nodeEnv !== "production" ||
+    config.lumenEnv === "local"
+  ) {
+    return {
+      service: new RateLimitService(),
+      close: async () => undefined
+    };
+  }
+
+  const client = new Redis(config.redisUrl, {
+    lazyConnect: true,
+    maxRetriesPerRequest: 1
+  });
+  return {
+    service: new RateLimitService({ counterStore: new RedisRateLimitCounterStore(client) }),
+    close: async () => {
+      if (client.status === "wait" || client.status === "end") {
+        client.disconnect();
+        return;
+      }
+      await client.quit();
+    }
+  };
 }
 
 function hashRateLimitKey(key: string) {

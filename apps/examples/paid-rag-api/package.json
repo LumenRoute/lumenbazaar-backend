@@ -10,7 +10,10 @@
   "dependencies": {
     "@lumenbazaar/seller-sdk": "workspace:*",
     "@lumenbazaar/shared": "workspace:*",
-    "fastify": "5.12.1",
+    "fastify": "5.12.5",
     "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@lumenbazaar/testkit": "workspace:*"
   }
 }

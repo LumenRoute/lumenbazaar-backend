@@ -25,6 +25,7 @@ describe("conformance routes", () => {
         return {
           transactionHash: "tx_conformance",
           ledger: 789,
+          status: "confirmed",
           adapter: "@x402/stellar"
         };
       }

@@ -1,9 +1,18 @@
 {
   "environment": "testnet",
   "status": "template",
+  "commits": {
+    "api": "replace_me",
+    "worker": "replace_me",
+    "mcp": "replace_me",
+    "paidResource": "replace_me"
+  },
+  "migrationRunId": "replace_me",
   "api": {
     "baseUrl": "https://api.testnet.lumenbazaar.example",
     "health": "https://api.testnet.lumenbazaar.example/health",
+    "readiness": "https://api.testnet.lumenbazaar.example/ready",
+    "version": "https://api.testnet.lumenbazaar.example/version",
     "metrics": "https://api.testnet.lumenbazaar.example/metrics",
     "openapi": "https://api.testnet.lumenbazaar.example/openapi.json",
     "supported": "https://api.testnet.lumenbazaar.example/v1/supported",
@@ -14,7 +23,20 @@
   "mcp": {
     "streamableHttp": "https://mcp.testnet.lumenbazaar.example/mcp",
     "health": "https://mcp.testnet.lumenbazaar.example/health",
+    "metrics": "https://mcp.testnet.lumenbazaar.example/metrics",
+    "readiness": "https://mcp.testnet.lumenbazaar.example/ready",
+    "version": "https://mcp.testnet.lumenbazaar.example/version",
+    "schema": "https://mcp.testnet.lumenbazaar.example/schema",
     "localStdioCommand": "pnpm start:mcp"
+  },
+  "paidResource": {
+    "baseUrl": "https://weather.testnet.lumenbazaar.example",
+    "health": "https://weather.testnet.lumenbazaar.example/health",
+    "readiness": "https://weather.testnet.lumenbazaar.example/ready",
+    "version": "https://weather.testnet.lumenbazaar.example/version",
+    "metrics": "https://weather.testnet.lumenbazaar.example/metrics",
+    "resourceUrl": "https://weather.testnet.lumenbazaar.example/weather/Lagos",
+    "resourceId": "replace_me"
   },
   "worker": {
     "service": "lumenbazaar-worker",

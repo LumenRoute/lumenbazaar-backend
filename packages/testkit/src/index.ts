@@ -14,6 +14,16 @@ export {
   testReceipt,
   testPaymentPayload,
   testPaymentRequirement,
+  testPaymentRequest,
+  testPaymentConfigEnv,
+  createTestPaymentRequest,
+  testMalformedPaymentRequest,
+  testWrongVersionPaymentRequest,
+  testWrongNetworkPaymentRequest,
+  testWrongSchemePaymentRequest,
+  testWrongAssetPaymentRequest,
+  testExpiredPaymentRequest,
+  testAssetContractId,
   testResourceMetadata
 } from "./fixtures.js";
 

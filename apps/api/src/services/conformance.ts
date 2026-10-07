@@ -338,7 +338,7 @@ async function assertSupported(config: AppConfig, network: NetworkId): Promise<J
     advertised: true,
     network,
     assetCount: match.assets.length,
-    x402Version: "1"
+    x402Version: "2"
   };
 }
 
@@ -367,14 +367,11 @@ async function assertSettle(
   definition: ConformanceCaseDefinition
 ): Promise<JsonObject> {
   const payload = exactPaymentRequest(config, definition.network, definition.id);
-  const verified = await verificationService.verify(payload);
-  const settled = await settlementService.settle({
-    paymentAttemptId: verified.paymentAttemptId,
-    ...payload
-  });
+  await verificationService.verify(payload);
+  const settled = await settlementService.settle(payload);
 
-  if (settled.status !== "settled") {
-    throw new Error("/v1/settle did not return a settled receipt");
+  if (settled.status !== "confirmed") {
+    throw new Error("/v1/settle did not return a confirmed receipt");
   }
 
   return {
@@ -464,38 +461,35 @@ function requirePaymentSessionService(
 function exactPaymentRequest(config: AppConfig, network: NetworkId, seed: string) {
   const asset = config.networks[network].assets[0];
 
-  if (asset === undefined) {
-    throw new Error(`No configured asset for ${network}`);
+  if (asset?.contractId === undefined) {
+    throw new Error(`No configured SEP-41 asset contract for ${network}`);
   }
 
+  const paymentRequirements = {
+    scheme: "exact" as const,
+    network,
+    asset: asset.contractId,
+    amount: "100000",
+    payTo: config.facilitatorAccount || localIssuerPublicKey,
+    maxTimeoutSeconds: 60,
+    extra: {
+      assetCode: asset.code,
+      assetIssuer: asset.issuer
+    }
+  };
+
   return {
+    x402Version: 2 as const,
     paymentPayload: {
-      scheme: "exact" as const,
-      network,
-      asset: {
-        code: asset.code,
-        issuer: asset.issuer
-      },
-      amount: "0.01",
-      payTo: config.facilitatorAccount || localIssuerPublicKey,
-      expiresAtLedger: 20,
-      authorization: {
-        test: "conformance"
-      },
-      paymentHash: `conformance_${seed}_${Date.now()}_${Math.random().toString(36).slice(2)}`
+      x402Version: 2 as const,
+      accepted: paymentRequirements,
+      payload: {
+        transaction: Buffer.from(
+          `conformance:${seed}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+        ).toString("base64")
+      }
     },
-    paymentRequirements: {
-      scheme: "exact" as const,
-      network,
-      asset: {
-        code: asset.code,
-        issuer: asset.issuer
-      },
-      amount: "0.01",
-      payTo: config.facilitatorAccount || localIssuerPublicKey
-    },
-    currentLedger: 10,
-    resourceId: `conformance_${seed}`
+    paymentRequirements
   };
 }
 

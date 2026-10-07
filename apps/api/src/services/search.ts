@@ -40,12 +40,29 @@ export type SearchResult = {
   nextCursor: string | null;
 };
 
-export class SearchService {
+export type SearchDocumentStore = {
+  get: (resourceId: string) => Promise<SearchDocument | undefined>;
+  upsert: (document: SearchDocument) => Promise<SearchDocument>;
+};
+
+export class InMemorySearchDocumentStore implements SearchDocumentStore {
   private readonly documents = new Map<string, SearchDocument>();
 
+  async get(resourceId: string) {
+    return this.documents.get(resourceId);
+  }
+
+  async upsert(document: SearchDocument) {
+    this.documents.set(document.resourceId, document);
+    return document;
+  }
+}
+
+export class SearchService {
   constructor(
     private readonly resourceService: ResourceService,
-    private readonly metrics?: MetricsService
+    private readonly metrics?: MetricsService,
+    private readonly documentStore: SearchDocumentStore = new InMemorySearchDocumentStore()
   ) {}
 
   async rebuildIndex() {
@@ -75,8 +92,7 @@ export class SearchService {
       updatedAt: now
     };
 
-    this.documents.set(resource.id, document);
-    return document;
+    return this.documentStore.upsert(document);
   }
 
   async search(input: unknown): Promise<SearchResult> {
@@ -87,15 +103,22 @@ export class SearchService {
       const limit = normalizeLimit(filters.limit);
       const page = await this.resourceService.listResources({
         limit: 100,
+        status: "active",
         ...(filters.network === undefined ? {} : { network: filters.network }),
         ...(filters.asset === undefined ? {} : { asset: filters.asset }),
         ...(filters.type === undefined ? {} : { type: filters.type }),
         ...(filters.sellerId === undefined ? {} : { sellerId: filters.sellerId })
       });
       const queryTerms = tokenize(filters.q ?? "");
+      const documentEntries = await Promise.all(
+        page.resources.map(
+          async (resource) => [resource.id, await this.documentStore.get(resource.id)] as const
+        )
+      );
+      const documents = new Map(documentEntries);
       const ranked = page.resources
         .map((resource) => {
-          const document = this.documents.get(resource.id);
+          const document = documents.get(resource.id);
           const body = document?.body ?? buildSearchBody(resource);
           const matchedTerms = queryTerms.filter((term) => body.includes(term));
           const score = scoreResource(resource, matchedTerms, document);
@@ -123,7 +146,7 @@ export class SearchService {
           strategy: "postgres-full-text-v1"
         },
         partialResults: page.resources.some(
-          (resource) => this.documents.get(resource.id)?.stale !== false
+          (resource) => documents.get(resource.id)?.stale !== false
         ),
         nextCursor: null
       };

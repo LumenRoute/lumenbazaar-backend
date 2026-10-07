@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  createCorrelationId,
+  getCorrelationId,
   LumenError,
   type ErrorCode,
   type NetworkId,
@@ -8,9 +10,11 @@ import {
 } from "@lumenbazaar/shared";
 
 export type CreatePaymentAttemptInput = {
+  correlationId?: string;
   resourceId?: string;
   sellerId?: string;
   paymentHash: string;
+  idempotencyKey?: string;
   network: NetworkId;
   assetCode: string;
   assetIssuer: string;
@@ -27,6 +31,7 @@ export type UpdatePaymentAttemptInput = {
 
 export type PaymentAttemptStore = {
   createVerifiedAttempt: (input: CreatePaymentAttemptInput) => Promise<PaymentAttempt>;
+  claimSettlement: (paymentAttemptId: string) => Promise<PaymentAttempt | undefined>;
   getPaymentAttempt: (paymentAttemptId: string) => Promise<PaymentAttempt | undefined>;
   findPaymentAttemptByHash: (paymentHash: string) => Promise<PaymentAttempt | undefined>;
   updatePaymentAttempt: (
@@ -38,9 +43,11 @@ export type PaymentAttemptStore = {
 export class InMemoryPaymentAttemptStore implements PaymentAttemptStore {
   private readonly attempts = new Map<string, PaymentAttempt>();
   private readonly hashes = new Map<string, string>();
+  private readonly idempotencyKeys = new Map<string, string>();
 
   async createVerifiedAttempt(input: CreatePaymentAttemptInput) {
-    if (this.hashes.has(input.paymentHash)) {
+    const idempotencyKey = input.idempotencyKey ?? `verify:${input.paymentHash}`;
+    if (this.hashes.has(input.paymentHash) || this.idempotencyKeys.has(idempotencyKey)) {
       throw new LumenError("REPLAY_DETECTED", "Payment payload has already been used.");
     }
 
@@ -48,9 +55,11 @@ export class InMemoryPaymentAttemptStore implements PaymentAttemptStore {
     const id = `pay_${randomUUID().replaceAll("-", "").slice(0, 24)}`;
     const attempt: PaymentAttempt = {
       id,
+      correlationId: input.correlationId ?? getCorrelationId() ?? createCorrelationId(),
       resourceId: input.resourceId ?? null,
       sellerId: input.sellerId ?? null,
       paymentHash: input.paymentHash,
+      idempotencyKey,
       network: input.network,
       assetCode: input.assetCode,
       assetIssuer: input.assetIssuer,
@@ -66,12 +75,28 @@ export class InMemoryPaymentAttemptStore implements PaymentAttemptStore {
 
     this.attempts.set(id, attempt);
     this.hashes.set(input.paymentHash, id);
+    this.idempotencyKeys.set(idempotencyKey, id);
 
     return attempt;
   }
 
   async getPaymentAttempt(paymentAttemptId: string) {
     return this.attempts.get(paymentAttemptId);
+  }
+
+  async claimSettlement(paymentAttemptId: string) {
+    const attempt = this.attempts.get(paymentAttemptId);
+    if (attempt === undefined || attempt.status !== "verified") {
+      return undefined;
+    }
+
+    const claimed: PaymentAttempt = {
+      ...attempt,
+      status: "settling",
+      updatedAt: new Date().toISOString()
+    };
+    this.attempts.set(paymentAttemptId, claimed);
+    return claimed;
   }
 
   async findPaymentAttemptByHash(paymentHash: string) {

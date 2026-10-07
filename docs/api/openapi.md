@@ -9,7 +9,8 @@ API version: 0.1.0
 
 | Method | Path                                      | Summary                                                      |
 | ------ | ----------------------------------------- | ------------------------------------------------------------ |
-| GET    | `/health`                                 | Return API health and dependency configuration.              |
+| GET    | `/health`                                 | Return API process liveness.                                 |
+| GET    | `/ready`                                  | Return dependency readiness and usable payment capabilities. |
 | GET    | `/version`                                | Return backend version and environment.                      |
 | GET    | `/v1/networks`                            | List configured Stellar networks and assets.                 |
 | GET    | `/v1/supported`                           | List supported x402 payment schemes.                         |

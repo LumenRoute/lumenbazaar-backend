@@ -1,4 +1,7 @@
+import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { describe, expect, it, vi } from "vitest";
+
+import { testAssetContractId } from "@lumenbazaar/testkit";
 
 import {
   createFastifyPaymentMiddleware,
@@ -10,28 +13,32 @@ import {
 
 const requirement = paymentRequirement({
   network: "stellar:testnet",
+  assetContractId: testAssetContractId,
   assetCode: "USDC",
   assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-  amount: "0.05",
+  amount: "500000",
   payTo: "GBZXN7PIRZGNMHGAIQW7QEJWW36L5CVVNRYANMDW2G3QOF2VCR4DQSQE"
 });
 
 describe("seller SDK middleware", () => {
-  it("creates a stable x402 payment-required response", () => {
-    expect(createPaymentRequired(requirement)).toMatchObject({
+  it("creates an official x402 v2 payment-required response", () => {
+    const response = createPaymentRequired(requirement, {
+      url: "https://seller.example/weather"
+    });
+
+    expect(response).toMatchObject({
       status: 402,
-      headers: {
-        "x-payment-scheme": "exact"
-      },
       body: {
-        paymentRequired: {
-          amount: "0.05"
-        }
+        x402Version: 2,
+        accepts: [{ amount: "500000", asset: testAssetContractId }]
       }
     });
+    expect(decodePaymentRequiredHeader(response.headers["payment-required"])).toEqual(
+      response.body
+    );
   });
 
-  it("sends Fastify 402 responses with x402 headers", () => {
+  it("sends Fastify 402 responses with PAYMENT-REQUIRED", () => {
     const reply = {
       code: vi.fn(() => reply),
       header: vi.fn(() => reply),
@@ -41,13 +48,9 @@ describe("seller SDK middleware", () => {
     sendFastifyPaymentRequired(reply, requirement);
 
     expect(reply.code).toHaveBeenCalledWith(402);
-    expect(reply.header).toHaveBeenCalledWith("x-payment-scheme", "exact");
+    expect(reply.header).toHaveBeenCalledWith("PAYMENT-REQUIRED", expect.any(String));
     expect(reply.send).toHaveBeenCalledWith(
-      expect.objectContaining({
-        paymentRequired: expect.objectContaining({
-          amount: "0.05"
-        })
-      })
+      expect.objectContaining({ x402Version: 2, accepts: [requirement] })
     );
   });
 
