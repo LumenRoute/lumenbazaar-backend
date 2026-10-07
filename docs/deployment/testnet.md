@@ -22,6 +22,7 @@ Required settings:
 - `LUMEN_ENV=testnet`
 - `API_PUBLIC_URL`
 - `MCP_PUBLIC_URL`
+- `MCP_TRUST_PROXY` (`true` only behind an ingress that replaces client forwarding headers)
 - `DATABASE_URL`
 - `REDIS_URL`
 - `STELLAR_TESTNET_RPC_URL`
@@ -75,12 +76,21 @@ curl "$API_PUBLIC_URL/health"
 curl "$API_PUBLIC_URL/ready"
 curl "$API_PUBLIC_URL/v1/supported"
 curl "https://lumenbazaar-mcp.onrender.com/health"
+curl "https://lumenbazaar-mcp.onrender.com/ready"
+curl "https://lumenbazaar-mcp.onrender.com/version"
+curl "https://lumenbazaar-mcp.onrender.com/schema"
 ```
 
 `/health` is process liveness only. `/ready` returns HTTP 503 unless Postgres, Redis, migrations,
 the active Stellar RPC and Horizon endpoints, configured assets, and any required signer are ready.
 The supported-schemes response uses the same evaluated state and cannot advertise a payment adapter
 whose dependencies are unavailable.
+
+The MCP service advertises discovery and receipt tools only while its backend is ready, and
+advertises payment preparation and paid-call tools only while the backend reports the official
+exact capability. Its HTTP boundary rate-limits callers, caps declared request bodies, does not
+publish OAuth metadata, never forwards caller credentials, and pins paid calls to the resource URL
+stored in the catalog.
 
 ## Endpoint Manifest
 

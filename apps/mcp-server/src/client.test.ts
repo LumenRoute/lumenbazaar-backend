@@ -31,6 +31,37 @@ describe("MCP backend client", () => {
     ]);
   });
 
+  it("advertises exact tools only when readiness and supported capabilities agree", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        if (String(input).endsWith("/ready")) {
+          return Response.json({ ok: true });
+        }
+        return Response.json({
+          kinds: [{ x402Version: 2, scheme: "exact", network: "stellar:testnet" }]
+        });
+      })
+    );
+
+    await expect(
+      new BackendClient("https://api.example.test").getToolCapabilities()
+    ).resolves.toEqual({ backend: true, exact: true });
+  });
+
+  it("fails capability probing closed when the backend cannot be reached", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("connection failed");
+      })
+    );
+
+    await expect(
+      new BackendClient("https://api.example.test").getToolCapabilities()
+    ).resolves.toEqual({ backend: false, exact: false });
+  });
+
   it("computes MCP payment terms from direct resource search results", async () => {
     vi.stubGlobal(
       "fetch",
@@ -52,7 +83,7 @@ describe("MCP backend client", () => {
         {
           paymentTerms: {
             scheme: "exact",
-            amount: "0.05",
+            amount: "500000",
             payTo: "GBZXN7PIRZGNMHGAIQW7QEJWW36L5CVVNRYANMDW2G3QOF2VCR4DQSQE"
           }
         }
@@ -69,10 +100,13 @@ describe("MCP backend client", () => {
     ).resolves.toMatchObject({
       id: "resource_1",
       paymentTerms: {
-        amount: "0.05"
+        amount: "500000"
       }
     });
-    expect(fetchImpl).toHaveBeenCalledWith("https://api.example.test/v1/resources/resource_1");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.example.test/v1/resources/resource_1",
+      expect.objectContaining({ headers: { accept: "application/json" } })
+    );
   });
 });
 

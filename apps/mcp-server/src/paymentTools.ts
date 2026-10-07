@@ -9,6 +9,7 @@ import {
 } from "@lumenbazaar/buyer-sdk";
 
 import { BackendClient } from "./client.js";
+import { PermissionError } from "./errors.js";
 
 type ExactResourcePaymentRequirements = PaymentRequirements;
 
@@ -61,6 +62,14 @@ export class McpPaymentToolService {
   async callPaidResource(input: CallPaidResourceInput) {
     const resource = await this.client.getResource(input.resourceId);
     const paymentRequirements = paymentTermsFromResource(resource);
+    const registeredUrl = requireString(resource.url, "url");
+
+    if (
+      input.resourceUrl !== undefined &&
+      normalizeUrl(input.resourceUrl) !== normalizeUrl(registeredUrl)
+    ) {
+      throw new PermissionError("Paid calls must use the cataloged resource URL.");
+    }
 
     this.assertWithinBudget(paymentRequirements);
 
@@ -72,7 +81,7 @@ export class McpPaymentToolService {
       ...(input.maxRetries === undefined ? {} : { maxRetries: input.maxRetries }),
       ...(input.method === undefined ? {} : { method: input.method }),
       paymentPayload: input.paymentPayload,
-      ...(input.resourceUrl === undefined ? {} : { resourceUrl: input.resourceUrl }),
+      resourceUrl: registeredUrl,
       ...(input.retryDelayMs === undefined ? {} : { retryDelayMs: input.retryDelayMs }),
       ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
       resourceId: input.resourceId
@@ -97,9 +106,15 @@ export class McpPaymentToolService {
 
   private assertWithinBudget(paymentRequirements: ExactResourcePaymentRequirements) {
     if (!this.budgetManager.canAffordAtomic(paymentRequirements.amount)) {
-      throw new Error(`Local budget cap exceeded for amount ${paymentRequirements.amount}`);
+      throw new PermissionError("Local payment budget cap exceeded.");
     }
   }
+}
+
+function normalizeUrl(value: string) {
+  const url = new URL(value);
+  url.hash = "";
+  return url.toString();
 }
 
 function paymentTermsFromResource(

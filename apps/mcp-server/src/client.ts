@@ -1,3 +1,6 @@
+import { BackendError } from "./errors.js";
+import { type McpToolCapabilities } from "./tools.js";
+
 /**
  * Backend client for MCP server.
  * Wraps API calls to the facilitator and discovery endpoints.
@@ -6,8 +9,12 @@
 export class BackendClient {
   private baseUrl: string;
 
-  constructor(baseUrl: string = process.env.API_BASE_URL || "http://localhost:8000") {
-    this.baseUrl = baseUrl.replace(/\/$/, "");
+  constructor(baseUrl: string = process.env.API_BASE_URL || "http://localhost:3000") {
+    const parsed = new URL(baseUrl);
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+      throw new Error("API_BASE_URL must not contain credentials, query parameters, or fragments.");
+    }
+    this.baseUrl = parsed.toString().replace(/\/$/, "");
   }
 
   getBaseUrl() {
@@ -18,22 +25,37 @@ export class BackendClient {
    * Fetch supported payment schemes, networks, and assets
    */
   async getSupported(): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/v1/supported`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch /v1/supported: ${response.statusText}`);
+    return this.requestJson<Record<string, unknown>>("/v1/supported");
+  }
+
+  async getToolCapabilities(): Promise<McpToolCapabilities> {
+    try {
+      const [readiness, supported] = await Promise.all([
+        this.requestJson<Record<string, unknown>>("/ready"),
+        this.getSupported()
+      ]);
+      const kinds = Array.isArray(supported.kinds) ? supported.kinds : [];
+      return {
+        backend: readiness.ok === true,
+        exact: kinds.some(
+          (kind) =>
+            typeof kind === "object" &&
+            kind !== null &&
+            !Array.isArray(kind) &&
+            (kind as Record<string, unknown>).scheme === "exact" &&
+            (kind as Record<string, unknown>).x402Version === 2
+        )
+      };
+    } catch {
+      return { backend: false, exact: false };
     }
-    return unwrapApiData<Record<string, unknown>>(await response.json());
   }
 
   /**
    * List all supported networks
    */
   async listNetworks(): Promise<Array<{ id: string; name: string; chain: string }>> {
-    const response = await fetch(`${this.baseUrl}/v1/networks`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch /v1/networks: ${response.statusText}`);
-    }
-    const data = unwrapApiData<Record<string, unknown>>(await response.json());
+    const data = await this.requestJson<Record<string, unknown>>("/v1/networks");
     const networks = asRecordArray(data.networks);
 
     return networks.map((n) => ({
@@ -66,11 +88,9 @@ export class BackendClient {
     if (params.limit) query.append("limit", String(params.limit));
     if (params.cursor) query.append("cursor", params.cursor);
 
-    const response = await fetch(`${this.baseUrl}/v1/discovery/search?${query.toString()}`);
-    if (!response.ok) {
-      throw new Error(`Failed to search resources: ${response.statusText}`);
-    }
-    const data = unwrapApiData<Record<string, unknown>>(await response.json());
+    const data = await this.requestJson<Record<string, unknown>>(
+      `/v1/discovery/search?${query.toString()}`
+    );
     const resources = asRecordArray(data.resources).map(withPaymentTerms);
     const cursor = (data.cursor ?? data.nextCursor) as string | undefined;
     const total = data.total as number | undefined;
@@ -92,22 +112,36 @@ export class BackendClient {
    * Get a specific resource by ID
    */
   async getResource(resourceId: string): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/v1/resources/${resourceId}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch resource ${resourceId}: ${response.statusText}`);
-    }
-    return withPaymentTerms(unwrapApiData<Record<string, unknown>>(await response.json()));
+    return withPaymentTerms(
+      await this.requestJson<Record<string, unknown>>(
+        `/v1/resources/${encodeURIComponent(resourceId)}`
+      )
+    );
   }
 
   /**
    * Get payment receipt by ID
    */
   async getReceipt(receiptId: string): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/v1/receipts/${receiptId}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch receipt ${receiptId}: ${response.statusText}`);
+    return this.requestJson<Record<string, unknown>>(
+      `/v1/receipts/${encodeURIComponent(receiptId)}`
+    );
+  }
+
+  private async requestJson<T>(path: string): Promise<T> {
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(5_000)
+      });
+    } catch {
+      throw new BackendError("Backend request failed.");
     }
-    return unwrapApiData<Record<string, unknown>>(await response.json());
+    if (!response.ok) {
+      throw new BackendError("Backend request failed.", { status: response.status });
+    }
+    return unwrapApiData<T>(await response.json());
   }
 }
 
@@ -132,17 +166,35 @@ function withPaymentTerms(resource: Record<string, unknown>) {
     return resource;
   }
 
+  const extensions = asRecord(resource.extensions);
+  const assetContractId = extensions?.assetContractId;
   return {
     ...resource,
     paymentTerms: {
       scheme: "exact",
       network: resource.network,
-      asset: {
-        code: resource.assetCode,
-        issuer: resource.assetIssuer
-      },
-      amount: resource.amount,
-      payTo: resource.payTo
+      asset: typeof assetContractId === "string" ? assetContractId : "",
+      amount: decimalToAtomic(String(resource.amount ?? "")),
+      payTo: resource.payTo,
+      maxTimeoutSeconds: 60,
+      extra: {
+        assetCode: resource.assetCode,
+        assetIssuer: resource.assetIssuer
+      }
     }
   };
+}
+
+function decimalToAtomic(amount: string) {
+  const [whole, fraction = ""] = amount.split(".");
+  if (!/^\d+$/u.test(whole ?? "") || !/^\d*$/u.test(fraction) || fraction.length > 7) {
+    throw new BackendError("Backend resource price is invalid.");
+  }
+  return `${whole}${fraction.padEnd(7, "0")}`.replace(/^0+(?=\d)/u, "");
+}
+
+function asRecord(value: unknown) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }

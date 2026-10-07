@@ -11,6 +11,7 @@ const validEnv = {
   LUMEN_ENV: "testnet",
   API_PUBLIC_URL: "https://api.testnet.lumenbazaar.dev",
   MCP_PUBLIC_URL: "https://mcp.testnet.lumenbazaar.dev/mcp",
+  MCP_TRUST_PROXY: "true",
   DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/lumenbazaar",
   REDIS_URL: "redis://redis:6379",
   DEFAULT_ASSET_CODE: "USDC",
@@ -57,10 +58,24 @@ describe("testnet deployment check", () => {
         },
         mcp: {
           health: "https://mcp.testnet.lumenbazaar.dev/health",
-          streamableHttp: "https://mcp.testnet.lumenbazaar.dev/mcp"
+          readiness: "https://mcp.testnet.lumenbazaar.dev/ready",
+          schema: "https://mcp.testnet.lumenbazaar.dev/schema",
+          streamableHttp: "https://mcp.testnet.lumenbazaar.dev/mcp",
+          version: "https://mcp.testnet.lumenbazaar.dev/version"
         }
       }
     });
+  });
+
+  it("requires an explicit MCP proxy trust decision", () => {
+    const result = validateTestnetDeploymentEnv(
+      { ...validEnv, MCP_TRUST_PROXY: "sometimes" },
+      { allowPlaceholders: false }
+    );
+
+    expect(result.errors).toContain(
+      "MCP_TRUST_PROXY must be true or false for testnet deployment."
+    );
   });
 
   it("fails closed on placeholders unless examples are explicitly allowed", () => {

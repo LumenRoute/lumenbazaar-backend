@@ -1,21 +1,24 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { z, ZodError } from "zod";
 
 import type { PaymentPayload } from "@lumenbazaar/buyer-sdk";
 
 import { BackendClient } from "./client.js";
-import { handleToolError } from "./errors.js";
+import { CapabilityUnavailableError, handleToolError, ValidationError } from "./errors.js";
 import { McpPaymentToolService } from "./paymentTools.js";
-import { getToolDefinition, listToolDefinitions } from "./tools.js";
+import { getToolDefinition, listToolDefinitions, type McpToolCapabilities } from "./tools.js";
 
 export type CreateMcpServerOptions = {
   client?: BackendClient;
+  capabilityProvider?: () => Promise<McpToolCapabilities>;
   paymentTools?: McpPaymentToolService;
 };
 
 export function createMcpServer(options: CreateMcpServerOptions = {}) {
   const client = options.client ?? new BackendClient();
   const paymentTools = options.paymentTools ?? new McpPaymentToolService({ client });
+  const capabilityProvider = options.capabilityProvider ?? (() => client.getToolCapabilities());
   const server = new Server(
     {
       name: "lumenbazaar",
@@ -29,10 +32,12 @@ export function createMcpServer(options: CreateMcpServerOptions = {}) {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const tools = listToolDefinitions().map((def) => ({
+    const capabilities = await capabilityProvider();
+    const tools = listToolDefinitions(capabilities).map((def) => ({
       name: def.name,
       description: def.description,
-      inputSchema: def.jsonInputSchema
+      inputSchema: z.toJSONSchema(def.inputSchema),
+      outputSchema: z.toJSONSchema(def.outputSchema)
     }));
 
     return { tools };
@@ -43,10 +48,15 @@ export function createMcpServer(options: CreateMcpServerOptions = {}) {
     const toolName = req.params.name;
 
     try {
-      const toolDefinition = getToolDefinition(toolName);
+      const capabilities = await capabilityProvider();
+      const knownTool = getToolDefinition(toolName);
+      const toolDefinition = getToolDefinition(toolName, capabilities);
 
+      if (knownTool !== undefined && toolDefinition === undefined) {
+        throw new CapabilityUnavailableError();
+      }
       if (toolDefinition === undefined) {
-        throw new Error(`Unknown tool: ${toolName}`);
+        throw new ValidationError("Unknown tool name.");
       }
 
       const toolInput = toolDefinition.inputSchema.parse(req.params.arguments ?? {}) as Record<
@@ -155,9 +165,6 @@ export function createMcpServer(options: CreateMcpServerOptions = {}) {
               ? {}
               : { method: toolInput.method as "GET" | "POST" }),
             paymentPayload: toolInput.paymentPayload as PaymentPayload,
-            ...(toolInput.resourceUrl === undefined
-              ? {}
-              : { resourceUrl: toolInput.resourceUrl as string }),
             ...(toolInput.retryDelayMs === undefined
               ? {}
               : { retryDelayMs: toolInput.retryDelayMs as number }),
@@ -182,19 +189,31 @@ export function createMcpServer(options: CreateMcpServerOptions = {}) {
         }
 
         default:
-          throw new Error(`Unknown tool: ${toolName}`);
+          throw new ValidationError("Unknown tool name.");
       }
+
+      const output = toolDefinition.outputSchema.parse(result) as Record<string, unknown>;
 
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(result, null, 2)
+            text: JSON.stringify(output, null, 2)
           }
-        ]
+        ],
+        structuredContent: output
       };
     } catch (error) {
-      const errorInfo = handleToolError(error);
+      const errorInfo = handleToolError(
+        error instanceof ZodError
+          ? new ValidationError("Tool input or output did not match its schema.", {
+              issues: error.issues.map((issue) => ({
+                path: issue.path.join("."),
+                message: issue.message
+              }))
+            })
+          : error
+      );
       return {
         content: [
           {
@@ -216,4 +235,17 @@ export function createMcpServer(options: CreateMcpServerOptions = {}) {
   });
 
   return server;
+}
+
+export function mcpToolSchemaDocument(capabilities: McpToolCapabilities) {
+  return {
+    schemaVersion: 1,
+    service: "lumenbazaar",
+    tools: listToolDefinitions(capabilities).map((definition) => ({
+      name: definition.name,
+      description: definition.description,
+      inputSchema: z.toJSONSchema(definition.inputSchema),
+      outputSchema: z.toJSONSchema(definition.outputSchema)
+    }))
+  };
 }

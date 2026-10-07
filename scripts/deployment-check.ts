@@ -20,7 +20,10 @@ export type DeploymentCheckResult = {
     };
     mcp: {
       health: string;
+      readiness: string;
+      schema: string;
       streamableHttp: string;
+      version: string;
     };
   };
   errors: string[];
@@ -35,6 +38,7 @@ const requiredKeys = [
   "LUMEN_ENV",
   "API_PUBLIC_URL",
   "MCP_PUBLIC_URL",
+  "MCP_TRUST_PROXY",
   "DATABASE_URL",
   "REDIS_URL",
   "STELLAR_TESTNET_RPC_URL",
@@ -75,6 +79,10 @@ export function validateTestnetDeploymentEnv(
 
   if (env.LUMEN_ENV !== "testnet") {
     errors.push("LUMEN_ENV must be testnet for testnet deployment.");
+  }
+
+  if (env.MCP_TRUST_PROXY !== "true" && env.MCP_TRUST_PROXY !== "false") {
+    errors.push("MCP_TRUST_PROXY must be true or false for testnet deployment.");
   }
 
   if (env.FACILITATOR_SIGNER_PROVIDER !== "environment") {
@@ -148,8 +156,13 @@ export function validateTestnetDeploymentEnv(
     env.API_PUBLIC_URL ?? "https://api.testnet.lumenbazaar.example"
   );
   const mcpUrl = env.MCP_PUBLIC_URL ?? "https://mcp.testnet.lumenbazaar.example/mcp";
-  const mcpHealthUrl = new URL(mcpUrl);
-  mcpHealthUrl.pathname = "/health";
+  const mcpEndpoint = (pathname: string) => {
+    const url = new URL(mcpUrl);
+    url.pathname = pathname;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  };
 
   return {
     endpoints: {
@@ -161,8 +174,11 @@ export function validateTestnetDeploymentEnv(
         supported: `${apiBaseUrl}/v1/supported`
       },
       mcp: {
-        health: mcpHealthUrl.toString(),
-        streamableHttp: mcpUrl
+        health: mcpEndpoint("/health"),
+        readiness: mcpEndpoint("/ready"),
+        schema: mcpEndpoint("/schema"),
+        streamableHttp: mcpUrl,
+        version: mcpEndpoint("/version")
       }
     },
     errors,

@@ -66,8 +66,24 @@ describe("MCP payment tools", () => {
     });
 
     await expect(service.preparePayment({ resourceId: "resource_1" })).rejects.toThrow(
-      "Local budget cap exceeded"
+      "Local payment budget cap exceeded"
     );
+  });
+
+  it("rejects paid-call URL overrides that differ from the catalog record", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json(resource()))
+    );
+    const service = new McpPaymentToolService({ apiUrl: "https://api.example.test" });
+
+    await expect(
+      service.callPaidResource({
+        paymentPayload: testPaymentPayload,
+        resourceId: "resource_1",
+        resourceUrl: "https://internal.example/admin"
+      })
+    ).rejects.toThrow("cataloged resource URL");
   });
 
   it("calls paid resources through verify, resource call, settle, and receipt lookup", async () => {

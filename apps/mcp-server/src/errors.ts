@@ -49,6 +49,13 @@ export class PermissionError extends McpError {
   }
 }
 
+export class CapabilityUnavailableError extends McpError {
+  constructor() {
+    super("CAPABILITY_UNAVAILABLE", "The backing service for this tool is unavailable.");
+    this.name = "CapabilityUnavailableError";
+  }
+}
+
 /**
  * Map errors to structured MCP responses
  */
@@ -71,7 +78,7 @@ export function handleToolError(error: unknown): {
   if (error instanceof Error) {
     return {
       code: "INTERNAL_ERROR",
-      message: error.message
+      message: "Tool execution failed."
     };
   }
 

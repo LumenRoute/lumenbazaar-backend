@@ -14,6 +14,9 @@
   "mcp": {
     "streamableHttp": "https://mcp.testnet.lumenbazaar.example/mcp",
     "health": "https://mcp.testnet.lumenbazaar.example/health",
+    "readiness": "https://mcp.testnet.lumenbazaar.example/ready",
+    "version": "https://mcp.testnet.lumenbazaar.example/version",
+    "schema": "https://mcp.testnet.lumenbazaar.example/schema",
     "localStdioCommand": "pnpm start:mcp"
   },
   "worker": {
