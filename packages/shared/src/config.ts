@@ -71,7 +71,12 @@ const envSchema = z.object({
   STELLAR_PUBNET_USDC_ISSUER: z.string().min(1).default(localIssuerPublicKey),
   STELLAR_PUBNET_USDC_CONTRACT_ID: optionalNonEmptyStringEnv,
   STELLAR_PUBNET_UPTO_SESSION_CONTRACT_ID: optionalNonEmptyStringEnv,
-  FACILITATOR_ACCOUNT: z.string().min(1).default(localIssuerPublicKey)
+  FACILITATOR_ACCOUNT: z.string().min(1).default(localIssuerPublicKey),
+  FACILITATOR_SIGNER_PROVIDER: z.enum(["disabled", "environment"]).default("disabled"),
+  FACILITATOR_SIGNER_NETWORK: z
+    .enum(["stellar:testnet", "stellar:pubnet"])
+    .default("stellar:testnet"),
+  FACILITATOR_SIGNING_KEY_VERSION: optionalNonEmptyStringEnv
 });
 
 export type RawEnv = z.input<typeof envSchema>;
@@ -92,6 +97,11 @@ export type AppConfig = {
   databaseUrl: string;
   redisUrl: string;
   facilitatorAccount: string;
+  signer: {
+    provider: ParsedEnv["FACILITATOR_SIGNER_PROVIDER"];
+    network: NetworkId;
+    keyVersion?: string;
+  };
   features: {
     uptoScheme: boolean;
   };
@@ -169,6 +179,13 @@ export function loadConfig(
     databaseUrl: env.DATABASE_URL,
     redisUrl: env.REDIS_URL,
     facilitatorAccount: env.FACILITATOR_ACCOUNT,
+    signer: {
+      provider: env.FACILITATOR_SIGNER_PROVIDER,
+      network: env.FACILITATOR_SIGNER_NETWORK,
+      ...(env.FACILITATOR_SIGNING_KEY_VERSION === undefined
+        ? {}
+        : { keyVersion: env.FACILITATOR_SIGNING_KEY_VERSION })
+    },
     features: {
       uptoScheme: env.ENABLE_UPTO_SCHEME
     },
@@ -192,12 +209,26 @@ function assertEnvironmentConfiguration(
     env.LUMEN_ENV === "mainnet" ? networks["stellar:pubnet"] : networks["stellar:testnet"];
   const activeAsset = activeNetwork.assets[0];
 
+  if (
+    env.FACILITATOR_SIGNER_PROVIDER === "environment" &&
+    env.FACILITATOR_SIGNER_NETWORK !== activeNetwork.id
+  ) {
+    throw new Error("FACILITATOR_SIGNER_NETWORK must match the active Stellar network.");
+  }
+
   if (env.LUMEN_ENV === "mainnet" && activeAsset?.issuer === localIssuerPublicKey) {
     throw new Error("STELLAR_PUBNET_USDC_ISSUER must be configured before mainnet startup.");
   }
 
   if (env.NODE_ENV !== "production" || env.LUMEN_ENV === "local" || options.allowPlaceholders) {
     return;
+  }
+
+  if (
+    env.FACILITATOR_SIGNER_PROVIDER === "environment" &&
+    env.FACILITATOR_SIGNING_KEY_VERSION === undefined
+  ) {
+    throw new Error("FACILITATOR_SIGNING_KEY_VERSION is required for hosted environment signers.");
   }
 
   const requiredPublicValues: Array<[string, string]> = [

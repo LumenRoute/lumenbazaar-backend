@@ -6,6 +6,7 @@ import {
   listConfiguredNetworks,
   localIssuerPublicKey
 } from "@lumenbazaar/shared";
+import { type FacilitatorSignerProvider } from "@lumenbazaar/stellar-payments";
 
 export type PaymentCapabilities = {
   exact: boolean;
@@ -140,7 +141,10 @@ export function createStaticReadinessService(
   };
 }
 
-export function createRuntimeReadinessProbes(config: AppConfig): ReadinessProbes {
+export function createRuntimeReadinessProbes(
+  config: AppConfig,
+  signerProvider?: FacilitatorSignerProvider
+): ReadinessProbes {
   const network = listConfiguredNetworks(config)[0];
 
   if (network === undefined) {
@@ -148,6 +152,11 @@ export function createRuntimeReadinessProbes(config: AppConfig): ReadinessProbes
   }
 
   return {
+    ...(signerProvider === undefined
+      ? {}
+      : {
+          signer: async () => signerProvider.assertReady()
+        }),
     async database() {
       const client = createPrismaClient(config.databaseUrl);
       try {

@@ -41,7 +41,10 @@ const requiredKeys = [
   "STELLAR_TESTNET_HORIZON_URL",
   "STELLAR_TESTNET_USDC_ISSUER",
   "STELLAR_TESTNET_USDC_CONTRACT_ID",
-  "FACILITATOR_ACCOUNT"
+  "FACILITATOR_ACCOUNT",
+  "FACILITATOR_SIGNER_PROVIDER",
+  "FACILITATOR_SIGNER_NETWORK",
+  "FACILITATOR_SIGNING_KEY_VERSION"
 ];
 
 export async function runDeploymentCheck(
@@ -70,6 +73,14 @@ export function validateTestnetDeploymentEnv(
 
   if (env.LUMEN_ENV !== "testnet") {
     errors.push("LUMEN_ENV must be testnet for testnet deployment.");
+  }
+
+  if (env.FACILITATOR_SIGNER_PROVIDER !== "environment") {
+    errors.push("FACILITATOR_SIGNER_PROVIDER must be environment for testnet deployment.");
+  }
+
+  if (env.FACILITATOR_SIGNER_NETWORK !== "stellar:testnet") {
+    errors.push("FACILITATOR_SIGNER_NETWORK must be stellar:testnet for testnet deployment.");
   }
 
   collectUrlError(env.API_PUBLIC_URL, "API_PUBLIC_URL", errors);

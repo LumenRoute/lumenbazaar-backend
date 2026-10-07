@@ -10,6 +10,10 @@ describe("loadConfig", () => {
     expect(config.lumenEnv).toBe("local");
     expect(config.api.port).toBe(3000);
     expect(config.features.uptoScheme).toBe(false);
+    expect(config.signer).toEqual({
+      provider: "disabled",
+      network: "stellar:testnet"
+    });
     expect(config.networks["stellar:testnet"].passphrase).toContain("Test SDF Network");
     expect(config.networks["stellar:testnet"].assets[0]).toMatchObject({
       code: "USDC",
@@ -72,6 +76,33 @@ describe("loadConfig", () => {
   it("parses boolean feature flags explicitly", () => {
     expect(loadConfig({ ENABLE_UPTO_SCHEME: "true" }).features.uptoScheme).toBe(true);
     expect(loadConfig({ ENABLE_UPTO_SCHEME: "0" }).features.uptoScheme).toBe(false);
+  });
+
+  it("rejects test signers and signer networks that do not match the active network", () => {
+    expect(() => loadConfig({ FACILITATOR_SIGNER_PROVIDER: "test" } as never)).toThrow(ZodError);
+    expect(() =>
+      loadConfig({
+        FACILITATOR_SIGNER_PROVIDER: "environment",
+        FACILITATOR_SIGNER_NETWORK: "stellar:pubnet"
+      })
+    ).toThrow("FACILITATOR_SIGNER_NETWORK must match the active Stellar network");
+  });
+
+  it("requires a key version for a hosted environment signer", () => {
+    expect(() =>
+      loadConfig({
+        NODE_ENV: "production",
+        LUMEN_ENV: "testnet",
+        API_PUBLIC_URL: "https://api.testnet.lumenbazaar.dev",
+        MCP_PUBLIC_URL: "https://mcp.testnet.lumenbazaar.dev/mcp",
+        DATABASE_URL: "postgresql://lumenbazaar@postgres:5432/lumenbazaar",
+        REDIS_URL: "redis://redis:6379",
+        FACILITATOR_ACCOUNT: "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ",
+        STELLAR_TESTNET_USDC_ISSUER: "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ",
+        FACILITATOR_SIGNER_PROVIDER: "environment",
+        FACILITATOR_SIGNER_NETWORK: "stellar:testnet"
+      })
+    ).toThrow("FACILITATOR_SIGNING_KEY_VERSION is required");
   });
 
   it("parses explicit CORS origins", () => {

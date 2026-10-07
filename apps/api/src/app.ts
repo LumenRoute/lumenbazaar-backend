@@ -8,6 +8,7 @@ import {
   PaymentSessionService,
   PaymentVerificationService,
   SettlementService,
+  type FacilitatorSignerProvider,
   type ReceiptService
 } from "@lumenbazaar/stellar-payments";
 
@@ -29,6 +30,7 @@ import { createMetricsService, type MetricsService } from "./services/metrics.js
 import { RateLimitService } from "./services/rateLimit.js";
 import {
   createReadinessService,
+  createRuntimeReadinessProbes,
   type PaymentCapabilities,
   type ReadinessService
 } from "./services/readiness.js";
@@ -55,6 +57,7 @@ export type BuildApiAppOptions = {
   metricsService?: MetricsService;
   paymentCapabilities?: PaymentCapabilities;
   readinessService?: ReadinessService;
+  signerProvider?: FacilitatorSignerProvider;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -69,7 +72,12 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     upto: false
   };
   const readinessService =
-    options.readinessService ?? createReadinessService(config, paymentCapabilities);
+    options.readinessService ??
+    createReadinessService(
+      config,
+      paymentCapabilities,
+      createRuntimeReadinessProbes(config, options.signerProvider)
+    );
 
   void app.register(cors, {
     origin: config.api.corsAllowedOrigins

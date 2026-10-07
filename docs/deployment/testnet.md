@@ -29,6 +29,14 @@ Required settings:
 - `STELLAR_TESTNET_USDC_ISSUER`
 - `STELLAR_TESTNET_USDC_CONTRACT_ID`
 - `FACILITATOR_ACCOUNT`
+- `FACILITATOR_SIGNER_PROVIDER=environment`
+- `FACILITATOR_SIGNER_NETWORK=stellar:testnet`
+- `FACILITATOR_SIGNING_KEY_VERSION`
+
+Store `FACILITATOR_SIGNING_KEY` only in the hosting provider's secret manager. It is intentionally
+absent from `config/testnet.release.env`. Follow
+[`docs/security/facilitator-signer.md`](../security/facilitator-signer.md) for provisioning,
+rotation, revocation, and incident handling.
 
 Validate the file before rollout:
 

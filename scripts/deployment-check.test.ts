@@ -18,7 +18,10 @@ const validEnv = {
   STELLAR_TESTNET_HORIZON_URL: "https://horizon-testnet.stellar.org",
   STELLAR_TESTNET_USDC_ISSUER: "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ",
   STELLAR_TESTNET_USDC_CONTRACT_ID: "CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS",
-  FACILITATOR_ACCOUNT: "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ"
+  FACILITATOR_ACCOUNT: "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ",
+  FACILITATOR_SIGNER_PROVIDER: "environment",
+  FACILITATOR_SIGNER_NETWORK: "stellar:testnet",
+  FACILITATOR_SIGNING_KEY_VERSION: "render-secret-v1"
 };
 
 describe("testnet deployment check", () => {
@@ -71,6 +74,25 @@ describe("testnet deployment check", () => {
     expect(
       validateTestnetDeploymentEnv(placeholderEnv, { allowPlaceholders: true }).warnings
     ).toContain("API_PUBLIC_URL uses a placeholder value.");
+  });
+
+  it("requires the hosted environment signer profile without reading the secret", () => {
+    const result = validateTestnetDeploymentEnv(
+      {
+        ...validEnv,
+        FACILITATOR_SIGNER_PROVIDER: "disabled",
+        FACILITATOR_SIGNER_NETWORK: "stellar:pubnet"
+      },
+      { allowPlaceholders: false }
+    );
+
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        "FACILITATOR_SIGNER_PROVIDER must be environment for testnet deployment.",
+        "FACILITATOR_SIGNER_NETWORK must be stellar:testnet for testnet deployment."
+      ])
+    );
+    expect(JSON.stringify(result)).not.toContain("FACILITATOR_SIGNING_KEY=");
   });
 
   it("parses CLI arguments", () => {
