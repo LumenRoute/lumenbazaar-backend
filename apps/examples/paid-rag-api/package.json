@@ -12,5 +12,8 @@
     "@lumenbazaar/shared": "workspace:*",
     "fastify": "5.12.5",
     "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@lumenbazaar/testkit": "workspace:*"
   }
 }

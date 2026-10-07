@@ -12,5 +12,8 @@
     "@lumenbazaar/seller-sdk": "workspace:*",
     "@lumenbazaar/shared": "workspace:*",
     "fastify": "5.12.5"
+  },
+  "devDependencies": {
+    "@lumenbazaar/testkit": "workspace:*"
   }
 }

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { loadConfig, localIssuerPublicKey, type LumenError } from "@lumenbazaar/shared";
+import { loadConfig, type LumenError } from "@lumenbazaar/shared";
+import {
+  testAssetContractId,
+  testPaymentPayload,
+  testPaymentRequest,
+  testPaymentRequirement
+} from "@lumenbazaar/testkit";
 
 import { PaymentVerificationService, type X402StellarAdapter } from "./index.js";
 
@@ -19,42 +25,19 @@ const rejectingAdapter: X402StellarAdapter = {
       valid: false,
       failureCode: "INVALID_SIGNATURE",
       failureReason: "Signature rejected.",
+      officialContext: { invalidReason: "invalid_exact_stellar_payload" },
       adapter: "@x402/stellar"
     };
   }
 };
 
-function request() {
-  return {
-    paymentPayload: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey,
-      expiresAtLedger: 100,
-      authorization: {
-        signature: "sig"
-      }
-    },
-    paymentRequirements: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      amount: "0.05",
-      payTo: localIssuerPublicKey
-    },
-    currentLedger: 99
-  };
-}
+const config = loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId });
 
 describe("PaymentVerificationService", () => {
   it("accepts valid exact payments through the x402 Stellar adapter", async () => {
-    const service = new PaymentVerificationService(loadConfig({}), { adapter: acceptingAdapter });
+    const service = new PaymentVerificationService(config, { adapter: acceptingAdapter });
 
-    await expect(service.verify(request())).resolves.toMatchObject({
+    await expect(service.verify(testPaymentRequest)).resolves.toMatchObject({
       network: "stellar:testnet",
       status: "verified",
       adapter: "@x402/stellar"
@@ -62,26 +45,32 @@ describe("PaymentVerificationService", () => {
   });
 
   it("rejects invalid payment details before settlement", async () => {
-    const service = new PaymentVerificationService(loadConfig({}), { adapter: acceptingAdapter });
+    const service = new PaymentVerificationService(config, { adapter: acceptingAdapter });
+    const changedRequirement = { ...testPaymentRequirement, amount: "100000" };
     const invalid = {
-      ...request(),
+      ...testPaymentRequest,
       paymentPayload: {
-        ...request().paymentPayload,
-        amount: "0.01"
-      }
+        ...testPaymentPayload,
+        accepted: changedRequirement
+      },
+      paymentRequirements: testPaymentRequirement
     };
 
     await expect(service.verify(invalid)).rejects.toMatchObject({
-      code: "AMOUNT_MISMATCH"
+      code: "INVALID_PAYMENT_PAYLOAD"
     });
   });
 
   it("maps x402 Stellar verification rejection to a stable code", async () => {
-    const service = new PaymentVerificationService(loadConfig({}), { adapter: rejectingAdapter });
+    const service = new PaymentVerificationService(config, { adapter: rejectingAdapter });
 
-    await expect(service.verify(request())).rejects.toMatchObject({
+    await expect(service.verify(testPaymentRequest)).rejects.toMatchObject({
       code: "INVALID_SIGNATURE",
-      message: "Signature rejected."
+      message: "Signature rejected.",
+      details: {
+        adapter: "@x402/stellar",
+        invalidReason: "invalid_exact_stellar_payload"
+      }
     } satisfies Partial<LumenError>);
   });
 });

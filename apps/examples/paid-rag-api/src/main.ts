@@ -9,6 +9,8 @@ import {
 } from "@lumenbazaar/seller-sdk";
 import { localIssuerPublicKey, serviceName, type JsonObject } from "@lumenbazaar/shared";
 
+const testAssetContractId = "CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS";
+
 const defaultTopK = 3;
 const maxTopK = 8;
 
@@ -128,9 +130,10 @@ export function createRagPaymentRequirement(input: unknown): PaymentRequirement 
 
   return paymentRequirement({
     network: "stellar:testnet",
+    assetContractId: testAssetContractId,
     assetCode: "USDC",
     assetIssuer: localIssuerPublicKey,
-    amount: formatCents(5 + topK),
+    amount: String((5 + topK) * 100_000),
     payTo: localIssuerPublicKey
   });
 }
@@ -151,16 +154,17 @@ export function createRagCatalogMetadata(options: RagCatalogOptions = {}) {
       url: `${baseUrl.replace(/\/$/, "")}/rag/query`,
       network: defaultRequirement.network,
       payTo: defaultRequirement.payTo,
-      assetCode: defaultRequirement.asset.code,
-      assetIssuer: defaultRequirement.asset.issuer,
-      amount: defaultRequirement.amount,
+      assetCode: "USDC",
+      assetIssuer: localIssuerPublicKey,
+      amount: formatCents(5 + defaultTopK),
       extensions: {
         ...ragResourceMetadata.resource.extensions,
         bazaar: true,
         example: "paid-rag-api",
+        assetContractId: defaultRequirement.asset,
         pricing: {
           baseAmount: "0.05",
-          defaultAmount: defaultRequirement.amount,
+          defaultAmount: formatCents(5 + defaultTopK),
           defaultTopK,
           model: "per-request",
           topKIncrement: "0.01",
@@ -250,7 +254,7 @@ function answerRagRequest(input: RagRequest, requirement: PaymentRequirement): R
     citations,
     paid: true,
     pricing: {
-      amount: requirement.amount,
+      amount: atomicToDecimal(requirement.amount),
       model: "per-request",
       network: requirement.network
     }
@@ -266,11 +270,18 @@ function corpusDocuments(corpus: RagRequest["corpus"]) {
 }
 
 function hasPaymentHeader(request: FastifyRequest) {
-  return typeof request.headers["x-payment-required"] === "string";
+  return typeof request.headers["payment-signature"] === "string";
 }
 
 function formatCents(cents: number) {
   return (cents / 100).toFixed(2);
+}
+
+function atomicToDecimal(amount: string) {
+  const padded = amount.padStart(8, "0");
+  const whole = padded.slice(0, -7);
+  const fraction = padded.slice(-7).replace(/0+$/, "");
+  return fraction.length === 0 ? whole : `${whole}.${fraction}`;
 }
 
 if (process.env.NODE_ENV !== "test") {

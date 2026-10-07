@@ -14,3 +14,4 @@ export * from "./settlementStore.js";
 export * from "./uptoContractBindings.js";
 export * from "./verification.js";
 export * from "./x402Adapter.js";
+export * from "./x402Transport.js";

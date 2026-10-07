@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { testPaymentPayload } from "@lumenbazaar/testkit";
+
 import {
   createRagApp,
   createRagCatalogMetadata,
@@ -26,9 +28,7 @@ describe("paid RAG API example", () => {
       method: "POST",
       url: "/rag/query",
       headers: {
-        "x-payment-required": JSON.stringify({
-          scheme: "exact"
-        })
+        "payment-signature": Buffer.from(JSON.stringify(testPaymentPayload)).toString("base64")
       },
       payload: {
         corpus: "api",
@@ -39,11 +39,14 @@ describe("paid RAG API example", () => {
 
     expect(unpaid.statusCode).toBe(402);
     expect(unpaid.json()).toMatchObject({
-      paymentRequired: {
-        amount: "0.09",
-        scheme: "exact",
-        network: "stellar:testnet"
-      }
+      x402Version: 2,
+      accepts: [
+        {
+          amount: "900000",
+          scheme: "exact",
+          network: "stellar:testnet"
+        }
+      ]
     });
     expect(paid.statusCode).toBe(200);
     expect(paid.json()).toMatchObject({
@@ -107,10 +110,8 @@ describe("paid RAG API example", () => {
         topK: 8
       })
     ).toMatchObject({
-      amount: "0.13",
-      asset: {
-        code: "USDC"
-      },
+      amount: "1300000",
+      asset: "CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS",
       scheme: "exact"
     });
   });

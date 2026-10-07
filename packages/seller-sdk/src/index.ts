@@ -13,6 +13,7 @@ export type {
   FastifyPaymentReply,
   MiddlewareResponse,
   PaymentRequirement,
+  PaymentResource,
   X402PaymentHeader
 } from "./middleware.js";
 

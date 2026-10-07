@@ -24,6 +24,9 @@ importers:
       '@stellar/stellar-sdk':
         specifier: 17.2.1
         version: 17.2.1
+      '@x402/core':
+        specifier: 2.28.0
+        version: 2.28.0
       '@x402/stellar':
         specifier: 2.28.0
         version: 2.28.0
@@ -82,9 +85,16 @@ importers:
       '@lumenbazaar/stellar-payments':
         specifier: workspace:*
         version: link:../../packages/stellar-payments
+    devDependencies:
+      '@lumenbazaar/testkit':
+        specifier: workspace:*
+        version: link:../../packages/testkit
 
   apps/examples/paid-mcp-tool:
     dependencies:
+      '@lumenbazaar/buyer-sdk':
+        specifier: workspace:*
+        version: link:../../../packages/buyer-sdk
       '@lumenbazaar/mcp-server':
         specifier: workspace:*
         version: link:../../mcp-server
@@ -100,6 +110,10 @@ importers:
       zod:
         specifier: 4.1.12
         version: 4.1.12
+    devDependencies:
+      '@lumenbazaar/testkit':
+        specifier: workspace:*
+        version: link:../../../packages/testkit
 
   apps/examples/paid-rag-api:
     dependencies:
@@ -115,6 +129,10 @@ importers:
       zod:
         specifier: 4.1.12
         version: 4.1.12
+    devDependencies:
+      '@lumenbazaar/testkit':
+        specifier: workspace:*
+        version: link:../../../packages/testkit
 
   apps/examples/paid-weather-api:
     dependencies:
@@ -130,6 +148,10 @@ importers:
       fastify:
         specifier: 5.12.5
         version: 5.12.5
+    devDependencies:
+      '@lumenbazaar/testkit':
+        specifier: workspace:*
+        version: link:../../../packages/testkit
 
   apps/mcp-server:
     dependencies:
@@ -145,6 +167,10 @@ importers:
       zod:
         specifier: 4.1.12
         version: 4.1.12
+    devDependencies:
+      '@lumenbazaar/testkit':
+        specifier: workspace:*
+        version: link:../../packages/testkit
 
   apps/worker:
     dependencies:
@@ -169,6 +195,16 @@ importers:
       '@lumenbazaar/stellar-payments':
         specifier: workspace:*
         version: link:../stellar-payments
+      '@x402/core':
+        specifier: 2.28.0
+        version: 2.28.0
+      '@x402/stellar':
+        specifier: 2.28.0
+        version: 2.28.0
+    devDependencies:
+      '@lumenbazaar/testkit':
+        specifier: workspace:*
+        version: link:../testkit
 
   packages/seller-sdk:
     dependencies:
@@ -178,6 +214,13 @@ importers:
       '@lumenbazaar/stellar-payments':
         specifier: workspace:*
         version: link:../stellar-payments
+      '@x402/core':
+        specifier: 2.28.0
+        version: 2.28.0
+    devDependencies:
+      '@lumenbazaar/testkit':
+        specifier: workspace:*
+        version: link:../testkit
 
   packages/shared: {}
 
@@ -186,21 +229,19 @@ importers:
       '@lumenbazaar/shared':
         specifier: workspace:*
         version: link:../shared
+      '@x402/core':
+        specifier: 2.28.0
+        version: 2.28.0
+    devDependencies:
+      '@lumenbazaar/testkit':
+        specifier: workspace:*
+        version: link:../testkit
 
   packages/testkit:
     dependencies:
-      '@lumenbazaar/buyer-sdk':
-        specifier: workspace:*
-        version: link:../buyer-sdk
-      '@lumenbazaar/seller-sdk':
-        specifier: workspace:*
-        version: link:../seller-sdk
       '@lumenbazaar/shared':
         specifier: workspace:*
         version: link:../shared
-      '@lumenbazaar/stellar-payments':
-        specifier: workspace:*
-        version: link:../stellar-payments
 
 packages:
 

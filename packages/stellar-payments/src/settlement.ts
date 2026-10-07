@@ -1,5 +1,6 @@
 import { type Queue } from "bullmq";
 import { z } from "zod";
+import { type SettleResponse } from "@x402/core/types";
 
 import { LumenError, type AppConfig } from "@lumenbazaar/shared";
 
@@ -19,12 +20,9 @@ import {
 } from "./x402Adapter.js";
 
 export const settlePaymentRequestSchema = z.object({
-  paymentAttemptId: z.string().min(1),
+  x402Version: z.literal(2),
   paymentPayload: z.unknown(),
-  paymentRequirements: z.unknown(),
-  resourceId: z.string().optional(),
-  sellerId: z.string().optional(),
-  currentLedger: z.number().int().nonnegative().optional()
+  paymentRequirements: z.unknown()
 });
 
 export type SettlementServiceOptions = {
@@ -41,9 +39,30 @@ export type SettlementServiceResult = {
   receiptId: string;
   transactionHash: string;
   ledger: number;
-  network: NormalizedVerifyPaymentRequest["paymentPayload"]["network"];
+  network: NormalizedVerifyPaymentRequest["network"];
   status: "settled";
+  amount: string;
 };
+
+export type LumenSettleResponse = SettleResponse & {
+  success: true;
+  extra: {
+    lumenbazaar: Omit<SettlementServiceResult, "amount" | "network">;
+  };
+};
+
+export function toLumenSettleResponse(result: SettlementServiceResult): LumenSettleResponse {
+  const { amount, network, ...projectResult } = result;
+  return {
+    success: true,
+    transaction: result.transactionHash,
+    network,
+    amount,
+    extra: {
+      lumenbazaar: projectResult
+    }
+  };
+}
 
 export class SettlementService {
   private readonly auditLogService: PaymentAuditLogger | undefined;
@@ -66,18 +85,26 @@ export class SettlementService {
   }
 
   async settle(input: unknown): Promise<SettlementServiceResult> {
-    const parsed = settlePaymentRequestSchema.parse(input);
+    const parsedResult = settlePaymentRequestSchema.safeParse(input);
+    if (!parsedResult.success) {
+      throw new LumenError("INVALID_PAYMENT_PAYLOAD", "Settlement request is not valid x402 v2.", {
+        details: {
+          requiredVersion: 2,
+          issues: parsedResult.error.issues
+        }
+      });
+    }
+    const parsed = parsedResult.data;
     const normalized = parseVerifyPaymentRequest(
       {
+        x402Version: parsed.x402Version,
         paymentPayload: parsed.paymentPayload,
-        paymentRequirements: parsed.paymentRequirements,
-        ...(parsed.resourceId === undefined ? {} : { resourceId: parsed.resourceId }),
-        ...(parsed.sellerId === undefined ? {} : { sellerId: parsed.sellerId }),
-        ...(parsed.currentLedger === undefined ? {} : { currentLedger: parsed.currentLedger })
+        paymentRequirements: parsed.paymentRequirements
       },
       this.config
     );
-    const attempt = await this.attemptStore.getPaymentAttempt(parsed.paymentAttemptId);
+    const paymentHash = computePaymentHash(normalized.paymentPayload);
+    const attempt = await this.attemptStore.findPaymentAttemptByHash(paymentHash);
 
     if (attempt === undefined) {
       throw new LumenError("INVALID_PAYMENT_PAYLOAD", "Payment attempt was not found.");
@@ -86,9 +113,6 @@ export class SettlementService {
     if (attempt.status === "settled") {
       throw new LumenError("REPLAY_DETECTED", "Payment attempt has already been settled.");
     }
-
-    const paymentHash =
-      normalized.paymentPayload.paymentHash ?? computePaymentHash(normalized.paymentPayload);
 
     if (attempt.paymentHash !== paymentHash) {
       throw new LumenError("INVALID_PAYMENT_PAYLOAD", "Payment payload does not match attempt.");
@@ -100,10 +124,10 @@ export class SettlementService {
       paymentAttemptId: attempt.id,
       transactionHash: adapterResult.transactionHash,
       ledger: adapterResult.ledger,
-      network: normalized.paymentPayload.network,
-      amount: normalized.paymentPayload.amount,
-      assetCode: normalized.paymentPayload.asset.code,
-      assetIssuer: normalized.paymentPayload.asset.issuer,
+      network: normalized.network,
+      amount: normalized.amount,
+      assetCode: normalized.asset.code,
+      assetIssuer: normalized.asset.issuer,
       status: "settled",
       settledAt
     });
@@ -137,7 +161,7 @@ export class SettlementService {
         {
           settlementId: settlement.id,
           transactionHash: adapterResult.transactionHash,
-          network: normalized.paymentPayload.network,
+          network: normalized.network,
           paymentAttemptId: attempt.id
         },
         {
@@ -158,8 +182,9 @@ export class SettlementService {
       receiptId: receipt.id,
       transactionHash: adapterResult.transactionHash,
       ledger: adapterResult.ledger,
-      network: normalized.paymentPayload.network,
-      status: "settled"
+      network: normalized.network,
+      status: "settled",
+      amount: normalized.amount
     };
   }
 

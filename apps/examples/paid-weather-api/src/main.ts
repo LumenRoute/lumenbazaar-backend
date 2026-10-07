@@ -5,7 +5,8 @@ import {
   createDefaultBudget,
   runPaidResourceFlow,
   type CallOptions,
-  type PaidResourceFlowResult
+  type PaidResourceFlowResult,
+  type PaymentPayload
 } from "@lumenbazaar/buyer-sdk";
 import {
   httpResource,
@@ -14,11 +15,14 @@ import {
 } from "@lumenbazaar/seller-sdk";
 import { localIssuerPublicKey, serviceName, type JsonObject } from "@lumenbazaar/shared";
 
+const testAssetContractId = "CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS";
+
 export const weatherPaymentRequirement = paymentRequirement({
   network: "stellar:testnet",
+  assetContractId: testAssetContractId,
   assetCode: "USDC",
   assetIssuer: localIssuerPublicKey,
-  amount: "0.02",
+  amount: "200000",
   payTo: localIssuerPublicKey
 });
 
@@ -92,10 +96,8 @@ export type PublishWeatherMetadataOptions = Required<WeatherCatalogOptions> & {
 
 export type CallWeatherBuyerOptions = CallOptions & {
   apiUrl: string;
-  authorization?: Record<string, unknown>;
   city: string;
-  currentLedger?: number;
-  expiresAtLedger?: number;
+  paymentPayload: PaymentPayload;
   resourceId: string;
   sellerBaseUrl?: string;
 };
@@ -112,13 +114,14 @@ export function createWeatherCatalogMetadata(options: WeatherCatalogOptions = {}
       url: `${baseUrl.replace(/\/$/, "")}/weather/Lagos`,
       network: weatherPaymentRequirement.network,
       payTo: weatherPaymentRequirement.payTo,
-      assetCode: weatherPaymentRequirement.asset.code,
-      assetIssuer: weatherPaymentRequirement.asset.issuer,
-      amount: weatherPaymentRequirement.amount,
+      assetCode: "USDC",
+      assetIssuer: localIssuerPublicKey,
+      amount: "0.02",
       extensions: {
         ...weatherResourceMetadata.resource.extensions,
         bazaar: true,
         example: "paid-weather-api",
+        assetContractId: weatherPaymentRequirement.asset,
         testnet: true
       }
     }
@@ -182,14 +185,12 @@ export async function callWeatherWithBuyerSdk(
   return runPaidResourceFlow({
     apiUrl: options.apiUrl,
     budgetManager,
-    ...(options.authorization === undefined ? {} : { authorization: options.authorization }),
-    ...(options.currentLedger === undefined ? {} : { currentLedger: options.currentLedger }),
-    ...(options.expiresAtLedger === undefined ? {} : { expiresAtLedger: options.expiresAtLedger }),
     ...(options.headers === undefined ? {} : { headers: options.headers }),
     ...(options.maxRetries === undefined ? {} : { maxRetries: options.maxRetries }),
     ...(options.retryDelayMs === undefined ? {} : { retryDelayMs: options.retryDelayMs }),
     ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     resourceId: options.resourceId,
+    paymentPayload: options.paymentPayload,
     resourceUrl: `${baseUrl}/weather/${encodeURIComponent(options.city)}`
   });
 }
@@ -202,7 +203,7 @@ export async function startWeatherExample() {
 }
 
 function hasPaymentHeader(request: FastifyRequest) {
-  return typeof request.headers["x-payment-required"] === "string";
+  return typeof request.headers["payment-signature"] === "string";
 }
 
 function forecastForCity(city: string): WeatherForecast {

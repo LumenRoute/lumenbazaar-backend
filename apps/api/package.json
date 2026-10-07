@@ -10,5 +10,8 @@
   "dependencies": {
     "@lumenbazaar/shared": "workspace:*",
     "@lumenbazaar/stellar-payments": "workspace:*"
+  },
+  "devDependencies": {
+    "@lumenbazaar/testkit": "workspace:*"
   }
 }

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { testPaymentPayload } from "@lumenbazaar/testkit";
+
 import {
   callWeatherWithBuyerSdk,
   createWeatherApp,
@@ -24,16 +26,15 @@ describe("paid weather API example", () => {
       method: "POST",
       url: "/weather/Lagos",
       headers: {
-        "x-payment-required": JSON.stringify({
-          scheme: "exact"
-        })
+        "payment-signature": Buffer.from(JSON.stringify(testPaymentPayload)).toString("base64")
       }
     });
 
     expect(unpaid.statusCode).toBe(402);
-    expect(unpaid.headers["x-payment-scheme"]).toBe("exact");
+    expect(unpaid.headers["payment-required"]).toEqual(expect.any(String));
     expect(unpaid.json()).toMatchObject({
-      paymentRequired: weatherPaymentRequirement
+      x402Version: 2,
+      accepts: [weatherPaymentRequirement]
     });
     expect(paid.statusCode).toBe(200);
     expect(paid.json()).toMatchObject({
@@ -106,9 +107,12 @@ describe("paid weather API example", () => {
           routeTemplate: "/weather/{city}",
           network: paymentTerms.network,
           payTo: paymentTerms.payTo,
-          assetCode: paymentTerms.asset.code,
-          assetIssuer: paymentTerms.asset.issuer,
-          amount: paymentTerms.amount,
+          assetCode: "USDC",
+          assetIssuer: paymentTerms.extra.assetIssuer,
+          amount: "0.02",
+          extensions: {
+            assetContractId: paymentTerms.asset
+          },
           inputSchema: createWeatherCatalogMetadata().resource.inputSchema,
           outputSchema: createWeatherCatalogMetadata().resource.outputSchema
         });
@@ -116,9 +120,16 @@ describe("paid weather API example", () => {
 
       if (url === "https://api.example.test/v1/verify") {
         return Response.json({
-          ok: true,
-          paymentAttemptId: "attempt_weather",
-          status: "verified"
+          isValid: true,
+          extra: {
+            lumenbazaar: {
+              adapter: "@x402/stellar",
+              network: "stellar:testnet",
+              paymentAttemptId: "attempt_weather",
+              paymentHash: "hash_weather",
+              status: "verified"
+            }
+          }
         });
       }
 
@@ -134,13 +145,19 @@ describe("paid weather API example", () => {
 
       if (url === "https://api.example.test/v1/settle") {
         return Response.json({
-          ok: true,
-          receiptId: "receipt_weather",
-          settlementId: "settlement_weather",
-          status: "settled",
-          transactionHash: "tx_weather",
-          ledger: 12345,
-          settledAt: "2026-09-05T00:00:00.000Z"
+          success: true,
+          amount: "200000",
+          network: "stellar:testnet",
+          transaction: "tx_weather",
+          extra: {
+            lumenbazaar: {
+              receiptId: "receipt_weather",
+              settlementId: "settlement_weather",
+              status: "settled",
+              transactionHash: "tx_weather",
+              ledger: 12345
+            }
+          }
         });
       }
 
@@ -161,10 +178,11 @@ describe("paid weather API example", () => {
     await expect(
       callWeatherWithBuyerSdk({
         apiUrl: "https://api.example.test",
-        authorization: {
-          wallet: "buyer_testnet"
-        },
         city: "Lagos",
+        paymentPayload: {
+          ...testPaymentPayload,
+          accepted: paymentTerms
+        },
         resourceId,
         retryDelayMs: 0
       })
@@ -181,12 +199,22 @@ describe("paid weather API example", () => {
         status: "finalized"
       },
       settlement: {
-        receiptId: "receipt_weather",
-        status: "settled"
+        success: true,
+        extra: {
+          lumenbazaar: {
+            receiptId: "receipt_weather",
+            status: "settled"
+          }
+        }
       },
       verification: {
-        paymentAttemptId: "attempt_weather",
-        status: "verified"
+        isValid: true,
+        extra: {
+          lumenbazaar: {
+            paymentAttemptId: "attempt_weather",
+            status: "verified"
+          }
+        }
       }
     });
   });

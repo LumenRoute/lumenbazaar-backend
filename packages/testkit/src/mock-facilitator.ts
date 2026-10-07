@@ -1,8 +1,9 @@
 import { type JsonObject } from "@lumenbazaar/shared";
+import { testAssetContractId } from "./fixtures.js";
 
 export type MockFacilitatorOptions = {
   supportedNetworks?: string[];
-  supportedAssets?: { code: string; issuer: string }[];
+  supportedAssets?: { code: string; issuer: string; contractId: string }[];
   verifyDelay?: number;
   settleDelay?: number;
   simulateErrors?: boolean;
@@ -21,7 +22,11 @@ export class MockFacilitator {
     this.options = {
       supportedNetworks: options.supportedNetworks || ["stellar:testnet", "stellar:pubnet"],
       supportedAssets: options.supportedAssets || [
-        { code: "USDC", issuer: "GDZST3XVCDTUJ76ZAV2HA72KYRTYKYI6YLJVMQ5DNPMJR7BKQW5EBXM" }
+        {
+          code: "USDC",
+          issuer: "GDZST3XVCDTUJ76ZAV2HA72KYRTYKYI6YLJVMQ5DNPMJR7BKQW5EBXM",
+          contractId: testAssetContractId
+        }
       ],
       verifyDelay: options.verifyDelay || 0,
       settleDelay: options.settleDelay || 0,
@@ -34,24 +39,22 @@ export class MockFacilitator {
    */
   getSupported(): JsonObject {
     return {
-      schemes: this.options.supportedNetworks.map((network) => ({
-        name: "exact",
+      kinds: this.options.supportedNetworks.map((network) => ({
+        x402Version: 2,
+        scheme: "exact",
         network,
-        assets: this.options.supportedAssets.map((asset) => ({
-          code: asset.code,
-          issuer: asset.issuer,
-          decimals: 7
-        })),
-        extensions: {
-          x402Version: "1",
-          upto: false
+        extra: {
+          areFeesSponsored: true,
+          assets: this.options.supportedAssets.map((asset) => ({
+            code: asset.code,
+            issuer: asset.issuer,
+            contractId: asset.contractId,
+            decimals: 7
+          }))
         }
       })),
-      extensions: {
-        bazaar: true,
-        upto: false,
-        uptoContracts: []
-      }
+      extensions: ["bazaar"],
+      signers: {}
     };
   }
 
@@ -65,9 +68,9 @@ export class MockFacilitator {
 
     if (this.options.simulateErrors) {
       return {
-        valid: false,
-        failureCode: "INVALID_SIGNATURE",
-        failureReason: "Simulated verification failure"
+        isValid: false,
+        invalidReason: "invalid_signature",
+        invalidMessage: "Simulated verification failure"
       };
     }
 
@@ -79,9 +82,15 @@ export class MockFacilitator {
     this.verifications.set(paymentHash, payload);
 
     return {
-      valid: true,
-      paymentAttemptId: `attempt_${paymentHash}`,
-      paymentHash
+      isValid: true,
+      extra: {
+        lumenbazaar: {
+          paymentAttemptId: `attempt_${paymentHash}`,
+          paymentHash,
+          status: "verified",
+          adapter: "@x402/stellar"
+        }
+      }
     };
   }
 
@@ -95,24 +104,35 @@ export class MockFacilitator {
 
     if (this.options.simulateErrors) {
       return {
-        code: "SETTLEMENT_FAILED",
-        message: "Simulated settlement failure"
+        success: false,
+        transaction: "",
+        network: "stellar:testnet",
+        errorReason: "settlement_failed",
+        errorMessage: "Simulated settlement failure"
       };
     }
 
     const inputObj = input as Record<string, unknown>;
+    const requirements = (inputObj.paymentRequirements ?? {}) as Record<string, unknown>;
     const settlementId = `settlement_${Math.random().toString(36).slice(2, 9)}`;
     const transactionHash = `tx_${Math.random().toString(36).slice(2, 64)}`;
 
     this.settlements.set(settlementId, inputObj);
 
     return {
-      settlementId,
-      receiptId: `receipt_${Math.random().toString(36).slice(2, 9)}`,
-      transactionHash,
-      ledger: Math.floor(Math.random() * 1000000),
-      network: (inputObj.network as string) || "stellar:testnet",
-      status: "settled"
+      success: true,
+      transaction: transactionHash,
+      network: (requirements.network as string) || "stellar:testnet",
+      amount: typeof requirements.amount === "string" ? requirements.amount : "0",
+      extra: {
+        lumenbazaar: {
+          settlementId,
+          receiptId: `receipt_${Math.random().toString(36).slice(2, 9)}`,
+          transactionHash,
+          ledger: Math.floor(Math.random() * 1000000),
+          status: "settled"
+        }
+      }
     };
   }
 

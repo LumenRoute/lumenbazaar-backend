@@ -138,12 +138,6 @@ export function createMcpServer(options: CreateMcpServerOptions = {}) {
 
         case "prepare_payment": {
           result = await paymentTools.preparePayment({
-            ...(toolInput.authorization === undefined
-              ? {}
-              : { authorization: toolInput.authorization as Record<string, unknown> }),
-            ...(toolInput.expiresAtLedger === undefined
-              ? {}
-              : { expiresAtLedger: toolInput.expiresAtLedger as number }),
             resourceId: toolInput.resourceId as string
           });
           break;
@@ -151,27 +145,16 @@ export function createMcpServer(options: CreateMcpServerOptions = {}) {
 
         case "call_paid_resource": {
           result = await paymentTools.callPaidResource({
-            ...(toolInput.authorization === undefined
-              ? {}
-              : { authorization: toolInput.authorization as Record<string, unknown> }),
-            ...(toolInput.currentLedger === undefined
-              ? {}
-              : { currentLedger: toolInput.currentLedger as number }),
             ...(toolInput.body === undefined
               ? {}
               : { body: toolInput.body as Record<string, unknown> }),
-            ...(toolInput.expiresAtLedger === undefined
-              ? {}
-              : { expiresAtLedger: toolInput.expiresAtLedger as number }),
             ...(toolInput.maxRetries === undefined
               ? {}
               : { maxRetries: toolInput.maxRetries as number }),
             ...(toolInput.method === undefined
               ? {}
               : { method: toolInput.method as "GET" | "POST" }),
-            ...(toolInput.paymentPayload === undefined
-              ? {}
-              : { paymentPayload: toolInput.paymentPayload as PaymentPayload }),
+            paymentPayload: toolInput.paymentPayload as PaymentPayload,
             ...(toolInput.resourceUrl === undefined
               ? {}
               : { resourceUrl: toolInput.resourceUrl as string }),

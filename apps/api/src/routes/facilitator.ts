@@ -5,6 +5,8 @@ import { LumenError, type AppConfig, listConfiguredNetworks } from "@lumenbazaar
 import {
   PaymentVerificationService,
   SettlementService,
+  toLumenSettleResponse,
+  toLumenVerifyResponse,
   type ReceiptService
 } from "@lumenbazaar/stellar-payments";
 
@@ -34,52 +36,41 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
   app.get("/v1/supported", async () => {
     const capabilities = (await options.readiness.evaluate()).capabilities;
     const networks = listConfiguredNetworks(options.config);
-    const uptoContracts = networks.flatMap((network) =>
-      capabilities.upto &&
-      options.config.features.uptoScheme &&
-      network.uptoSessionContractId !== undefined
-        ? [
-            {
-              network: network.id,
-              contractId: network.uptoSessionContractId
-            }
-          ]
-        : []
-    );
-    const exactSchemes = capabilities.exact
+    const exactKinds = capabilities.exact
       ? networks.map((network) => ({
-          name: "exact",
+          x402Version: 2,
+          scheme: "exact",
           network: network.id,
-          assets: network.assets.map((asset) => ({
-            code: asset.code,
-            issuer: asset.issuer,
-            decimals: asset.decimals
-          })),
-          extensions: {
-            x402Version: "2",
-            upto: false
+          extra: {
+            areFeesSponsored: true,
+            assets: network.assets.map((asset) => ({
+              code: asset.code,
+              issuer: asset.issuer,
+              contractId: asset.contractId,
+              decimals: asset.decimals
+            }))
           }
         }))
       : [];
-    const uptoSchemes = networks.flatMap((network) =>
+    const uptoKinds = networks.flatMap((network) =>
       capabilities.upto &&
       options.config.features.uptoScheme &&
       network.uptoSessionContractId !== undefined
         ? [
             {
-              name: "upto",
+              x402Version: 2,
+              scheme: "upto",
               network: network.id,
-              assets: network.assets
-                .filter((asset) => asset.contractId !== undefined)
-                .map((asset) => ({
-                  code: asset.code,
-                  issuer: asset.issuer,
-                  contractId: asset.contractId,
-                  decimals: asset.decimals
-                })),
-              extensions: {
+              extra: {
+                assets: network.assets
+                  .filter((asset) => asset.contractId !== undefined)
+                  .map((asset) => ({
+                    code: asset.code,
+                    issuer: asset.issuer,
+                    contractId: asset.contractId,
+                    decimals: asset.decimals
+                  })),
                 contractId: network.uptoSessionContractId,
-                x402Version: "2",
                 sessionEndpoint: "/v1/payment-sessions"
               }
             }
@@ -87,13 +78,12 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
         : []
     );
 
+    const kinds = [...exactKinds, ...uptoKinds];
+
     return {
-      schemes: [...exactSchemes, ...uptoSchemes],
-      extensions: {
-        bazaar: true,
-        upto: capabilities.upto && options.config.features.uptoScheme,
-        uptoContracts
-      }
+      kinds,
+      extensions: ["bazaar"],
+      signers: kinds.length === 0 ? {} : { "stellar:*": [options.config.facilitatorAccount] }
     };
   });
 
@@ -102,7 +92,7 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
     const network = extractPaymentNetwork(request.body);
 
     try {
-      return await verificationService.verify(request.body);
+      return toLumenVerifyResponse(await verificationService.verify(request.body));
     } catch (error) {
       recordRpcErrorIfNeeded(options.metrics, network, "verify", error);
       throw error;
@@ -118,7 +108,7 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
     try {
       const result = await settlementService.settle(request.body);
       options.metrics?.recordSettlementResult(result.network, "settled");
-      return result;
+      return toLumenSettleResponse(result);
     } catch (error) {
       options.metrics?.recordSettlementResult(network, "failed");
       recordRpcErrorIfNeeded(options.metrics, network, "settle", error);
@@ -145,7 +135,11 @@ function extractPaymentNetwork(body: unknown): string {
     paymentPayload !== null &&
     !Array.isArray(paymentPayload)
   ) {
-    const network = (paymentPayload as Record<string, unknown>).network;
+    const accepted = (paymentPayload as Record<string, unknown>).accepted;
+    const network =
+      typeof accepted === "object" && accepted !== null && !Array.isArray(accepted)
+        ? (accepted as Record<string, unknown>).network
+        : undefined;
 
     if (typeof network === "string") {
       return network;

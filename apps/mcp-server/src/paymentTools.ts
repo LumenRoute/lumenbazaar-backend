@@ -1,7 +1,6 @@
 import {
   createBudgetManager,
   createDefaultBudget,
-  createPaymentPayloadFromResource,
   runPaidResourceFlow,
   type CallOptions,
   type BudgetManager,
@@ -11,12 +10,7 @@ import {
 
 import { BackendClient } from "./client.js";
 
-type ExactResourcePaymentRequirements = PaymentRequirements & {
-  asset: {
-    code: string;
-    issuer: string;
-  };
-};
+type ExactResourcePaymentRequirements = PaymentRequirements;
 
 export type McpPaymentToolServiceOptions = {
   apiUrl?: string;
@@ -25,16 +19,11 @@ export type McpPaymentToolServiceOptions = {
 };
 
 export type PreparePaymentInput = {
-  authorization?: Record<string, unknown>;
-  expiresAtLedger?: number;
   resourceId: string;
 };
 
 export type CallPaidResourceInput = CallOptions & {
-  authorization?: Record<string, unknown>;
-  currentLedger?: number;
-  expiresAtLedger?: number;
-  paymentPayload?: PaymentPayload;
+  paymentPayload: PaymentPayload;
   resourceId: string;
   resourceUrl?: string;
 };
@@ -61,15 +50,10 @@ export class McpPaymentToolService {
 
     this.assertWithinBudget(paymentRequirements);
 
-    const paymentPayload = createPaymentPayloadFromResource(paymentRequirements, {
-      ...(input.authorization === undefined ? {} : { authorization: input.authorization }),
-      ...(input.expiresAtLedger === undefined ? {} : { expiresAtLedger: input.expiresAtLedger })
-    });
-
     return {
       resourceId: input.resourceId,
-      paymentPayload,
       paymentRequirements,
+      requiresWalletSignature: true,
       budget: this.inspectBudget()
     };
   }
@@ -83,14 +67,11 @@ export class McpPaymentToolService {
     const flow = await runPaidResourceFlow({
       apiUrl: this.apiUrl,
       budgetManager: this.budgetManager,
-      ...(input.authorization === undefined ? {} : { authorization: input.authorization }),
       ...(input.body === undefined ? {} : { body: input.body }),
-      ...(input.currentLedger === undefined ? {} : { currentLedger: input.currentLedger }),
-      ...(input.expiresAtLedger === undefined ? {} : { expiresAtLedger: input.expiresAtLedger }),
       ...(input.headers === undefined ? {} : { headers: input.headers }),
       ...(input.maxRetries === undefined ? {} : { maxRetries: input.maxRetries }),
       ...(input.method === undefined ? {} : { method: input.method }),
-      ...(input.paymentPayload === undefined ? {} : { paymentPayload: input.paymentPayload }),
+      paymentPayload: input.paymentPayload,
       ...(input.resourceUrl === undefined ? {} : { resourceUrl: input.resourceUrl }),
       ...(input.retryDelayMs === undefined ? {} : { retryDelayMs: input.retryDelayMs }),
       ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
@@ -115,7 +96,7 @@ export class McpPaymentToolService {
   }
 
   private assertWithinBudget(paymentRequirements: ExactResourcePaymentRequirements) {
-    if (!this.budgetManager.canAfford(paymentRequirements.amount)) {
+    if (!this.budgetManager.canAffordAtomic(paymentRequirements.amount)) {
       throw new Error(`Local budget cap exceeded for amount ${paymentRequirements.amount}`);
     }
   }
@@ -133,12 +114,14 @@ function paymentTermsFromResource(
   return {
     scheme: "exact",
     network: requireNetwork(resource.network),
-    asset: {
-      code: requireString(resource.assetCode, "assetCode"),
-      issuer: requireString(resource.assetIssuer, "assetIssuer")
-    },
-    amount: requireString(resource.amount, "amount"),
-    payTo: requireString(resource.payTo, "payTo")
+    asset: requireAssetContract(resource),
+    amount: decimalToAtomic(requireString(resource.amount, "amount")),
+    payTo: requireString(resource.payTo, "payTo"),
+    maxTimeoutSeconds: 60,
+    extra: {
+      assetCode: requireString(resource.assetCode, "assetCode"),
+      assetIssuer: requireString(resource.assetIssuer, "assetIssuer")
+    }
   };
 }
 
@@ -150,11 +133,28 @@ function isResourcePaymentTerms(value: unknown): value is ExactResourcePaymentRe
     (value as PaymentRequirements).scheme === "exact" &&
     ((value as PaymentRequirements).network === "stellar:testnet" ||
       (value as PaymentRequirements).network === "stellar:pubnet") &&
-    typeof (value as ExactResourcePaymentRequirements).asset === "object" &&
-    (value as ExactResourcePaymentRequirements).asset !== null &&
+    typeof (value as ExactResourcePaymentRequirements).asset === "string" &&
     typeof (value as PaymentRequirements).amount === "string" &&
     typeof (value as PaymentRequirements).payTo === "string"
   );
+}
+
+function requireAssetContract(resource: Record<string, unknown>) {
+  if (typeof resource.assetContractId === "string") return resource.assetContractId;
+  const extensions = resource.extensions;
+  if (typeof extensions === "object" && extensions !== null && !Array.isArray(extensions)) {
+    const contractId = (extensions as Record<string, unknown>).assetContractId;
+    if (typeof contractId === "string") return contractId;
+  }
+  throw new Error("Resource assetContractId is required");
+}
+
+function decimalToAtomic(amount: string) {
+  const [whole, fraction = ""] = amount.split(".");
+  if (!/^\d+$/.test(whole ?? "") || !/^\d*$/.test(fraction) || fraction.length > 7) {
+    throw new Error("Resource amount must use at most seven decimal places");
+  }
+  return `${whole}${fraction.padEnd(7, "0")}`.replace(/^0+(?=\d)/, "");
 }
 
 function requireNetwork(value: unknown): "stellar:testnet" | "stellar:pubnet" {

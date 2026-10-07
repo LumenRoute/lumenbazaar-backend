@@ -60,33 +60,27 @@ describe("payment session routes", () => {
     });
 
     expect(supported.json()).toMatchObject({
-      schemes: expect.arrayContaining([
+      kinds: expect.arrayContaining([
         expect.objectContaining({
-          name: "upto",
+          x402Version: 2,
+          scheme: "upto",
           network: "stellar:testnet",
-          assets: [
-            {
-              code: "USDC",
-              issuer: localIssuerPublicKey,
-              contractId: assetContractId,
-              decimals: 7
-            }
-          ],
-          extensions: expect.objectContaining({
+          extra: expect.objectContaining({
+            assets: [
+              {
+                code: "USDC",
+                issuer: localIssuerPublicKey,
+                contractId: assetContractId,
+                decimals: 7
+              }
+            ],
             contractId,
             sessionEndpoint: "/v1/payment-sessions"
           })
         })
       ]),
-      extensions: {
-        upto: true,
-        uptoContracts: [
-          {
-            network: "stellar:testnet",
-            contractId
-          }
-        ]
-      }
+      extensions: ["bazaar"],
+      signers: { "stellar:*": [localIssuerPublicKey] }
     });
     expect(created.statusCode).toBe(200);
     expect(created.json()).toMatchObject({

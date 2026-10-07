@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { LumenError, loadConfig, localIssuerPublicKey } from "@lumenbazaar/shared";
+import { createTestPaymentRequest, testPaymentConfigEnv } from "@lumenbazaar/testkit";
 import {
   InMemoryPaymentAttemptStore,
   PaymentVerificationService,
@@ -64,12 +65,9 @@ describe("API server base", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
-      schemes: [],
-      extensions: {
-        bazaar: true,
-        upto: false,
-        uptoContracts: []
-      }
+      kinds: [],
+      extensions: ["bazaar"],
+      signers: {}
     });
     await app.close();
   });
@@ -95,7 +93,7 @@ describe("API server base", () => {
       checks: { database: { status: "unavailable" } },
       capabilities: { exact: false, upto: false }
     });
-    expect(supported.json().schemes).toEqual([]);
+    expect(supported.json().kinds).toEqual([]);
     await app.close();
   });
 
@@ -129,7 +127,7 @@ describe("API server base", () => {
         };
       }
     };
-    const config = loadConfig({});
+    const config = loadConfig(testPaymentConfigEnv);
     const app = buildApiApp({
       logger: false,
       verificationService: new PaymentVerificationService(config, { adapter })
@@ -143,11 +141,16 @@ describe("API server base", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      network: "stellar:testnet",
-      status: "verified",
-      adapter: "@x402/stellar"
+      isValid: true,
+      extra: {
+        lumenbazaar: {
+          network: "stellar:testnet",
+          status: "verified",
+          adapter: "@x402/stellar"
+        }
+      }
     });
-    expect(response.json().paymentHash).toHaveLength(64);
+    expect(response.json().extra.lumenbazaar.paymentHash).toHaveLength(64);
     await app.close();
   });
 
@@ -167,7 +170,7 @@ describe("API server base", () => {
         };
       }
     };
-    const config = loadConfig({});
+    const config = loadConfig(testPaymentConfigEnv);
     const attemptStore = new InMemoryPaymentAttemptStore();
     const verificationService = new PaymentVerificationService(config, { adapter, attemptStore });
     const receiptService = new ReceiptService();
@@ -187,23 +190,29 @@ describe("API server base", () => {
     const response = await app.inject({
       method: "POST",
       url: "/v1/settle",
-      payload: {
-        paymentAttemptId: verified.paymentAttemptId,
-        ...exactPaymentRequest()
-      }
+      payload: exactPaymentRequest()
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      transactionHash: "tx_api_settle",
-      receiptId: expect.stringMatching(/^receipt_/),
-      ledger: 456,
-      status: "settled"
+      success: true,
+      transaction: "tx_api_settle",
+      network: "stellar:testnet",
+      extra: {
+        lumenbazaar: {
+          transactionHash: "tx_api_settle",
+          receiptId: expect.stringMatching(/^receipt_/),
+          ledger: 456,
+          status: "settled"
+        }
+      }
     });
+
+    const receiptId = response.json().extra.lumenbazaar.receiptId;
 
     const receipt = await app.inject({
       method: "GET",
-      url: `/v1/receipts/${response.json().receiptId}`
+      url: `/v1/receipts/${receiptId}`
     });
 
     expect(receipt.statusCode).toBe(200);
@@ -471,29 +480,7 @@ describe("API server base", () => {
 });
 
 function exactPaymentRequest() {
-  return {
-    paymentPayload: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey,
-      expiresAtLedger: 10,
-      authorization: {
-        signature: "sig"
-      }
-    },
-    paymentRequirements: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      amount: "0.05",
-      payTo: localIssuerPublicKey
-    },
-    currentLedger: 9
-  };
+  return createTestPaymentRequest("api");
 }
 
 function resourcePayload(sellerId: string) {

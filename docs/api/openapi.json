@@ -180,7 +180,32 @@
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["kinds", "extensions", "signers"],
+                  "properties": {
+                    "kinds": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["x402Version", "scheme", "network"],
+                        "properties": {
+                          "x402Version": { "type": "integer", "enum": [2] },
+                          "scheme": { "type": "string" },
+                          "network": { "type": "string" },
+                          "extra": { "type": "object", "additionalProperties": true }
+                        }
+                      }
+                    },
+                    "extensions": { "type": "array", "items": { "type": "string" } },
+                    "signers": {
+                      "type": "object",
+                      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+                    }
+                  }
+                }
+              }
             }
           },
           "default": {
@@ -221,56 +246,98 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["paymentPayload", "paymentRequirements"],
+                "additionalProperties": false,
+                "required": ["x402Version", "paymentPayload", "paymentRequirements"],
                 "properties": {
+                  "x402Version": { "type": "integer", "enum": [2] },
                   "paymentPayload": {
                     "type": "object",
-                    "required": ["scheme", "network", "asset", "amount", "payTo"],
+                    "additionalProperties": false,
+                    "required": ["x402Version", "accepted", "payload"],
                     "properties": {
-                      "scheme": { "type": "string", "enum": ["exact"] },
-                      "network": {
-                        "type": "string",
-                        "enum": ["stellar:testnet", "stellar:pubnet"]
-                      },
-                      "asset": {
+                      "x402Version": { "type": "integer", "enum": [2] },
+                      "resource": {
                         "type": "object",
-                        "required": ["code", "issuer"],
+                        "required": ["url"],
                         "properties": {
-                          "code": { "type": "string" },
-                          "issuer": { "type": "string" }
+                          "url": { "type": "string", "format": "uri" },
+                          "description": { "type": "string" },
+                          "mimeType": { "type": "string" }
                         }
                       },
-                      "amount": { "type": "string" },
-                      "payTo": { "type": "string" },
-                      "expiresAtLedger": { "type": "integer" },
-                      "authorization": { "type": "object", "additionalProperties": true },
-                      "paymentHash": { "type": "string" }
+                      "accepted": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "scheme",
+                          "network",
+                          "asset",
+                          "amount",
+                          "payTo",
+                          "maxTimeoutSeconds",
+                          "extra"
+                        ],
+                        "properties": {
+                          "scheme": { "type": "string", "enum": ["exact"] },
+                          "network": {
+                            "type": "string",
+                            "enum": ["stellar:testnet", "stellar:pubnet"]
+                          },
+                          "asset": { "type": "string", "description": "SEP-41 token contract ID." },
+                          "amount": {
+                            "type": "string",
+                            "pattern": "^[1-9]\\d*$",
+                            "description": "Amount in the token's atomic units."
+                          },
+                          "payTo": { "type": "string" },
+                          "maxTimeoutSeconds": { "type": "integer", "minimum": 1 },
+                          "extra": { "type": "object", "additionalProperties": true }
+                        }
+                      },
+                      "payload": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["transaction"],
+                        "properties": {
+                          "transaction": {
+                            "type": "string",
+                            "contentEncoding": "base64",
+                            "description": "Wallet-signed Stellar transaction envelope XDR."
+                          }
+                        }
+                      },
+                      "extensions": { "type": "object", "additionalProperties": true }
                     }
                   },
                   "paymentRequirements": {
                     "type": "object",
-                    "required": ["scheme", "network", "amount", "payTo"],
+                    "additionalProperties": false,
+                    "required": [
+                      "scheme",
+                      "network",
+                      "asset",
+                      "amount",
+                      "payTo",
+                      "maxTimeoutSeconds",
+                      "extra"
+                    ],
                     "properties": {
                       "scheme": { "type": "string", "enum": ["exact"] },
                       "network": {
                         "type": "string",
                         "enum": ["stellar:testnet", "stellar:pubnet"]
                       },
-                      "asset": {
-                        "type": "object",
-                        "required": ["code", "issuer"],
-                        "properties": {
-                          "code": { "type": "string" },
-                          "issuer": { "type": "string" }
-                        }
+                      "asset": { "type": "string", "description": "SEP-41 token contract ID." },
+                      "amount": {
+                        "type": "string",
+                        "pattern": "^[1-9]\\d*$",
+                        "description": "Amount in the token's atomic units."
                       },
-                      "amount": { "type": "string" },
-                      "payTo": { "type": "string" }
+                      "payTo": { "type": "string" },
+                      "maxTimeoutSeconds": { "type": "integer", "minimum": 1 },
+                      "extra": { "type": "object", "additionalProperties": true }
                     }
-                  },
-                  "resourceId": { "type": "string" },
-                  "sellerId": { "type": "string" },
-                  "currentLedger": { "type": "integer" }
+                  }
                 }
               }
             }
@@ -280,7 +347,21 @@
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["isValid"],
+                  "properties": {
+                    "isValid": { "type": "boolean" },
+                    "invalidReason": { "type": "string" },
+                    "invalidMessage": { "type": "string" },
+                    "payer": { "type": "string" },
+                    "extensions": { "type": "object", "additionalProperties": true },
+                    "extensionResponses": { "type": "object", "additionalProperties": true },
+                    "extra": { "type": "object", "additionalProperties": true }
+                  }
+                }
+              }
             }
           },
           "default": {
@@ -321,57 +402,98 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["paymentAttemptId", "paymentPayload", "paymentRequirements"],
+                "additionalProperties": false,
+                "required": ["x402Version", "paymentPayload", "paymentRequirements"],
                 "properties": {
-                  "paymentAttemptId": { "type": "string" },
+                  "x402Version": { "type": "integer", "enum": [2] },
                   "paymentPayload": {
                     "type": "object",
-                    "required": ["scheme", "network", "asset", "amount", "payTo"],
+                    "additionalProperties": false,
+                    "required": ["x402Version", "accepted", "payload"],
                     "properties": {
-                      "scheme": { "type": "string", "enum": ["exact"] },
-                      "network": {
-                        "type": "string",
-                        "enum": ["stellar:testnet", "stellar:pubnet"]
-                      },
-                      "asset": {
+                      "x402Version": { "type": "integer", "enum": [2] },
+                      "resource": {
                         "type": "object",
-                        "required": ["code", "issuer"],
+                        "required": ["url"],
                         "properties": {
-                          "code": { "type": "string" },
-                          "issuer": { "type": "string" }
+                          "url": { "type": "string", "format": "uri" },
+                          "description": { "type": "string" },
+                          "mimeType": { "type": "string" }
                         }
                       },
-                      "amount": { "type": "string" },
-                      "payTo": { "type": "string" },
-                      "expiresAtLedger": { "type": "integer" },
-                      "authorization": { "type": "object", "additionalProperties": true },
-                      "paymentHash": { "type": "string" }
+                      "accepted": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "scheme",
+                          "network",
+                          "asset",
+                          "amount",
+                          "payTo",
+                          "maxTimeoutSeconds",
+                          "extra"
+                        ],
+                        "properties": {
+                          "scheme": { "type": "string", "enum": ["exact"] },
+                          "network": {
+                            "type": "string",
+                            "enum": ["stellar:testnet", "stellar:pubnet"]
+                          },
+                          "asset": { "type": "string", "description": "SEP-41 token contract ID." },
+                          "amount": {
+                            "type": "string",
+                            "pattern": "^[1-9]\\d*$",
+                            "description": "Amount in the token's atomic units."
+                          },
+                          "payTo": { "type": "string" },
+                          "maxTimeoutSeconds": { "type": "integer", "minimum": 1 },
+                          "extra": { "type": "object", "additionalProperties": true }
+                        }
+                      },
+                      "payload": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["transaction"],
+                        "properties": {
+                          "transaction": {
+                            "type": "string",
+                            "contentEncoding": "base64",
+                            "description": "Wallet-signed Stellar transaction envelope XDR."
+                          }
+                        }
+                      },
+                      "extensions": { "type": "object", "additionalProperties": true }
                     }
                   },
                   "paymentRequirements": {
                     "type": "object",
-                    "required": ["scheme", "network", "amount", "payTo"],
+                    "additionalProperties": false,
+                    "required": [
+                      "scheme",
+                      "network",
+                      "asset",
+                      "amount",
+                      "payTo",
+                      "maxTimeoutSeconds",
+                      "extra"
+                    ],
                     "properties": {
                       "scheme": { "type": "string", "enum": ["exact"] },
                       "network": {
                         "type": "string",
                         "enum": ["stellar:testnet", "stellar:pubnet"]
                       },
-                      "asset": {
-                        "type": "object",
-                        "required": ["code", "issuer"],
-                        "properties": {
-                          "code": { "type": "string" },
-                          "issuer": { "type": "string" }
-                        }
+                      "asset": { "type": "string", "description": "SEP-41 token contract ID." },
+                      "amount": {
+                        "type": "string",
+                        "pattern": "^[1-9]\\d*$",
+                        "description": "Amount in the token's atomic units."
                       },
-                      "amount": { "type": "string" },
-                      "payTo": { "type": "string" }
+                      "payTo": { "type": "string" },
+                      "maxTimeoutSeconds": { "type": "integer", "minimum": 1 },
+                      "extra": { "type": "object", "additionalProperties": true }
                     }
-                  },
-                  "resourceId": { "type": "string" },
-                  "sellerId": { "type": "string" },
-                  "currentLedger": { "type": "integer" }
+                  }
                 }
               }
             }
@@ -381,7 +503,24 @@
           "200": {
             "description": "Successful response",
             "content": {
-              "application/json": { "schema": { "type": "object", "additionalProperties": true } }
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "transaction", "network"],
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "errorReason": { "type": "string" },
+                    "errorMessage": { "type": "string" },
+                    "payer": { "type": "string" },
+                    "transaction": { "type": "string" },
+                    "network": { "type": "string", "enum": ["stellar:testnet", "stellar:pubnet"] },
+                    "amount": { "type": "string", "pattern": "^[1-9]\\d*$" },
+                    "extensions": { "type": "object", "additionalProperties": true },
+                    "extensionResponses": { "type": "object", "additionalProperties": true },
+                    "extra": { "type": "object", "additionalProperties": true }
+                  }
+                }
+              }
             }
           },
           "default": {

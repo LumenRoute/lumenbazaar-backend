@@ -1,14 +1,14 @@
 import { type ErrorCode } from "@lumenbazaar/shared";
 
 import {
-  type ExactPaymentPayload,
-  type ExactPaymentRequirements,
+  type ExactStellarPaymentPayload,
+  type ExactStellarPaymentRequirements,
   type NormalizedVerifyPaymentRequest
 } from "./paymentPayload.js";
 
 export type X402VerificationInput = {
-  paymentPayload: ExactPaymentPayload;
-  paymentRequirements: ExactPaymentRequirements;
+  paymentPayload: ExactStellarPaymentPayload;
+  paymentRequirements: ExactStellarPaymentRequirements;
   normalizedRequest: NormalizedVerifyPaymentRequest;
 };
 
@@ -16,6 +16,7 @@ export type X402VerificationResult = {
   valid: boolean;
   failureCode?: ErrorCode;
   failureReason?: string;
+  officialContext?: Record<string, unknown>;
   adapter: "@x402/stellar";
 };
 

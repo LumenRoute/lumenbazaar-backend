@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { loadConfig, localIssuerPublicKey } from "@lumenbazaar/shared";
+import { loadConfig } from "@lumenbazaar/shared";
+import { testAssetContractId, testPaymentPayload, testPaymentRequest } from "@lumenbazaar/testkit";
 
 import {
   InMemoryPaymentAttemptStore,
@@ -26,45 +27,18 @@ const adapter: X402StellarAdapter = {
   }
 };
 
-function request() {
-  return {
-    paymentPayload: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo: localIssuerPublicKey,
-      expiresAtLedger: 100,
-      authorization: {
-        signature: "sig"
-      }
-    },
-    paymentRequirements: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      amount: "0.05",
-      payTo: localIssuerPublicKey
-    },
-    currentLedger: 99
-  };
-}
-
 describe("SettlementService", () => {
   it("settles a verified exact payment and stores transaction evidence", async () => {
     const attemptStore = new InMemoryPaymentAttemptStore();
     const settlementStore = new InMemorySettlementStore();
-    const config = loadConfig({});
+    const config = loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId });
     const verification = new PaymentVerificationService(config, { adapter, attemptStore });
     const settlement = new SettlementService(config, { adapter, attemptStore, settlementStore });
-    const verified = await verification.verify(request());
+    const verified = await verification.verify(testPaymentRequest);
 
     await expect(
       settlement.settle({
-        paymentAttemptId: verified.paymentAttemptId,
-        ...request()
+        ...testPaymentRequest
       })
     ).resolves.toMatchObject({
       transactionHash: "tx_exact_123",
@@ -81,22 +55,23 @@ describe("SettlementService", () => {
 
   it("rejects settlement when the payload differs from the verified attempt", async () => {
     const attemptStore = new InMemoryPaymentAttemptStore();
-    const config = loadConfig({});
+    const config = loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId });
     const verification = new PaymentVerificationService(config, { adapter, attemptStore });
     const settlement = new SettlementService(config, { adapter, attemptStore });
-    const verified = await verification.verify(request());
+    await verification.verify(testPaymentRequest);
 
     await expect(
       settlement.settle({
-        paymentAttemptId: verified.paymentAttemptId,
-        ...request(),
+        ...testPaymentRequest,
         paymentPayload: {
-          ...request().paymentPayload,
-          amount: "0.06"
+          ...testPaymentPayload,
+          payload: {
+            transaction: Buffer.from("different-transaction-xdr").toString("base64")
+          }
         }
       })
     ).rejects.toMatchObject({
-      code: "AMOUNT_MISMATCH"
+      code: "INVALID_PAYMENT_PAYLOAD"
     });
   });
 });

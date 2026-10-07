@@ -1,6 +1,7 @@
 import Fastify, { type FastifyRequest } from "fastify";
 import { z } from "zod";
 
+import { type PaymentPayload } from "@lumenbazaar/buyer-sdk";
 import { McpPaymentToolService } from "@lumenbazaar/mcp-server";
 import {
   mcpResource,
@@ -8,6 +9,8 @@ import {
   sendFastifyPaymentRequired
 } from "@lumenbazaar/seller-sdk";
 import { localIssuerPublicKey, serviceName, type JsonObject } from "@lumenbazaar/shared";
+
+const testAssetContractId = "CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS";
 
 export const paidMcpToolName = "quote_price";
 export const paidMcpServerName = "lumenbazaar-examples";
@@ -89,17 +92,18 @@ export type RegisterPaidMcpToolOptions = Required<PaidMcpToolCatalogOptions> & {
 
 export type CallPaidMcpToolOptions = {
   apiUrl: string;
-  authorization?: Record<string, unknown>;
   input: PaidMcpToolRequest;
+  paymentPayload: PaymentPayload;
   resourceId: string;
   serverBaseUrl?: string;
 };
 
 export const paidMcpPaymentRequirement = paymentRequirement({
   network: "stellar:testnet",
+  assetContractId: testAssetContractId,
   assetCode: "USDC",
   assetIssuer: localIssuerPublicKey,
-  amount: "0.03",
+  amount: "300000",
   payTo: localIssuerPublicKey
 });
 
@@ -125,13 +129,14 @@ export function createPaidMcpToolCatalogMetadata(options: PaidMcpToolCatalogOpti
       url: `${baseUrl.replace(/\/$/, "")}/tools/${paidMcpToolName}`,
       network: paidMcpPaymentRequirement.network,
       payTo: paidMcpPaymentRequirement.payTo,
-      assetCode: paidMcpPaymentRequirement.asset.code,
-      assetIssuer: paidMcpPaymentRequirement.asset.issuer,
-      amount: paidMcpPaymentRequirement.amount,
+      assetCode: "USDC",
+      assetIssuer: localIssuerPublicKey,
+      amount: "0.03",
       extensions: {
         ...paidMcpToolMetadata.resource.extensions,
         bazaar: true,
         example: "paid-mcp-tool",
+        assetContractId: paidMcpPaymentRequirement.asset,
         mcp: {
           serverName: paidMcpServerName,
           toolName: paidMcpToolName,
@@ -202,9 +207,9 @@ export async function callPaidMcpToolThroughLumenBazaar(options: CallPaidMcpTool
   const baseUrl = (options.serverBaseUrl ?? "https://mcp.example.test").replace(/\/$/, "");
 
   return service.callPaidResource({
-    ...(options.authorization === undefined ? {} : { authorization: options.authorization }),
     body: options.input,
     resourceId: options.resourceId,
+    paymentPayload: options.paymentPayload,
     resourceUrl: `${baseUrl}/tools/${paidMcpToolName}`
   });
 }
@@ -235,7 +240,7 @@ function quoteUnitPrice(sku: string) {
 }
 
 function hasPaymentHeader(request: FastifyRequest) {
-  return typeof request.headers["x-payment-required"] === "string";
+  return typeof request.headers["payment-signature"] === "string";
 }
 
 if (process.env.NODE_ENV !== "test") {

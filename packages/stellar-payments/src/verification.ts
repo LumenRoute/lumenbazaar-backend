@@ -1,4 +1,5 @@
 import { LumenError, type AppConfig } from "@lumenbazaar/shared";
+import { type VerifyResponse } from "@x402/core/types";
 
 import { computePaymentHash } from "./hash.js";
 import {
@@ -15,10 +16,26 @@ import { InMemoryPaymentAttemptStore, type PaymentAttemptStore } from "./payment
 export type PaymentVerificationResult = {
   paymentAttemptId: string;
   paymentHash: string;
-  network: NormalizedVerifyPaymentRequest["paymentPayload"]["network"];
+  network: NormalizedVerifyPaymentRequest["network"];
   status: "verified";
   adapter: "@x402/stellar";
 };
+
+export type LumenVerifyResponse = VerifyResponse & {
+  isValid: true;
+  extra: {
+    lumenbazaar: PaymentVerificationResult;
+  };
+};
+
+export function toLumenVerifyResponse(result: PaymentVerificationResult): LumenVerifyResponse {
+  return {
+    isValid: true,
+    extra: {
+      lumenbazaar: result
+    }
+  };
+}
 
 export type PaymentAuditLogger = {
   record: (input: {
@@ -53,8 +70,7 @@ export class PaymentVerificationService {
 
   async verify(input: unknown): Promise<PaymentVerificationResult> {
     const normalized = parseVerifyPaymentRequest(input, this.config);
-    const paymentHash =
-      normalized.paymentPayload.paymentHash ?? computePaymentHash(normalized.paymentPayload);
+    const paymentHash = computePaymentHash(normalized.paymentPayload);
 
     if ((await this.attemptStore.findPaymentAttemptByHash(paymentHash)) !== undefined) {
       throw new LumenError("REPLAY_DETECTED", "Payment payload has already been used.");
@@ -70,21 +86,16 @@ export class PaymentVerificationService {
 
     const attempt = await this.attemptStore.createVerifiedAttempt({
       paymentHash,
-      network: normalized.paymentPayload.network,
-      assetCode: normalized.paymentPayload.asset.code,
-      assetIssuer: normalized.paymentPayload.asset.issuer,
-      amount: normalized.paymentPayload.amount,
-      payTo: normalized.paymentPayload.payTo,
-      ...(normalized.resourceId === undefined ? {} : { resourceId: normalized.resourceId }),
-      ...(normalized.sellerId === undefined ? {} : { sellerId: normalized.sellerId }),
-      ...(normalized.paymentPayload.expiresAtLedger === undefined
-        ? {}
-        : { expiresAtLedger: normalized.paymentPayload.expiresAtLedger })
+      network: normalized.network,
+      assetCode: normalized.asset.code,
+      assetIssuer: normalized.asset.issuer,
+      amount: normalized.amount,
+      payTo: normalized.payTo
     });
 
     await this.auditLogService?.record({
       action: "payment.verify",
-      actorId: normalized.sellerId ?? null,
+      actorId: null,
       actorType: "facilitator",
       targetId: attempt.id,
       targetType: "payment_attempt",
@@ -101,7 +112,7 @@ export class PaymentVerificationService {
     return {
       paymentAttemptId: attempt.id,
       paymentHash,
-      network: normalized.paymentPayload.network,
+      network: normalized.network,
       status: "verified",
       adapter: adapterResult.adapter
     };
@@ -119,6 +130,12 @@ function assertAdapterAccepted(result: X402VerificationResult) {
 
   throw new LumenError(
     result.failureCode ?? "INVALID_SIGNATURE",
-    result.failureReason ?? "x402 Stellar verification rejected the payload."
+    result.failureReason ?? "x402 Stellar verification rejected the payload.",
+    {
+      details: {
+        adapter: result.adapter,
+        ...(result.officialContext ?? {})
+      }
+    }
   );
 }

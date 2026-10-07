@@ -7,9 +7,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@lumenbazaar/shared": "workspace:*",
-    "@lumenbazaar/buyer-sdk": "workspace:*",
-    "@lumenbazaar/seller-sdk": "workspace:*",
-    "@lumenbazaar/stellar-payments": "workspace:*"
+    "@lumenbazaar/shared": "workspace:*"
   }
 }

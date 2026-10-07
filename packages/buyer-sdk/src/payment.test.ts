@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { testPaymentPayload, testPaymentRequirement } from "@lumenbazaar/testkit";
+
 import {
+  createPaymentHeaders,
   createPaymentPayloadFromResource,
+  deserializePaymentPayload,
   preparePaymentPayload,
+  serializePaymentPayload,
   settlePayment,
   validatePaymentPayload,
   verifyPayment
@@ -13,106 +18,98 @@ describe("buyer SDK payment helpers", () => {
     vi.unstubAllGlobals();
   });
 
-  it("prepares backend-compatible payment payloads using payTo", () => {
+  it("prepares and validates official x402 v2 Stellar payloads", () => {
     const payload = preparePaymentPayload({
-      network: "stellar:testnet",
-      assetCode: "USDC",
-      assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-      amount: "0.05",
-      payTo: "GBZXN7PIRZGNMHGAIQW7QEJWW36L5CVVNRYANMDW2G3QOF2VCR4DQSQE",
-      expiresAtLedger: 123
+      paymentRequirements: testPaymentRequirement,
+      transaction: testPaymentPayload.payload.transaction
     });
 
-    expect(payload).toMatchObject({
-      payTo: "GBZXN7PIRZGNMHGAIQW7QEJWW36L5CVVNRYANMDW2G3QOF2VCR4DQSQE",
-      expiresAtLedger: 123
-    });
+    expect(payload).toEqual(testPaymentPayload);
     expect(validatePaymentPayload(payload)).toEqual({ valid: true, errors: [] });
   });
 
-  it("creates payment payloads from inspected resource terms", () => {
-    expect(
-      createPaymentPayloadFromResource(
-        {
-          network: "stellar:testnet",
-          asset: {
-            code: "USDC",
-            issuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
-          },
-          amount: "0.05",
-          payTo: "GBZXN7PIRZGNMHGAIQW7QEJWW36L5CVVNRYANMDW2G3QOF2VCR4DQSQE"
-        },
-        {
-          authorization: {
-            signature: "sig"
-          }
-        }
-      )
-    ).toMatchObject({
-      authorization: {
-        signature: "sig"
-      },
-      payTo: "GBZXN7PIRZGNMHGAIQW7QEJWW36L5CVVNRYANMDW2G3QOF2VCR4DQSQE"
+  it("creates payloads from requirements and round-trips PAYMENT-SIGNATURE", () => {
+    const payload = createPaymentPayloadFromResource(testPaymentRequirement, {
+      transaction: testPaymentPayload.payload.transaction,
+      resource: {
+        url: "https://seller.example/weather"
+      }
     });
+    const encoded = serializePaymentPayload(payload);
+
+    expect(createPaymentHeaders(payload)).toEqual({
+      "PAYMENT-SIGNATURE": encoded
+    });
+    expect(deserializePaymentPayload(encoded)).toEqual(payload);
   });
 
-  it("posts verify and settle requests to the facilitator API", async () => {
+  it("rejects non-canonical transaction encodings", () => {
+    expect(() =>
+      preparePaymentPayload({
+        paymentRequirements: testPaymentRequirement,
+        transaction: "not base64"
+      })
+    ).toThrow("canonical base64");
+  });
+
+  it("posts official verify and settle requests to the facilitator API", async () => {
     const fetchImpl = vi.fn(async (url: string) => {
       if (url.endsWith("/v1/verify")) {
         return Response.json({
-          adapter: "@x402/stellar",
-          network: "stellar:testnet",
-          paymentAttemptId: "attempt_1",
-          paymentHash: "hash",
-          status: "verified"
+          isValid: true,
+          extra: {
+            lumenbazaar: {
+              adapter: "@x402/stellar",
+              network: "stellar:testnet",
+              paymentAttemptId: "attempt_1",
+              paymentHash: "hash",
+              status: "verified"
+            }
+          }
         });
       }
 
       return Response.json({
-        ledger: 10,
+        success: true,
         network: "stellar:testnet",
-        receiptId: "receipt_1",
-        settlementId: "settlement_1",
-        status: "settled",
-        transactionHash: "tx_1"
+        amount: "500000",
+        transaction: "tx_1",
+        extra: {
+          lumenbazaar: {
+            ledger: 10,
+            receiptId: "receipt_1",
+            settlementId: "settlement_1",
+            status: "settled",
+            transactionHash: "tx_1"
+          }
+        }
       });
     });
     vi.stubGlobal("fetch", fetchImpl);
-    const paymentPayload = preparePaymentPayload({
-      network: "stellar:testnet",
-      assetCode: "USDC",
-      assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-      amount: "0.05",
-      payTo: "GBZXN7PIRZGNMHGAIQW7QEJWW36L5CVVNRYANMDW2G3QOF2VCR4DQSQE"
-    });
-    const paymentRequirements = {
-      scheme: "exact" as const,
-      network: "stellar:testnet" as const,
-      amount: "0.05",
-      payTo: "GBZXN7PIRZGNMHGAIQW7QEJWW36L5CVVNRYANMDW2G3QOF2VCR4DQSQE"
+    const request = {
+      x402Version: 2 as const,
+      paymentPayload: testPaymentPayload,
+      paymentRequirements: testPaymentRequirement
     };
 
-    await expect(
-      verifyPayment("https://api.example.test", {
-        paymentPayload,
-        paymentRequirements
-      })
-    ).resolves.toMatchObject({ paymentAttemptId: "attempt_1" });
-    await expect(
-      settlePayment("https://api.example.test", {
-        paymentAttemptId: "attempt_1",
-        paymentPayload,
-        paymentRequirements
-      })
-    ).resolves.toMatchObject({ receiptId: "receipt_1" });
+    await expect(verifyPayment("https://api.example.test", request)).resolves.toMatchObject({
+      isValid: true,
+      extra: { lumenbazaar: { paymentAttemptId: "attempt_1" } }
+    });
+    await expect(settlePayment("https://api.example.test", request)).resolves.toMatchObject({
+      success: true,
+      extra: { lumenbazaar: { receiptId: "receipt_1" } }
+    });
 
-    expect(fetchImpl).toHaveBeenCalledWith(
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      1,
       "https://api.example.test/v1/verify",
-      expect.objectContaining({ method: "POST" })
+      expect.objectContaining({ method: "POST", body: JSON.stringify(request) })
     );
-    expect(fetchImpl).toHaveBeenCalledWith(
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      2,
       "https://api.example.test/v1/settle",
-      expect.objectContaining({ method: "POST" })
+      expect.objectContaining({ method: "POST", body: JSON.stringify(request) })
     );
   });
 });

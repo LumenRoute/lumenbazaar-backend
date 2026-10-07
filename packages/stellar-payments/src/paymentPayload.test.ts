@@ -1,99 +1,67 @@
 import { describe, expect, it } from "vitest";
 
-import { LumenError, loadConfig, localIssuerPublicKey } from "@lumenbazaar/shared";
+import { LumenError, loadConfig } from "@lumenbazaar/shared";
+import {
+  testAssetContractId,
+  testPaymentPayload,
+  testPaymentRequest,
+  testPaymentRequirement,
+  testMalformedPaymentRequest,
+  testWrongAssetPaymentRequest,
+  testWrongNetworkPaymentRequest,
+  testWrongSchemePaymentRequest,
+  testWrongVersionPaymentRequest
+} from "@lumenbazaar/testkit";
 
-import { normalizeExactAmount, parseVerifyPaymentRequest } from "./index.js";
+import { parseVerifyPaymentRequest } from "./index.js";
 
-const payTo = localIssuerPublicKey;
+const config = loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId });
 
-function validPayload() {
-  return {
-    paymentPayload: {
-      scheme: "exact",
+describe("official x402 v2 Stellar payment model", () => {
+  it("parses the official v2 payload and SEP-41 asset requirement", () => {
+    expect(parseVerifyPaymentRequest(testPaymentRequest, config)).toMatchObject({
+      x402Version: 2,
       network: "stellar:testnet",
+      amount: "500000",
       asset: {
-        code: "usdc",
-        issuer: localIssuerPublicKey
+        contractId: testAssetContractId,
+        decimals: 7
       },
-      amount: "0.0500000",
-      payTo,
-      expiresAtLedger: 100,
-      authorization: {
-        signature: "sig"
-      }
-    },
-    paymentRequirements: {
-      scheme: "exact",
-      network: "stellar:testnet",
-      asset: {
-        code: "USDC",
-        issuer: localIssuerPublicKey
-      },
-      amount: "0.05",
-      payTo
-    },
-    currentLedger: 99
-  };
-}
-
-describe("payment payload model", () => {
-  const config = loadConfig({});
-
-  it("normalizes exact amounts to seven-decimal Stellar precision", () => {
-    expect(normalizeExactAmount("1.2300000")).toBe("1.23");
-    expect(normalizeExactAmount("10")).toBe("10");
-    expect(() => normalizeExactAmount("0")).toThrow("greater than zero");
-    expect(() => normalizeExactAmount("1.00000001")).toThrow("positive decimal string");
-  });
-
-  it("parses and normalizes valid exact payment requests", () => {
-    expect(parseVerifyPaymentRequest(validPayload(), config)).toMatchObject({
       paymentPayload: {
-        network: "stellar:testnet",
-        amount: "0.05",
-        asset: {
-          code: "USDC"
-        }
+        accepted: testPaymentRequirement,
+        payload: testPaymentPayload.payload
       }
     });
   });
 
   it.each([
-    ["UNSUPPORTED_NETWORK", { paymentPayload: { network: "stellar:futurenet" } }],
-    ["UNSUPPORTED_ASSET", { paymentPayload: { asset: { code: "EURC", issuer: payTo } } }],
-    ["AMOUNT_MISMATCH", { paymentPayload: { amount: "0.06" } }],
-    [
-      "RECIPIENT_MISMATCH",
-      { paymentRequirements: { payTo: "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" } }
-    ],
-    ["AUTH_EXPIRED", { currentLedger: 101 }]
-  ])("returns %s for invalid exact payment input", (code, override) => {
-    const input = mergePaymentOverride(validPayload(), override);
-
+    ["wrong version", "INVALID_PAYMENT_PAYLOAD", testWrongVersionPaymentRequest],
+    ["wrong network", "UNSUPPORTED_NETWORK", testWrongNetworkPaymentRequest],
+    ["wrong scheme", "INVALID_PAYMENT_PAYLOAD", testWrongSchemePaymentRequest],
+    ["wrong asset", "UNSUPPORTED_ASSET", testWrongAssetPaymentRequest],
+    ["malformed transaction base64", "INVALID_PAYMENT_PAYLOAD", testMalformedPaymentRequest]
+  ])("rejects %s with a stable error", (_name, code, input) => {
     expect(() => parseVerifyPaymentRequest(input, config)).toThrow(LumenError);
-
     try {
       parseVerifyPaymentRequest(input, config);
     } catch (error) {
-      expect((error as LumenError).code).toBe(code);
+      expect(error).toMatchObject({ code });
     }
   });
-});
 
-function mergePaymentOverride(
-  base: ReturnType<typeof validPayload>,
-  override: Record<string, unknown>
-) {
-  return {
-    ...base,
-    ...override,
-    paymentPayload: {
-      ...base.paymentPayload,
-      ...((override.paymentPayload as Record<string, unknown> | undefined) ?? {})
-    },
-    paymentRequirements: {
-      ...base.paymentRequirements,
-      ...((override.paymentRequirements as Record<string, unknown> | undefined) ?? {})
-    }
-  };
-}
+  it("rejects the former custom Stellar exact shape as v1", () => {
+    expect(() =>
+      parseVerifyPaymentRequest(
+        {
+          paymentPayload: {
+            scheme: "exact",
+            network: "stellar:testnet",
+            amount: "0.05"
+          },
+          paymentRequirements: testPaymentRequirement
+        },
+        config
+      )
+    ).toThrow("x402 v1 Stellar exact payloads are not supported");
+  });
+});

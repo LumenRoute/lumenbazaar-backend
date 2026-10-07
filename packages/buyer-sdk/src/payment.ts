@@ -1,251 +1,103 @@
-export type PaymentPayload = {
-  scheme: "exact";
-  network: "stellar:testnet" | "stellar:pubnet";
-  asset: {
-    code: string;
-    issuer: string;
-  };
-  amount: string;
-  payTo: string;
-  memo?: string;
-  expiresAtLedger?: number;
-  authorization?: Record<string, unknown>;
-};
+import { decodePaymentSignatureHeader, encodePaymentSignatureHeader } from "@x402/core/http";
+import { PaymentPayloadV2Schema, type PaymentPayloadV2 } from "@x402/core/schemas";
+
+import {
+  type ExactStellarPaymentPayload,
+  type ExactStellarPaymentRequirements,
+  type LumenSettleResponse,
+  type LumenVerifyResponse,
+  paymentSignatureHeader
+} from "@lumenbazaar/stellar-payments";
+
+export type PaymentPayload = ExactStellarPaymentPayload;
+export type PaymentRequirements = ExactStellarPaymentRequirements;
 
 export type PaymentPrepareInput = {
-  network: "stellar:testnet" | "stellar:pubnet";
-  assetCode: string;
-  assetIssuer: string;
-  amount: string;
-  payTo?: string;
-  recipient?: string;
-  memo?: string;
-  expiresAtLedger?: number;
-  authorization?: Record<string, unknown>;
-};
-
-export type PaymentRequirements = {
-  scheme: "exact";
-  network: "stellar:testnet" | "stellar:pubnet";
-  asset?: {
-    code: string;
-    issuer: string;
+  paymentRequirements: PaymentRequirements;
+  transaction: string;
+  resource?: {
+    url: string;
+    description?: string;
+    mimeType?: string;
   };
-  amount: string;
-  payTo: string;
 };
 
 export type VerifyPaymentInput = {
+  x402Version: 2;
   paymentPayload: PaymentPayload;
   paymentRequirements: PaymentRequirements;
-  currentLedger?: number;
-  resourceId?: string;
-  sellerId?: string;
 };
 
-export type VerifyPaymentResult = {
-  adapter: "@x402/stellar";
-  network: "stellar:testnet" | "stellar:pubnet";
-  paymentAttemptId: string;
-  paymentHash: string;
-  status: "verified";
-};
+export type VerifyPaymentResult = LumenVerifyResponse;
 
-export type SettlePaymentInput = VerifyPaymentInput & {
-  paymentAttemptId: string;
-};
+export type SettlePaymentInput = VerifyPaymentInput;
 
-export type SettlePaymentResult = {
-  ledger: number;
-  network: "stellar:testnet" | "stellar:pubnet";
-  receiptId: string;
-  settlementId: string;
-  status: "settled";
-  transactionHash: string;
-};
+export type SettlePaymentResult = LumenSettleResponse;
 
-/**
- * Prepare a payment payload for verification
- * @param input - Payment preparation input
- */
 export function preparePaymentPayload(input: PaymentPrepareInput): PaymentPayload {
-  const payTo = input.payTo ?? input.recipient;
-
-  if (payTo === undefined || payTo.trim().length === 0) {
-    throw new Error("Payment recipient is required");
-  }
-
-  const result: PaymentPayload = {
-    scheme: "exact",
-    network: input.network,
-    asset: {
-      code: input.assetCode,
-      issuer: input.assetIssuer
-    },
-    amount: input.amount,
-    payTo
+  assertCanonicalBase64(input.transaction);
+  return {
+    x402Version: 2,
+    ...(input.resource === undefined ? {} : { resource: input.resource }),
+    accepted: input.paymentRequirements,
+    payload: {
+      transaction: input.transaction
+    }
   };
-
-  // Add optional fields only if defined
-  if (input.memo !== undefined) {
-    result.memo = input.memo;
-  }
-  if (input.expiresAtLedger !== undefined) {
-    result.expiresAtLedger = input.expiresAtLedger;
-  }
-  if (input.authorization !== undefined) {
-    result.authorization = input.authorization;
-  }
-
-  return result;
 }
 
-/**
- * Create a payment payload from resource payment terms
- */
 export function createPaymentPayloadFromResource(
-  resourcePaymentTerms: {
-    network: "stellar:testnet" | "stellar:pubnet";
-    asset: { code: string; issuer: string };
-    amount: string;
-    payTo: string;
-  },
-  options: { authorization?: Record<string, unknown>; expiresAtLedger?: number } = {}
+  paymentRequirements: PaymentRequirements,
+  options: { transaction: string; resource?: PaymentPrepareInput["resource"] }
 ): PaymentPayload {
-  const input: PaymentPrepareInput = {
-    network: resourcePaymentTerms.network,
-    assetCode: resourcePaymentTerms.asset.code,
-    assetIssuer: resourcePaymentTerms.asset.issuer,
-    amount: resourcePaymentTerms.amount,
-    payTo: resourcePaymentTerms.payTo
-  };
-
-  if (options.expiresAtLedger !== undefined) {
-    input.expiresAtLedger = options.expiresAtLedger;
-  }
-  if (options.authorization !== undefined) {
-    input.authorization = options.authorization;
-  }
-
-  return preparePaymentPayload(input);
+  return preparePaymentPayload({
+    paymentRequirements,
+    transaction: options.transaction,
+    ...(options.resource === undefined ? {} : { resource: options.resource })
+  });
 }
 
-/**
- * Check if a payment payload is expired
- */
-export function isPaymentExpired(payload: PaymentPayload): boolean {
-  if (!payload.expiresAtLedger) {
-    return false;
-  }
-
-  return false;
-}
-
-/**
- * Get time remaining for payment expiry in seconds
- */
-export function getPaymentTimeRemaining(_payload: PaymentPayload): number | null {
-  return null;
-}
-
-export function isPaymentExpiredAtLedger(payload: PaymentPayload, currentLedger: number): boolean {
-  if (!payload.expiresAtLedger) {
-    return false;
-  }
-
-  return payload.expiresAtLedger <= currentLedger;
-}
-
-export function getPaymentLedgerTimeRemaining(
-  payload: PaymentPayload,
-  currentLedger: number
-): number | null {
-  if (!payload.expiresAtLedger) {
-    return null;
-  }
-
-  return Math.max(0, payload.expiresAtLedger - currentLedger);
-}
-
-/**
- * Verify payment payload has all required fields
- */
 export function validatePaymentPayload(payload: unknown): {
   valid: boolean;
   errors: string[];
 } {
-  const errors: string[] = [];
-
-  if (!payload || typeof payload !== "object") {
-    return { valid: false, errors: ["Payment payload must be an object"] };
+  const parsed = PaymentPayloadV2Schema.safeParse(payload);
+  if (!parsed.success) {
+    return {
+      valid: false,
+      errors: parsed.error.issues.map((issue) => issue.message)
+    };
   }
 
-  const p = payload as Record<string, unknown>;
-
-  if (p.scheme !== "exact") {
-    errors.push("Payment scheme must be 'exact'");
+  const transaction = parsed.data.payload.transaction;
+  if (parsed.data.accepted.scheme !== "exact" || typeof transaction !== "string") {
+    return { valid: false, errors: ["Payload must use Stellar exact with a transaction."] };
   }
 
-  if (!["stellar:testnet", "stellar:pubnet"].includes(String(p.network))) {
-    errors.push("Network must be 'stellar:testnet' or 'stellar:pubnet'");
-  }
-
-  if (!p.asset || typeof p.asset !== "object") {
-    errors.push("Asset is required");
-  } else {
-    const asset = p.asset as Record<string, unknown>;
-    if (!asset.code) errors.push("Asset code is required");
-    if (!asset.issuer) errors.push("Asset issuer is required");
-  }
-
-  if (!p.amount || typeof p.amount !== "string") {
-    errors.push("Amount is required");
-  }
-
-  if (!p.payTo || typeof p.payTo !== "string") {
-    errors.push("Recipient is required");
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors
-  };
-}
-
-/**
- * Serialize payment payload to JSON string for transmission
- */
-export function serializePaymentPayload(payload: PaymentPayload): string {
-  return JSON.stringify({
-    scheme: payload.scheme,
-    network: payload.network,
-    asset: payload.asset,
-    amount: payload.amount,
-    payTo: payload.payTo,
-    memo: payload.memo,
-    expiresAtLedger: payload.expiresAtLedger,
-    authorization: payload.authorization
-  });
-}
-
-/**
- * Deserialize payment payload from JSON string
- */
-export function deserializePaymentPayload(json: string): PaymentPayload {
   try {
-    return JSON.parse(json) as PaymentPayload;
-  } catch (err) {
-    throw new Error(`Invalid payment payload JSON: ${err}`);
+    assertCanonicalBase64(transaction);
+    return { valid: true, errors: [] };
+  } catch (error) {
+    return { valid: false, errors: [error instanceof Error ? error.message : String(error)] };
   }
 }
 
-/**
- * Create payment requirements for API headers
- */
+export function serializePaymentPayload(payload: PaymentPayload): string {
+  return encodePaymentSignatureHeader(payload);
+}
+
+export function deserializePaymentPayload(encoded: string): PaymentPayload {
+  const decoded = decodePaymentSignatureHeader(encoded);
+  const parsed = PaymentPayloadV2Schema.safeParse(decoded);
+  if (!parsed.success) {
+    throw new Error("PAYMENT-SIGNATURE does not contain an x402 v2 payload.");
+  }
+  return parsed.data as PaymentPayloadV2 as PaymentPayload;
+}
+
 export function createPaymentHeaders(payload: PaymentPayload): Record<string, string> {
   return {
-    "x-payment-required": serializePaymentPayload(payload),
-    "x-payment-scheme": payload.scheme
+    [paymentSignatureHeader]: serializePaymentPayload(payload)
   };
 }
 
@@ -263,12 +115,20 @@ export async function settlePayment(
   return postJson<SettlePaymentResult>(apiUrl, "/v1/settle", input);
 }
 
+function assertCanonicalBase64(value: string) {
+  const decoded = Buffer.from(value, "base64");
+  if (
+    decoded.length === 0 ||
+    decoded.toString("base64").replace(/=+$/, "") !== value.replace(/=+$/, "")
+  ) {
+    throw new Error("Stellar transaction must be canonical base64.");
+  }
+}
+
 async function postJson<T>(apiUrl: string, path: string, body: unknown): Promise<T> {
   const response = await fetch(`${apiUrl.replace(/\/$/, "")}${path}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
 
@@ -289,20 +149,11 @@ async function readJson(response: Response): Promise<unknown> {
 }
 
 function extractApiErrorMessage(body: unknown, fallback: string) {
-  if (typeof body !== "object" || body === null) {
-    return fallback;
-  }
-
+  if (typeof body !== "object" || body === null) return fallback;
   const record = body as Record<string, unknown>;
   const error = record.error;
-
   if (typeof error === "object" && error !== null && "message" in error) {
     return String((error as { message: unknown }).message);
   }
-
-  if (typeof record.message === "string") {
-    return record.message;
-  }
-
-  return fallback;
+  return typeof record.message === "string" ? record.message : fallback;
 }

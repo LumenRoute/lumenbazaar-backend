@@ -1,5 +1,28 @@
 import { z } from "zod";
 
+const paymentRequirementsSchema = z.object({
+  scheme: z.literal("exact"),
+  network: z.enum(["stellar:testnet", "stellar:pubnet"]),
+  asset: z.string(),
+  amount: z.string().regex(/^[1-9]\d*$/),
+  payTo: z.string(),
+  maxTimeoutSeconds: z.number().int().positive(),
+  extra: z.record(z.string(), z.unknown())
+});
+
+const paymentPayloadSchema = z.object({
+  x402Version: z.literal(2),
+  accepted: paymentRequirementsSchema,
+  payload: z.object({ transaction: z.string() }),
+  resource: z
+    .object({
+      url: z.string(),
+      description: z.string().optional(),
+      mimeType: z.string().optional()
+    })
+    .optional()
+});
+
 /**
  * Tool definitions and input/output schemas for MCP server
  */
@@ -93,14 +116,7 @@ export const toolDefinitions = [
           type: z.enum(["http", "mcp"]).describe("Resource type"),
           url: z.string().describe("Resource URL or endpoint"),
           paymentTerms: z.object({
-            scheme: z.enum(["exact", "upto"]),
-            network: z.enum(["stellar:testnet", "stellar:pubnet"]),
-            asset: z.object({
-              code: z.string(),
-              issuer: z.string()
-            }),
-            amount: z.string().describe("Price in stroops or smallest unit"),
-            payTo: z.string().describe("Payment recipient address")
+            ...paymentRequirementsSchema.shape
           })
         })
       ),
@@ -138,49 +154,30 @@ export const toolDefinitions = [
         .describe("For HTTP endpoints: route pattern with {param} placeholders"),
       inputSchema: z.record(z.string(), z.unknown()).describe("JSON schema for request payload"),
       outputSchema: z.record(z.string(), z.unknown()).describe("JSON schema for response payload"),
-      paymentTerms: z.object({
-        scheme: z.enum(["exact", "upto"]),
-        network: z.enum(["stellar:testnet", "stellar:pubnet"]),
-        asset: z.object({
-          code: z.string(),
-          issuer: z.string()
-        }),
-        amount: z.string(),
-        payTo: z.string()
-      })
+      paymentTerms: paymentRequirementsSchema
     })
   },
   {
     name: "prepare_payment",
-    description: "Prepare an exact Stellar x402 payment payload for a paid resource",
+    description: "Return exact Stellar x402 requirements for wallet signing",
     jsonInputSchema: {
       type: "object",
       properties: {
         resourceId: {
           type: "string",
           description: "Resource ID to pay for"
-        },
-        expiresAtLedger: {
-          type: "number",
-          description: "Optional ledger sequence where the authorization expires"
-        },
-        authorization: {
-          type: "object",
-          description: "Optional wallet authorization payload"
         }
       },
       required: ["resourceId"],
       additionalProperties: false
     },
     inputSchema: z.object({
-      resourceId: z.string().min(1),
-      expiresAtLedger: z.number().int().positive().optional(),
-      authorization: z.record(z.string(), z.unknown()).optional()
+      resourceId: z.string().min(1)
     }),
     outputSchema: z.object({
       resourceId: z.string(),
-      paymentPayload: z.record(z.string(), z.unknown()),
-      paymentRequirements: z.record(z.string(), z.unknown()),
+      paymentRequirements: paymentRequirementsSchema,
+      requiresWalletSignature: z.literal(true),
       budget: z.record(z.string(), z.unknown())
     })
   },
@@ -200,7 +197,40 @@ export const toolDefinitions = [
         },
         paymentPayload: {
           type: "object",
-          description: "Optional prepared payment payload"
+          description: "Wallet-signed official x402 v2 Stellar payload",
+          properties: {
+            x402Version: { type: "number", enum: [2] },
+            accepted: {
+              type: "object",
+              properties: {
+                scheme: { type: "string", enum: ["exact"] },
+                network: { type: "string", enum: ["stellar:testnet", "stellar:pubnet"] },
+                asset: { type: "string" },
+                amount: { type: "string", pattern: "^[1-9]\\d*$" },
+                payTo: { type: "string" },
+                maxTimeoutSeconds: { type: "number" },
+                extra: { type: "object" }
+              },
+              required: [
+                "scheme",
+                "network",
+                "asset",
+                "amount",
+                "payTo",
+                "maxTimeoutSeconds",
+                "extra"
+              ],
+              additionalProperties: false
+            },
+            payload: {
+              type: "object",
+              properties: { transaction: { type: "string" } },
+              required: ["transaction"],
+              additionalProperties: false
+            }
+          },
+          required: ["x402Version", "accepted", "payload"],
+          additionalProperties: false
         },
         body: {
           type: "object",
@@ -209,18 +239,6 @@ export const toolDefinitions = [
         method: {
           enum: ["GET", "POST"],
           description: "HTTP method used for the paid resource call"
-        },
-        authorization: {
-          type: "object",
-          description: "Optional wallet authorization payload"
-        },
-        currentLedger: {
-          type: "number",
-          description: "Current ledger for expiry checks"
-        },
-        expiresAtLedger: {
-          type: "number",
-          description: "Optional authorization expiry ledger"
         },
         maxRetries: {
           type: "number",
@@ -235,18 +253,15 @@ export const toolDefinitions = [
           description: "Paid endpoint timeout in milliseconds"
         }
       },
-      required: ["resourceId"],
+      required: ["resourceId", "paymentPayload"],
       additionalProperties: false
     },
     inputSchema: z.object({
       resourceId: z.string().min(1),
       resourceUrl: z.string().url().optional(),
-      paymentPayload: z.record(z.string(), z.unknown()).optional(),
+      paymentPayload: paymentPayloadSchema,
       body: z.record(z.string(), z.unknown()).optional(),
       method: z.enum(["GET", "POST"]).optional(),
-      authorization: z.record(z.string(), z.unknown()).optional(),
-      currentLedger: z.number().int().nonnegative().optional(),
-      expiresAtLedger: z.number().int().positive().optional(),
       maxRetries: z.number().int().min(0).max(10).optional(),
       retryDelayMs: z.number().int().min(0).max(60_000).optional(),
       timeoutMs: z.number().int().min(1).max(300_000).optional()

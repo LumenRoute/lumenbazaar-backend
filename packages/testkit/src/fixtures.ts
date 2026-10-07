@@ -1,4 +1,4 @@
-import { type JsonObject } from "@lumenbazaar/shared";
+import { localIssuerPublicKey, type JsonObject } from "@lumenbazaar/shared";
 
 /**
  * Test fixtures for LumenBazaar testing
@@ -130,17 +130,7 @@ export const testReceipt = {
 /**
  * Test payment payload fixture
  */
-export const testPaymentPayload = {
-  scheme: "exact" as const,
-  network: testnetConfig.network,
-  asset: {
-    code: testResource.assetCode,
-    issuer: testResource.assetIssuer
-  },
-  amount: testResource.amount,
-  recipient: testResource.payTo,
-  expires: Date.now() + 3600000 // 1 hour from now
-};
+export const testAssetContractId = "CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS";
 
 /**
  * Test payment requirement fixture
@@ -148,13 +138,95 @@ export const testPaymentPayload = {
 export const testPaymentRequirement = {
   scheme: "exact" as const,
   network: testnetConfig.network,
-  asset: {
-    code: testResource.assetCode,
-    issuer: testResource.assetIssuer
-  },
-  amount: testResource.amount,
-  payTo: testResource.payTo
+  asset: testAssetContractId,
+  amount: "500000",
+  payTo: localIssuerPublicKey,
+  maxTimeoutSeconds: 60,
+  extra: {
+    assetCode: testResource.assetCode,
+    assetIssuer: testResource.assetIssuer
+  }
 };
+
+export const testPaymentPayload = {
+  x402Version: 2 as const,
+  accepted: testPaymentRequirement,
+  payload: {
+    transaction: Buffer.from("stellar-transaction-xdr").toString("base64")
+  }
+};
+
+export const testPaymentRequest = {
+  x402Version: 2 as const,
+  paymentPayload: testPaymentPayload,
+  paymentRequirements: testPaymentRequirement
+};
+
+export const testPaymentConfigEnv = {
+  STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId
+};
+
+export function createTestPaymentRequest(seed = "default") {
+  const paymentRequirements = {
+    ...testPaymentRequirement,
+    extra: { ...testPaymentRequirement.extra }
+  };
+  const paymentPayload = {
+    x402Version: 2 as const,
+    accepted: paymentRequirements,
+    payload: {
+      transaction: Buffer.from(`stellar-transaction-xdr:${seed}`).toString("base64")
+    }
+  };
+
+  return {
+    x402Version: 2 as const,
+    paymentPayload,
+    paymentRequirements
+  };
+}
+
+export const testMalformedPaymentRequest = {
+  ...createTestPaymentRequest("malformed"),
+  paymentPayload: {
+    ...testPaymentPayload,
+    payload: { transaction: "not base64!" }
+  }
+};
+
+export const testWrongVersionPaymentRequest = {
+  ...createTestPaymentRequest("wrong-version"),
+  x402Version: 1
+};
+
+export const testWrongNetworkPaymentRequest = createRequestWithRequirement("wrong-network", {
+  network: "stellar:futurenet"
+});
+
+export const testWrongSchemePaymentRequest = createRequestWithRequirement("wrong-scheme", {
+  scheme: "upto"
+});
+
+export const testWrongAssetPaymentRequest = createRequestWithRequirement("wrong-asset", {
+  asset: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4"
+});
+
+export const testExpiredPaymentRequest = createTestPaymentRequest("expired-ledger-bounds");
+
+function createRequestWithRequirement(seed: string, override: Record<string, unknown>) {
+  const paymentRequirements = { ...testPaymentRequirement, ...override };
+  return {
+    x402Version: 2,
+    paymentRequirements,
+    paymentPayload: {
+      x402Version: 2,
+      accepted: paymentRequirements,
+      payload: {
+        transaction: Buffer.from(`stellar-transaction-xdr:${seed}`).toString("base64")
+      }
+    }
+  };
+}
 
 /**
  * Test resource metadata fixture
