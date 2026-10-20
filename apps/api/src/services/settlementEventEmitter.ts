@@ -30,11 +30,10 @@ export class SettlementEventEmitter {
     }
   ): Promise<void> {
     try {
-      await this.webhookEventService.emitSettlementEvent(
-        sellerId,
-        "settlement.finalized",
-        settlement
-      );
+      await this.webhookEventService.emitSettlementEvent(sellerId, "settlement.finalized", {
+        ...settlement,
+        network: settlement.network as "stellar:testnet" | "stellar:pubnet"
+      });
     } catch (error) {
       // Don't throw - webhook emission should never block settlement
       console.error("Failed to emit settlement.finalized event:", error);
@@ -62,11 +61,10 @@ export class SettlementEventEmitter {
     }
   ): Promise<void> {
     try {
-      await this.webhookEventService.emitSettlementEvent(
-        sellerId,
-        "settlement.failed",
-        settlement
-      );
+      await this.webhookEventService.emitSettlementEvent(sellerId, "settlement.failed", {
+        ...settlement,
+        network: settlement.network as "stellar:testnet" | "stellar:pubnet"
+      });
     } catch (error) {
       // Don't throw - webhook emission should never block settlement
       console.error("Failed to emit settlement.failed event:", error);
@@ -94,11 +92,10 @@ export class SettlementEventEmitter {
     }
   ): Promise<void> {
     try {
-      await this.webhookEventService.emitSettlementEvent(
-        sellerId,
-        "settlement.reconciled",
-        settlement
-      );
+      await this.webhookEventService.emitSettlementEvent(sellerId, "settlement.reconciled", {
+        ...settlement,
+        network: settlement.network as "stellar:testnet" | "stellar:pubnet"
+      });
     } catch (error) {
       // Don't throw - webhook emission should never block settlement
       console.error("Failed to emit settlement.reconciled event:", error);
@@ -126,11 +123,10 @@ export class SettlementEventEmitter {
     }
   ): Promise<void> {
     try {
-      await this.webhookEventService.emitSettlementEvent(
-        sellerId,
-        "settlement.pending",
-        settlement
-      );
+      await this.webhookEventService.emitSettlementEvent(sellerId, "settlement.pending", {
+        ...settlement,
+        network: settlement.network as "stellar:testnet" | "stellar:pubnet"
+      });
     } catch (error) {
       // Don't throw - webhook emission should never block settlement
       console.error("Failed to emit settlement.pending event:", error);

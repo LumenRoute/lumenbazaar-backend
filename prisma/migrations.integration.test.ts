@@ -9,7 +9,7 @@ import {
 
 /**
  * Integration tests for database migrations.
- * 
+ *
  * These tests verify:
  * 1. All migrations apply cleanly from an empty database
  * 2. Supported upgrade paths work without data loss

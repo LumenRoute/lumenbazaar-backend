@@ -42,7 +42,7 @@ const signerProvider = {
   assertReady: vi.fn(),
   getSigner: vi.fn(),
   getStatus: vi.fn()
-} as FacilitatorSignerProvider;
+} as unknown as FacilitatorSignerProvider;
 
 // Load the official SDK from @x402/stellar's node_modules to ensure XDR compatibility
 const officialRequire = createRequire(import.meta.resolve("@x402/stellar/exact/facilitator"));

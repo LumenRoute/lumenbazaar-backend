@@ -288,12 +288,8 @@ describe("ResourceService", () => {
 
       const rolledBack = await service.rollbackResource(resource.id, 1);
 
-      expect(
-        jobs.some((job) => job.versionId === rolledBack.version.id)
-      ).toBe(true);
-      expect(
-        jobs.some((job) => job.resourceId === resource.id)
-      ).toBe(true);
+      expect(jobs.some((job) => job.versionId === rolledBack.version.id)).toBe(true);
+      expect(jobs.some((job) => job.resourceId === resource.id)).toBe(true);
     });
   });
 
@@ -562,11 +558,7 @@ describe("ResourceService", () => {
       expect(resource.sellerId).toBe(seller.id);
 
       // Unauthenticated update
-      const updated = await service.updateResource(
-        resource.id,
-        { name: "Updated" },
-        undefined
-      );
+      const updated = await service.updateResource(resource.id, { name: "Updated" }, undefined);
       expect(updated.name).toBe("Updated");
     });
 

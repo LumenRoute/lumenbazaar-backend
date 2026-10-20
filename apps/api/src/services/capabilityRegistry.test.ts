@@ -1,14 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  type X402StellarAdapter,
-  type PaymentSessionService,
-} from "@lumenbazaar/stellar-payments";
+import { type X402StellarAdapter, type PaymentSessionService } from "@lumenbazaar/stellar-payments";
 
-import {
-  buildCapabilityRegistry,
-  createStaticCapabilityRegistry,
-} from "./capabilityRegistry.js";
+import { buildCapabilityRegistry, createStaticCapabilityRegistry } from "./capabilityRegistry.js";
 
 // ─── Fake adapters ────────────────────────────────────────────────────────────
 
@@ -59,20 +53,20 @@ describe("buildCapabilityRegistry – population", () => {
   it("registers exact when adapter passes startup check", async () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(),
-      networks: testNetworks,
+      networks: testNetworks
     });
 
     expect(registry.isSupported("exact", "stellar:testnet")).toBe(true);
     expect(registry.getSupportedSchemes()).toContainEqual({
       scheme: "exact",
-      network: "stellar:testnet",
+      network: "stellar:testnet"
     });
   });
 
   it("registers upto when session service passes startup check", async () => {
     const registry = await buildCapabilityRegistry({
       uptoService: liveUptoService() as PaymentSessionService,
-      networks: testNetworks,
+      networks: testNetworks
     });
 
     expect(registry.isSupported("upto", "stellar:testnet")).toBe(true);
@@ -82,7 +76,7 @@ describe("buildCapabilityRegistry – population", () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(),
       uptoService: liveUptoService() as PaymentSessionService,
-      networks: testNetworks,
+      networks: testNetworks
     });
 
     expect(registry.isSupported("exact", "stellar:testnet")).toBe(true);
@@ -101,7 +95,7 @@ describe("buildCapabilityRegistry – population", () => {
   it("registers exact only when upto adapter is absent", async () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(),
-      networks: testNetworks,
+      networks: testNetworks
     });
 
     expect(registry.isSupported("exact", "stellar:testnet")).toBe(true);
@@ -112,7 +106,7 @@ describe("buildCapabilityRegistry – population", () => {
   it("registers upto only when exact adapter is absent", async () => {
     const registry = await buildCapabilityRegistry({
       uptoService: liveUptoService() as PaymentSessionService,
-      networks: testNetworks,
+      networks: testNetworks
     });
 
     expect(registry.isSupported("exact", "stellar:testnet")).toBe(false);
@@ -124,7 +118,7 @@ describe("buildCapabilityRegistry – population", () => {
     const networks = ["stellar:testnet", "stellar:pubnet"] as const;
     const registry = await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(),
-      networks,
+      networks
     });
 
     expect(registry.isSupported("exact", "stellar:testnet")).toBe(true);
@@ -139,7 +133,7 @@ describe("buildCapabilityRegistry – failure cases", () => {
   it("does NOT register exact when adapter throws", async () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: throwingExactAdapter(),
-      networks: testNetworks,
+      networks: testNetworks
     });
 
     expect(registry.isSupported("exact", "stellar:testnet")).toBe(false);
@@ -148,7 +142,7 @@ describe("buildCapabilityRegistry – failure cases", () => {
   it("does NOT register upto when service throws", async () => {
     const registry = await buildCapabilityRegistry({
       uptoService: throwingUptoService() as PaymentSessionService,
-      networks: testNetworks,
+      networks: testNetworks
     });
 
     expect(registry.isSupported("upto", "stellar:testnet")).toBe(false);
@@ -173,7 +167,7 @@ describe("buildCapabilityRegistry – failure cases", () => {
   it("records startup_check_failed when adapter throws", async () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: throwingExactAdapter(),
-      networks: testNetworks,
+      networks: testNetworks
     });
     const reasons = registry.getUnavailableReasons();
     const exactReason = reasons.find((r) => r.scheme === "exact");
@@ -185,7 +179,7 @@ describe("buildCapabilityRegistry – failure cases", () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(500), // 500 ms
       networks: testNetworks,
-      checkOptions: { timeoutMs: 1 }, // 1 ms deadline
+      checkOptions: { timeoutMs: 1 } // 1 ms deadline
     });
     const reasons = registry.getUnavailableReasons();
     const exactReason = reasons.find((r) => r.scheme === "exact");
@@ -197,7 +191,7 @@ describe("buildCapabilityRegistry – failure cases", () => {
   it("never includes raw error text in reason codes", async () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: throwingExactAdapter(),
-      networks: testNetworks,
+      networks: testNetworks
     });
     const serialized = JSON.stringify(registry.getUnavailableReasons());
 
@@ -210,7 +204,7 @@ describe("buildCapabilityRegistry – failure cases", () => {
       buildCapabilityRegistry({
         exactAdapter: throwingExactAdapter(),
         uptoService: throwingUptoService() as PaymentSessionService,
-        networks: testNetworks,
+        networks: testNetworks
       })
     ).resolves.toBeDefined();
   });
@@ -222,7 +216,7 @@ describe("buildCapabilityRegistry – immutability", () => {
   it("getSupportedSchemes returns a frozen array", async () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(),
-      networks: testNetworks,
+      networks: testNetworks
     });
     const schemes = registry.getSupportedSchemes();
 
@@ -242,7 +236,7 @@ describe("buildCapabilityRegistry – immutability", () => {
   it("each RegisteredCapability entry is frozen", async () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(),
-      networks: testNetworks,
+      networks: testNetworks
     });
     const [first] = registry.getSupportedSchemes();
 
@@ -257,7 +251,7 @@ describe("buildCapabilityRegistry – allowedCapabilities restriction", () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(),
       networks: testNetworks,
-      allowedCapabilities: { exact: false },
+      allowedCapabilities: { exact: false }
     });
 
     expect(registry.isSupported("exact", "stellar:testnet")).toBe(false);
@@ -271,7 +265,7 @@ describe("buildCapabilityRegistry – allowedCapabilities restriction", () => {
     const registry = await buildCapabilityRegistry({
       uptoService: liveUptoService() as PaymentSessionService,
       networks: testNetworks,
-      allowedCapabilities: { upto: false },
+      allowedCapabilities: { upto: false }
     });
 
     expect(registry.isSupported("upto", "stellar:testnet")).toBe(false);
@@ -281,7 +275,7 @@ describe("buildCapabilityRegistry – allowedCapabilities restriction", () => {
     // allowedCapabilities can only restrict, never add beyond what the check produces.
     const registry = await buildCapabilityRegistry({
       networks: testNetworks,
-      allowedCapabilities: { exact: true }, // no adapter provided
+      allowedCapabilities: { exact: true } // no adapter provided
     });
 
     expect(registry.isSupported("exact", "stellar:testnet")).toBe(false);
@@ -295,7 +289,7 @@ describe("buildCapabilityRegistry – allowedCapabilities restriction", () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: throwingExactAdapter(), // adapter is wired but throws
       networks: testNetworks,
-      allowedCapabilities: { exact: true }, // explicit "allow" cannot override a failed check
+      allowedCapabilities: { exact: true } // explicit "allow" cannot override a failed check
     });
 
     expect(registry.isSupported("exact", "stellar:testnet")).toBe(false);
@@ -314,12 +308,12 @@ describe("buildCapabilityRegistry – startup diagnostics", () => {
     await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(),
       networks: testNetworks,
-      logger: { info, warn },
+      logger: { info, warn }
     });
 
     expect(info).toHaveBeenCalledWith("capability_registered", {
       scheme: "exact",
-      network: "stellar:testnet",
+      network: "stellar:testnet"
     });
     expect(warn).not.toHaveBeenCalledWith(
       "capability_unavailable",
@@ -333,7 +327,7 @@ describe("buildCapabilityRegistry – startup diagnostics", () => {
 
     await buildCapabilityRegistry({
       networks: testNetworks,
-      logger: { info, warn },
+      logger: { info, warn }
     });
 
     expect(warn).toHaveBeenCalledWith(
@@ -354,7 +348,7 @@ describe("buildCapabilityRegistry – startup diagnostics", () => {
     await buildCapabilityRegistry({
       exactAdapter: throwingExactAdapter(),
       networks: testNetworks,
-      logger: { info: vi.fn(), warn },
+      logger: { info: vi.fn(), warn }
     });
 
     const serialized = JSON.stringify(loggedData);
@@ -369,7 +363,7 @@ describe("buildCapabilityRegistry – isSupported lookup", () => {
   it("returns false for unknown scheme", async () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(),
-      networks: testNetworks,
+      networks: testNetworks
     });
 
     expect(registry.isSupported("upto" as never, "stellar:testnet")).toBe(false);
@@ -378,7 +372,7 @@ describe("buildCapabilityRegistry – isSupported lookup", () => {
   it("returns false for unknown network even when scheme is supported", async () => {
     const registry = await buildCapabilityRegistry({
       exactAdapter: liveExactAdapter(),
-      networks: testNetworks,
+      networks: testNetworks
     });
 
     expect(registry.isSupported("exact", "stellar:pubnet")).toBe(false);

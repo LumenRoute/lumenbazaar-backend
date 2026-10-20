@@ -2,7 +2,11 @@ import { PrismaClient } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { AuditLogService, PrismaAuditLogStore } from "./audit.js";
-import { RedactionService, DEFAULT_TESTNET_POLICY, DEFAULT_MAINNET_POLICY } from "@lumenbazaar/shared";
+import {
+  RedactionService,
+  DEFAULT_TESTNET_POLICY,
+  DEFAULT_MAINNET_POLICY
+} from "@lumenbazaar/shared";
 
 const databaseUrl = process.env.PAYMENT_PERSISTENCE_TEST_DATABASE_URL;
 const describePostgres = databaseUrl === undefined ? describe.skip : describe;
@@ -80,7 +84,8 @@ describePostgres("Redaction Policy Integration", () => {
         correlationId: "corr_test_redaction_2",
         targetType: "payment_attempt",
         metadata: {
-          description: "Failed to authenticate with Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0",
+          description:
+            "Failed to authenticate with Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0",
           errorContext: "stellar key SBGCYAXSV52JRYUBJJ3TTVHJ4THVDKUVPVGWYJK4RN3QXU74NI3EVDFX used",
           config: "api_key=secret_12345"
         }
@@ -96,18 +101,21 @@ describePostgres("Redaction Policy Integration", () => {
       expect(log).toBeDefined();
 
       // Verify Bearer token was redacted
-      expect((log?.metadata?.description as string) || "").toContain("[redacted]");
-      expect((log?.metadata?.description as string) || "").not.toContain("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
+      const meta = log?.metadata as Record<string, unknown> | undefined;
+      expect((meta?.description as string) || "").toContain("[redacted]");
+      expect((meta?.description as string) || "").not.toContain(
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+      );
 
       // Verify Stellar secret key was redacted
-      expect((log?.metadata?.errorContext as string) || "").toContain("[redacted]");
-      expect((log?.metadata?.errorContext as string) || "").not.toContain(
+      expect((meta?.errorContext as string) || "").toContain("[redacted]");
+      expect((meta?.errorContext as string) || "").not.toContain(
         "SBGCYAXSV52JRYUBJJ3TTVHJ4THVDKUVPVGWYJK4RN3QXU74NI3EVDFX"
       );
 
       // Verify key=value pair was redacted
-      expect((log?.metadata?.config as string) || "").toContain("[redacted]");
-      expect((log?.metadata?.config as string) || "").not.toContain("secret_12345");
+      expect((meta?.config as string) || "").toContain("[redacted]");
+      expect((meta?.config as string) || "").not.toContain("secret_12345");
     });
 
     it("redacts nested sensitive values", async () => {
@@ -146,12 +154,12 @@ describePostgres("Redaction Policy Integration", () => {
 
       const nested = log?.metadata as Record<string, unknown>;
       expect((nested.payment as Record<string, unknown>).amount).toBe("100.00");
-      expect(((nested.payment as Record<string, unknown>).credentials as Record<string, unknown>).token).toBe(
-        "[redacted]"
-      );
-      expect(((nested.payment as Record<string, unknown>).credentials as Record<string, unknown>).apiKey).toBe(
-        "[redacted]"
-      );
+      expect(
+        ((nested.payment as Record<string, unknown>).credentials as Record<string, unknown>).token
+      ).toBe("[redacted]");
+      expect(
+        ((nested.payment as Record<string, unknown>).credentials as Record<string, unknown>).apiKey
+      ).toBe("[redacted]");
       expect((nested.normal as Record<string, unknown>).field).toBe("value");
     });
 
@@ -185,13 +193,14 @@ describePostgres("Redaction Policy Integration", () => {
       });
 
       expect(log).toBeDefined();
-      expect(log?.metadata?.count).toBe(42);
-      expect(log?.metadata?.enabled).toBe(true);
-      expect(log?.metadata?.disabled).toBe(false);
-      expect(log?.metadata?.amount).toBe(99.99);
-      expect(log?.metadata?.nullValue).toBeNull();
-      expect(Array.isArray(log?.metadata?.arrayOfIds)).toBe(true);
-      expect(Array.isArray(log?.metadata?.mixed)).toBe(true);
+      const meta = log?.metadata as Record<string, unknown> | undefined;
+      expect(meta?.count).toBe(42);
+      expect(meta?.enabled).toBe(true);
+      expect(meta?.disabled).toBe(false);
+      expect(meta?.amount).toBe(99.99);
+      expect(meta?.nullValue).toBeNull();
+      expect(Array.isArray(meta?.arrayOfIds)).toBe(true);
+      expect(Array.isArray(meta?.mixed)).toBe(true);
     });
 
     it("survives database round-trip with redaction intact", async () => {
@@ -317,11 +326,12 @@ describePostgres("Redaction Policy Integration", () => {
       });
 
       expect(log).toBeDefined();
-      expect(log?.metadata?.network).toBe("stellar:testnet");
-      expect(log?.metadata?.amount).toBe("100.00");
-      expect(log?.metadata?.assetCode).toBe("USDC");
-      expect(log?.metadata?.paymentHash).toBe("[redacted]");
-      expect(log?.metadata?.idempotencyKey).toBe("[redacted]");
+      const meta = log?.metadata as Record<string, unknown> | undefined;
+      expect(meta?.network).toBe("stellar:testnet");
+      expect(meta?.amount).toBe("100.00");
+      expect(meta?.assetCode).toBe("USDC");
+      expect(meta?.paymentHash).toBe("[redacted]");
+      expect(meta?.idempotencyKey).toBe("[redacted]");
     });
 
     it("logs settlement with transaction hash redacted", async () => {
@@ -352,9 +362,10 @@ describePostgres("Redaction Policy Integration", () => {
       });
 
       expect(log).toBeDefined();
-      expect(log?.metadata?.transactionHash).toBe("[redacted]");
-      expect(log?.metadata?.ledger).toBe(1000000);
-      expect(log?.metadata?.status).toBe("settled");
+      const settledMeta = log?.metadata as Record<string, unknown> | undefined;
+      expect(settledMeta?.transactionHash).toBe("[redacted]");
+      expect(settledMeta?.ledger).toBe(1000000);
+      expect(settledMeta?.status).toBe("settled");
     });
   });
 

@@ -2,14 +2,15 @@ import { describe, expect, it } from "vitest";
 import Fastify from "fastify";
 
 import { type SellerApiKeyScope } from "@lumenbazaar/shared";
-import {
-  SellerApiKeyService,
-  InMemorySellerApiKeyStore
-} from "../services/sellerApiKeys.js";
+import { SellerApiKeyService, InMemorySellerApiKeyStore } from "../services/sellerApiKeys.js";
 import { registerErrorHandling } from "./errors.js";
 import { registerSellerApiKeyAuth } from "./sellerApiKeyAuth.js";
 import { registerRateLimitHook } from "./rateLimit.js";
-import { type RateLimitRequest, type RateLimitResult, type RateLimitService } from "../services/rateLimit.js";
+import {
+  type RateLimitRequest,
+  type RateLimitResult,
+  type RateLimitService
+} from "../services/rateLimit.js";
 
 function jsonBodyParser(app: Fastify.FastifyInstance) {
   app.addContentTypeParser("application/json", { parseAs: "string" }, (request, body, done) => {

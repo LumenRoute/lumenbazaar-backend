@@ -103,12 +103,14 @@ export function computeExpectedEvidenceHash(
   settlement: Settlement,
   digestFn?: (input: string) => string
 ): string {
-  const hash = digestFn ?? ((input: string) => {
-    // Use crypto dynamically to avoid circular dependency
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { createHash } = require("node:crypto");
-    return createHash("sha256").update(input, "utf8").digest("hex");
-  });
+  const hash =
+    digestFn ??
+    ((input: string) => {
+      // Use crypto dynamically to avoid circular dependency
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createHash } = require("node:crypto");
+      return createHash("sha256").update(input, "utf8").digest("hex");
+    });
 
   const input = [
     attempt.id,

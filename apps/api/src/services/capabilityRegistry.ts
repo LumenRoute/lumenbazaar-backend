@@ -14,12 +14,9 @@ import {
   checkExactAdapter,
   checkUptoAdapter,
   type AdapterStartupCheckFailureReason,
-  type AdapterStartupCheckOptions,
+  type AdapterStartupCheckOptions
 } from "@lumenbazaar/stellar-payments";
-import {
-  type PaymentSessionService,
-  type X402StellarAdapter,
-} from "@lumenbazaar/stellar-payments";
+import { type PaymentSessionService, type X402StellarAdapter } from "@lumenbazaar/stellar-payments";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -147,7 +144,7 @@ export async function buildCapabilityRegistry(
   // Run both startup checks in parallel with bounded timeouts.
   const [exactResult, uptoResult] = await Promise.all([
     checkExactAdapter(exactAdapter, checkOptions),
-    checkUptoAdapter(uptoService, checkOptions),
+    checkUptoAdapter(uptoService, checkOptions)
   ]);
 
   // Determine which schemes are available.
@@ -195,9 +192,7 @@ export async function buildCapabilityRegistry(
 
   // Freeze the arrays so callers cannot mutate them.
   const frozenSupported = Object.freeze(supported.map((c) => Object.freeze({ ...c })));
-  const frozenUnavailable = Object.freeze(
-    unavailable.map((d) => Object.freeze({ ...d }))
-  );
+  const frozenUnavailable = Object.freeze(unavailable.map((d) => Object.freeze({ ...d })));
 
   return {
     getSupportedSchemes(): ReadonlyArray<RegisteredCapability> {
@@ -210,7 +205,7 @@ export async function buildCapabilityRegistry(
 
     getUnavailableReasons(): ReadonlyArray<CapabilityDiagnostic> {
       return frozenUnavailable;
-    },
+    }
   };
 }
 
@@ -240,14 +235,12 @@ export function createStaticCapabilityRegistry(
   }
 
   const frozenSupported = Object.freeze(supported.map((c) => Object.freeze({ ...c })));
-  const frozenUnavailable = Object.freeze(
-    unavailable.map((d) => Object.freeze({ ...d }))
-  );
+  const frozenUnavailable = Object.freeze(unavailable.map((d) => Object.freeze({ ...d })));
 
   return {
     getSupportedSchemes: () => frozenSupported,
     isSupported: (scheme, network) =>
       frozenSupported.some((c) => c.scheme === scheme && c.network === network),
-    getUnavailableReasons: () => frozenUnavailable,
+    getUnavailableReasons: () => frozenUnavailable
   };
 }

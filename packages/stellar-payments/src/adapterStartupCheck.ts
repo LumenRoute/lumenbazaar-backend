@@ -131,10 +131,7 @@ export async function checkUptoAdapter(
  * Returns `"timeout"` if the timer fires first.  Raw errors from `fn` are
  * re-thrown so the caller can classify them as startup_check_failed.
  */
-async function raceTimeout<T>(
-  fn: () => Promise<T>,
-  timeoutMs: number
-): Promise<T | "timeout"> {
+async function raceTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<T | "timeout"> {
   return new Promise<T | "timeout">((resolve, reject) => {
     const id = setTimeout(() => resolve("timeout"), timeoutMs);
 
@@ -160,7 +157,7 @@ async function raceTimeout<T>(
 import type {
   ExactStellarPaymentPayload,
   ExactStellarPaymentRequirements,
-  NormalizedVerifyPaymentRequest,
+  NormalizedVerifyPaymentRequest
 } from "./paymentPayload.js";
 
 /** All-zeros sentinel Stellar public key (not a real key). */

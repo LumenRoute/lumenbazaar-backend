@@ -82,7 +82,7 @@ return { count, ttl }
 
 export class RedisRateLimitCounterStore implements RateLimitCounterStore {
   private readonly fallback = new InMemoryRateLimitCounterStore();
-  
+
   constructor(private readonly client: Redis) {}
 
   async consume(key: string, windowMs: number) {

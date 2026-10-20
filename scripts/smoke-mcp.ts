@@ -33,7 +33,7 @@ type StepResult = {
   step: string;
   pass: boolean;
   durationMs: number;
-  detail?: string;
+  detail?: string | undefined;
 };
 
 type SmokeOutput = {
@@ -64,18 +64,14 @@ function resolveUrl(): string {
   const fromEnv = process.env.MCP_SMOKE_URL;
   if (fromEnv !== undefined && fromEnv !== "") return fromEnv;
   console.error(
-    "smoke-mcp: target URL required. " +
-      "Set MCP_SMOKE_URL or pass the URL as the first argument."
+    "smoke-mcp: target URL required. " + "Set MCP_SMOKE_URL or pass the URL as the first argument."
   );
   process.exit(1);
 }
 
 function resolveCommit(): string {
   return (
-    process.env.GIT_SHA ??
-    process.env.RENDER_GIT_COMMIT ??
-    process.env.GIT_COMMIT ??
-    "unknown"
+    process.env.GIT_SHA ?? process.env.RENDER_GIT_COMMIT ?? process.env.GIT_COMMIT ?? "unknown"
   );
 }
 
@@ -89,10 +85,7 @@ function resolveTimeoutMs(): number {
 /** Run fn with a bounded timeout; returns a rejected promise on timeout. */
 async function withTimeout<T>(ms: number, label: string, fn: () => Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${ms}ms`)),
-      ms
-    );
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
     fn().then(
       (value) => {
         clearTimeout(timer);
@@ -218,13 +211,7 @@ export async function runMcpSmoke(
         throw new Error(`Forbidden tools in list: ${forbiddenPresent.join(", ")}`);
       }
 
-      recordStep(
-        steps,
-        "tools/list",
-        true,
-        Date.now() - t0,
-        `count=${toolCount}`
-      );
+      recordStep(steps, "tools/list", true, Date.now() - t0, `count=${toolCount}`);
     } catch (error) {
       recordStep(steps, "tools/list", false, Date.now() - t0, redactError(error));
       // Still attempt the tool call so we get partial evidence.
@@ -251,13 +238,7 @@ export async function runMcpSmoke(
 
       recordStep(steps, "tools/call inspect_budget", true, Date.now() - t0);
     } catch (error) {
-      recordStep(
-        steps,
-        "tools/call inspect_budget",
-        false,
-        Date.now() - t0,
-        redactError(error)
-      );
+      recordStep(steps, "tools/call inspect_budget", false, Date.now() - t0, redactError(error));
     }
   }
 
@@ -317,8 +298,7 @@ async function main() {
   }
 }
 
-const entrypoint =
-  process.argv[1] === undefined ? undefined : pathToFileURL(process.argv[1]).href;
+const entrypoint = process.argv[1] === undefined ? undefined : pathToFileURL(process.argv[1]).href;
 
 if (entrypoint === import.meta.url) {
   await main();

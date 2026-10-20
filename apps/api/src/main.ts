@@ -5,7 +5,6 @@ import {
   createRuntimeFacilitatorSignerProvider
 } from "@lumenbazaar/stellar-payments";
 
-
 const config = loadConfig();
 const signerProvider = createRuntimeFacilitatorSignerProvider(config);
 await assertRuntimeSignerReady(signerProvider);

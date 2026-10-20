@@ -10,7 +10,11 @@ import {
   runTestnetE2ESuite,
   createOfficialTestnetSigner
 } from "./testnet-e2e-suite.js";
-import type { PaymentRequirements, PaymentPayload, ReceiptResult } from "../packages/buyer-sdk/src/index.js";
+import type {
+  PaymentRequirements,
+  PaymentPayload,
+  ReceiptResult
+} from "../packages/buyer-sdk/src/index.js";
 
 /**
  * Integration tests for testnet e2e suite
@@ -57,23 +61,26 @@ const mockProbeEvidence: TestnetProbeEvidence = {
   checkedAt: new Date().toISOString(),
   commits: mockManifest.commits,
   migrationRunId: mockManifest.migrationRunId,
-  officialV2Challenge: true,
-  supportedExactTestnet: true
+  officialV2Challenge: true as const,
+  supportedExactTestnet: true as const
 };
 
 const mockRequirements: PaymentRequirements = {
   scheme: "exact",
   network: "stellar:testnet",
-  asset: "USDC:GDZST3XVCDTUJ76ZAV2HA72KYRTYKYI6YLJVMQ5DNPMJR7BKQW5EBXM:CAQAAE5BBKEWBLZX2Q5QIWZDWLKR3SXI5YLNPVIVJ2YVJKPLGOMF6LTHL",
+  asset:
+    "USDC:GDZST3XVCDTUJ76ZAV2HA72KYRTYKYI6YLJVMQ5DNPMJR7BKQW5EBXM:CAQAAE5BBKEWBLZX2Q5QIWZDWLKR3SXI5YLNPVIVJ2YVJKPLGOMF6LTHL",
   amount: "1.0000000",
-  payTo: "GDZST3XVCDTUJ76ZAV2HA72KYRTYKYI6YLJVMQ5DNPMJR7BKQW5EBXM"
+  payTo: "GDZST3XVCDTUJ76ZAV2HA72KYRTYKYI6YLJVMQ5DNPMJR7BKQW5EBXM",
+  maxTimeoutSeconds: 60,
+  extra: {}
 };
 
 const mockPaymentPayload: PaymentPayload = {
   x402Version: 2,
   resource: { url: mockManifest.paidResource.resourceUrl },
   accepted: mockRequirements,
-  payload: "mock_signed_payload_data"
+  payload: { transaction: "mock_signed_payload_data" }
 };
 
 const mockReceipt: ReceiptResult = {
@@ -83,32 +90,28 @@ const mockReceipt: ReceiptResult = {
   status: "finalized",
   transactionHash: "e".repeat(64),
   ledger: 123456,
-  timestamp: new Date().toISOString(),
-  network: "stellar:testnet",
-  amount: "1.0000000",
-  assetCode: "USDC",
-  assetIssuer: "GDZST3XVCDTUJ76ZAV2HA72KYRTYKYI6YLJVMQ5DNPMJR7BKQW5EBXM"
+  settledAt: new Date().toISOString()
 };
 
 describe("Testnet E2E Suite - Smoke Mode", () => {
   it("should run smoke mode successfully without credentials", async () => {
-    const mockFetch = vi.fn(async (url: string) => {
-      if (url.includes("/health")) {
+    const mockFetch = vi.fn(async (url: string | URL | Request) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/health")) {
         return new Response(JSON.stringify({ ok: true, app: "api" }), { status: 200 });
       }
-      if (url.includes("/ready")) {
+      if (urlStr.includes("/ready")) {
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }
-      if (url.includes("/version")) {
-        return new Response(
-          JSON.stringify({ commit: "a".repeat(40), app: "api" }),
-          { status: 200 }
-        );
+      if (urlStr.includes("/version")) {
+        return new Response(JSON.stringify({ commit: "a".repeat(40), app: "api" }), {
+          status: 200
+        });
       }
-      if (url.includes("/metrics")) {
+      if (urlStr.includes("/metrics")) {
         return new Response("lumenbazaar_api_uptime_seconds 100", { status: 200 });
       }
-      if (url.includes("/v1/supported")) {
+      if (urlStr.includes("/v1/supported")) {
         return new Response(
           JSON.stringify({
             kinds: [
@@ -123,14 +126,14 @@ describe("Testnet E2E Suite - Smoke Mode", () => {
           { status: 200 }
         );
       }
-      if (url.includes("/payment-required")) {
+      if (urlStr.includes("/payment-required")) {
         return new Response(null, {
           status: 402,
           headers: { "payment-required": "x402-v2 exact stellar:testnet" }
         });
       }
       return new Response(null, { status: 404 });
-    });
+    }) as unknown as typeof fetch;
 
     const evidence = await runTestnetE2ESmoke(mockManifest, mockFetch);
 
@@ -144,18 +147,19 @@ describe("Testnet E2E Suite - Smoke Mode", () => {
   it("should handle network errors gracefully in smoke mode", async () => {
     const mockFetch = vi.fn(async () => {
       throw new Error("Network error");
-    });
+    }) as unknown as typeof fetch;
 
     await expect(runTestnetE2ESmoke(mockManifest, mockFetch)).rejects.toThrow();
   });
 
   it("should detect unhealthy deployment", async () => {
-    const mockFetch = vi.fn(async (url: string) => {
-      if (url.includes("/health")) {
+    const mockFetch = vi.fn(async (url: string | URL | Request) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/health")) {
         return new Response(JSON.stringify({ ok: false }), { status: 200 });
       }
       return new Response(null, { status: 500 });
-    });
+    }) as unknown as typeof fetch;
 
     await expect(runTestnetE2ESmoke(mockManifest, mockFetch)).rejects.toThrow();
   });
@@ -165,13 +169,27 @@ describe("Testnet E2E Suite - Full Mode", () => {
   it("should complete full e2e flow with payment and settlement", async () => {
     const mockDependencies: E2ESuiteDependencies = {
       sign: async () => mockPaymentPayload,
-      runFlow: async () => ({
-        call: {
-          success: true,
-          statusCode: 200,
-          data: { weather: "sunny" }
-        },
-        settlement: {
+      runFlow: async () =>
+        ({
+          call: {
+            success: true,
+            statusCode: 200,
+            data: { weather: "sunny" }
+          },
+          settlement: {
+            transaction: "e".repeat(64),
+            extra: {
+              lumenbazaar: {
+                correlationId: "corr_123456",
+                ledger: 123456,
+                receiptId: "receipt_123456"
+              }
+            }
+          },
+          receipt: mockReceipt
+        }) as never,
+      settle: async () =>
+        ({
           transaction: "e".repeat(64),
           extra: {
             lumenbazaar: {
@@ -180,27 +198,11 @@ describe("Testnet E2E Suite - Full Mode", () => {
               receiptId: "receipt_123456"
             }
           }
-        },
-        receipt: mockReceipt
-      }),
-      settle: async () => ({
-        transaction: "e".repeat(64),
-        extra: {
-          lumenbazaar: {
-            correlationId: "corr_123456",
-            ledger: 123456,
-            receiptId: "receipt_123456"
-          }
-        }
-      }),
+        }) as never,
       receipt: async () => mockReceipt
     };
 
-    const evidence = await runTestnetE2ESuite(
-      mockManifest,
-      mockProbeEvidence,
-      mockDependencies
-    );
+    const evidence = await runTestnetE2ESuite(mockManifest, mockProbeEvidence, mockDependencies);
 
     expect(evidence).toBeDefined();
     expect(evidence.mode).toBe("full");
@@ -214,20 +216,21 @@ describe("Testnet E2E Suite - Full Mode", () => {
     let settleCallCount = 0;
     const mockDependencies: E2ESuiteDependencies = {
       sign: async () => mockPaymentPayload,
-      runFlow: async () => ({
-        call: { success: true, statusCode: 200, data: {} },
-        settlement: {
-          transaction: "e".repeat(64),
-          extra: {
-            lumenbazaar: {
-              correlationId: "corr_123456",
-              ledger: 123456,
-              receiptId: "receipt_123456"
+      runFlow: async () =>
+        ({
+          call: { success: true, statusCode: 200, data: {} },
+          settlement: {
+            transaction: "e".repeat(64),
+            extra: {
+              lumenbazaar: {
+                correlationId: "corr_123456",
+                ledger: 123456,
+                receiptId: "receipt_123456"
+              }
             }
-          }
-        },
-        receipt: mockReceipt
-      }),
+          },
+          receipt: mockReceipt
+        }) as never,
       settle: async () => {
         settleCallCount++;
         if (settleCallCount > 1) {
@@ -242,16 +245,12 @@ describe("Testnet E2E Suite - Full Mode", () => {
               receiptId: "receipt_123456"
             }
           }
-        };
+        } as never;
       },
       receipt: async () => mockReceipt
     };
 
-    const evidence = await runTestnetE2ESuite(
-      mockManifest,
-      mockProbeEvidence,
-      mockDependencies
-    );
+    const evidence = await runTestnetE2ESuite(mockManifest, mockProbeEvidence, mockDependencies);
 
     expect(evidence.replayRejection.errorCode).toContain("REPLAY");
     expect(evidence.summary.replayBlocked).toBe(true);
@@ -260,31 +259,28 @@ describe("Testnet E2E Suite - Full Mode", () => {
   it("should verify durable evidence persistence", async () => {
     const mockDependencies: E2ESuiteDependencies = {
       sign: async () => mockPaymentPayload,
-      runFlow: async () => ({
-        call: { success: true, statusCode: 200, data: {} },
-        settlement: {
-          transaction: "e".repeat(64),
-          extra: {
-            lumenbazaar: {
-              correlationId: "corr_123456",
-              ledger: 123456,
-              receiptId: "receipt_123456"
+      runFlow: async () =>
+        ({
+          call: { success: true, statusCode: 200, data: {} },
+          settlement: {
+            transaction: "e".repeat(64),
+            extra: {
+              lumenbazaar: {
+                correlationId: "corr_123456",
+                ledger: 123456,
+                receiptId: "receipt_123456"
+              }
             }
-          }
-        },
-        receipt: mockReceipt
-      }),
+          },
+          receipt: mockReceipt
+        }) as never,
       settle: async () => {
         throw new Error("REPLAY_DETECTED");
       },
       receipt: async () => mockReceipt
     };
 
-    const evidence = await runTestnetE2ESuite(
-      mockManifest,
-      mockProbeEvidence,
-      mockDependencies
-    );
+    const evidence = await runTestnetE2ESuite(mockManifest, mockProbeEvidence, mockDependencies);
 
     expect(evidence.durableVerification.receiptPersisted).toBe(true);
     expect(evidence.durableVerification.settlementIdempotent).toBe(true);
@@ -294,12 +290,13 @@ describe("Testnet E2E Suite - Full Mode", () => {
   it("should fail if payment flow incomplete", async () => {
     const mockDependencies: E2ESuiteDependencies = {
       sign: async () => mockPaymentPayload,
-      runFlow: async () => ({
-        call: { success: false, statusCode: 402 },
-        settlement: undefined,
-        receipt: undefined
-      }),
-      settle: async () => ({}),
+      runFlow: async () =>
+        ({
+          call: { success: false, statusCode: 402 },
+          settlement: undefined,
+          receipt: undefined
+        }) as never,
+      settle: async () => ({}) as never,
       receipt: async () => mockReceipt
     };
 
@@ -317,21 +314,22 @@ describe("Testnet E2E Suite - Full Mode", () => {
 
     const mockDependencies: E2ESuiteDependencies = {
       sign: async () => mockPaymentPayload,
-      runFlow: async () => ({
-        call: { success: true, statusCode: 200, data: {} },
-        settlement: {
-          transaction: "e".repeat(64),
-          extra: {
-            lumenbazaar: {
-              correlationId: "corr_123456",
-              ledger: 123456,
-              receiptId: "receipt_123456"
+      runFlow: async () =>
+        ({
+          call: { success: true, statusCode: 200, data: {} },
+          settlement: {
+            transaction: "e".repeat(64),
+            extra: {
+              lumenbazaar: {
+                correlationId: "corr_123456",
+                ledger: 123456,
+                receiptId: "receipt_123456"
+              }
             }
-          }
-        },
-        receipt: unfinalized
-      }),
-      settle: async () => ({}),
+          },
+          receipt: unfinalized
+        }) as never,
+      settle: async () => ({}) as never,
       receipt: async () => unfinalized
     };
 
@@ -345,31 +343,28 @@ describe("Testnet E2E Suite - Evidence Validation", () => {
   it("should include all required evidence fields", async () => {
     const mockDependencies: E2ESuiteDependencies = {
       sign: async () => mockPaymentPayload,
-      runFlow: async () => ({
-        call: { success: true, statusCode: 200, data: { result: "data" } },
-        settlement: {
-          transaction: "e".repeat(64),
-          extra: {
-            lumenbazaar: {
-              correlationId: "corr_123456",
-              ledger: 123456,
-              receiptId: "receipt_123456"
+      runFlow: async () =>
+        ({
+          call: { success: true, statusCode: 200, data: { result: "data" } },
+          settlement: {
+            transaction: "e".repeat(64),
+            extra: {
+              lumenbazaar: {
+                correlationId: "corr_123456",
+                ledger: 123456,
+                receiptId: "receipt_123456"
+              }
             }
-          }
-        },
-        receipt: mockReceipt
-      }),
+          },
+          receipt: mockReceipt
+        }) as never,
       settle: async () => {
         throw new Error("REPLAY_DETECTED");
       },
       receipt: async () => mockReceipt
     };
 
-    const evidence = await runTestnetE2ESuite(
-      mockManifest,
-      mockProbeEvidence,
-      mockDependencies
-    );
+    const evidence = await runTestnetE2ESuite(mockManifest, mockProbeEvidence, mockDependencies);
 
     // Check deployment evidence
     expect(evidence.deployment).toBeDefined();
@@ -406,31 +401,28 @@ describe("Testnet E2E Suite - Evidence Validation", () => {
   it("should hash authorization payload correctly", async () => {
     const mockDependencies: E2ESuiteDependencies = {
       sign: async () => mockPaymentPayload,
-      runFlow: async () => ({
-        call: { success: true, statusCode: 200, data: {} },
-        settlement: {
-          transaction: "e".repeat(64),
-          extra: {
-            lumenbazaar: {
-              correlationId: "corr_123456",
-              ledger: 123456,
-              receiptId: "receipt_123456"
+      runFlow: async () =>
+        ({
+          call: { success: true, statusCode: 200, data: {} },
+          settlement: {
+            transaction: "e".repeat(64),
+            extra: {
+              lumenbazaar: {
+                correlationId: "corr_123456",
+                ledger: 123456,
+                receiptId: "receipt_123456"
+              }
             }
-          }
-        },
-        receipt: mockReceipt
-      }),
+          },
+          receipt: mockReceipt
+        }) as never,
       settle: async () => {
         throw new Error("REPLAY_DETECTED");
       },
       receipt: async () => mockReceipt
     };
 
-    const evidence = await runTestnetE2ESuite(
-      mockManifest,
-      mockProbeEvidence,
-      mockDependencies
-    );
+    const evidence = await runTestnetE2ESuite(mockManifest, mockProbeEvidence, mockDependencies);
 
     expect(evidence.firstFlow.authorizationHash).toMatch(/^[a-f0-9]{64}$/);
     expect(evidence.replayRejection.replayAttemptPayload.authorizationHash).toBe(

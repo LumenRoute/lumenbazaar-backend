@@ -4,7 +4,7 @@ import {
   computeBackoffDelay,
   redactSensitiveHeaders,
   createWebhookDeliveryAttemptRecord,
-  type WebhookDeliveryJobInput,
+  type WebhookDeliveryJobInput
 } from "./webhookDelivery.js";
 import { buildWebhookPayload, type WebhookPayload } from "@lumenbazaar/shared";
 
@@ -27,9 +27,7 @@ describe("webhook delivery backoff", () => {
   });
 
   it("adds randomized jitter", () => {
-    const delays = Array.from({ length: 10 }, () =>
-      computeBackoffDelay(1, 5000)
-    );
+    const delays = Array.from({ length: 10 }, () => computeBackoffDelay(1, 5000));
     const unique = new Set(delays);
     expect(unique.size).toBeGreaterThan(1); // Should have variation
   });
@@ -41,7 +39,7 @@ describe("webhook delivery header redaction", () => {
       "content-type": "application/json",
       authorization: "Bearer token123",
       "x-api-key": "secret-key",
-      cookie: "session=xyz",
+      cookie: "session=xyz"
     };
 
     const redacted = redactSensitiveHeaders(headers);
@@ -55,7 +53,7 @@ describe("webhook delivery header redaction", () => {
   it("handles case-insensitive header names", () => {
     const headers = {
       Authorization: "Bearer token",
-      "Content-Type": "application/json",
+      "Content-Type": "application/json"
     };
 
     const redacted = redactSensitiveHeaders(headers);
@@ -77,7 +75,7 @@ describe("webhook delivery attempt record", () => {
         success: true,
         statusCode: 200,
         latencyMs: 150,
-        shouldRetry: false,
+        shouldRetry: false
       }
     );
 
@@ -104,7 +102,7 @@ describe("webhook delivery attempt record", () => {
         latencyMs: 5000,
         errorClass: "ServerError",
         responseBodyTruncated: longBody,
-        shouldRetry: true,
+        shouldRetry: true
       }
     );
 
@@ -128,7 +126,7 @@ describe("webhook delivery success scenarios", () => {
       network: "testnet",
       amount: "100000000",
       assetCode: "USDC",
-      assetIssuer: "GAAAA...",
+      assetIssuer: "GAAAA..."
     };
 
     const input: WebhookDeliveryJobInput = {
@@ -138,7 +136,7 @@ describe("webhook delivery success scenarios", () => {
       url: "https://api.example.com/webhook",
       payload,
       secret: "test-secret",
-      attemptNumber: 0,
+      attemptNumber: 0
     };
 
     // Actual delivery testing requires mocking fetch
@@ -157,8 +155,7 @@ describe("webhook delivery retry logic", () => {
     for (const status of retryableStatuses) {
       // statusCode >= 500 or statusCode in [408, 429, 503] should retry
       const shouldRetry =
-        (status >= 500 || status === 408 || status === 429 || status === 503) &&
-        0 < 5; // attemptNumber < MAX_ATTEMPTS
+        (status >= 500 || status === 408 || status === 429 || status === 503) && 0 < 5; // attemptNumber < MAX_ATTEMPTS
       expect(shouldRetry).toBe(true);
     }
 

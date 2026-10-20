@@ -33,14 +33,13 @@ export function registerDiscoveryRoutes(app: FastifyInstance, options: Discovery
 
   // Authenticated seller catalog endpoint
   app.post("/v1/sellers/:sellerId/catalog", async (request) =>
-    options.catalogService.catalog(
-      parseBody(request, z.unknown()),
-      getSellerContext(request)
-    )
+    options.catalogService.catalog(parseBody(request, z.unknown()), getSellerContext(request))
   );
 }
 
-function getSellerContext(request: FastifyRequest): { sellerId: string; auditable: boolean } | undefined {
+function getSellerContext(
+  request: FastifyRequest
+): { sellerId: string; auditable: boolean } | undefined {
   const principal = (request as any).sellerApiKeyPrincipal as SellerApiKeyPrincipal | undefined;
   if (principal === undefined) {
     return undefined;

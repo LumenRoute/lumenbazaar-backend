@@ -17,12 +17,12 @@ export type StalePaymentCleanupJobData = {
 
 /**
  * Stale Payment Cleanup Worker
- * 
+ *
  * Enforces retention policy on payment records by:
  * 1. Marking stale received attempts as expired
  * 2. Recording retention of failed payments for audit trail
  * 3. Archiving old settled/confirmed payments
- * 
+ *
  * All operations are idempotent and auditable. No data is deleted.
  */
 export async function handleStalePaymentCleanup(
@@ -66,12 +66,11 @@ export async function handleStalePaymentCleanup(
 
     job.log("Financial and audit evidence retention rules applied");
   } catch (err) {
-    const errorMsg = redaction.redactJobError(err);
+    const errorMsg = redaction.redactJobError(err as string | Error);
     job.log(`Stale payment cleanup job failed: ${errorMsg}`);
     throw err;
   }
 }
-
 
 /**
  * Clean up expired payment attempts (older than retention window)
@@ -143,8 +142,10 @@ async function cleanupExpiredPayments(
         } catch (err) {
           retries++;
           if (retries >= config.maxRetries) {
-            const errorMsg = redaction.redactJobError(err);
-            job.log(`Failed to expire payment ${attempt.id} after ${config.maxRetries} retries: ${errorMsg}`);
+            const errorMsg = redaction.redactJobError(err as string | Error);
+            job.log(
+              `Failed to expire payment ${attempt.id} after ${config.maxRetries} retries: ${errorMsg}`
+            );
           }
         }
       }
@@ -219,7 +220,7 @@ async function cleanupFailedPayments(
         } catch (err) {
           retries++;
           if (retries >= config.maxRetries) {
-            const errorMsg = redaction.redactJobError(err);
+            const errorMsg = redaction.redactJobError(err as string | Error);
             job.log(
               `Failed to record retention review for ${attempt.id} after ${config.maxRetries} retries: ${errorMsg}`
             );
@@ -319,7 +320,7 @@ async function archiveSettledPayments(
         } catch (err) {
           retries++;
           if (retries >= config.maxRetries) {
-            const errorMsg = redaction.redactJobError(err);
+            const errorMsg = redaction.redactJobError(err as string | Error);
             job.log(
               `Failed to archive payment ${attempt.id} after ${config.maxRetries} retries: ${errorMsg}`
             );

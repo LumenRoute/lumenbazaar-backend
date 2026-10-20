@@ -272,9 +272,11 @@ export class PaymentSessionService {
 
     const contractResult = await this.bindings.settleSession({
       actualAmountStroops: amountToStroops(request.amount),
+      buyer: session.buyer,
       contractId: session.contractId,
       contractSessionId: session.contractSessionId,
       network: session.network,
+      seller: session.payTo,
       usageHash: request.usageHash
     });
     const remainingAmount = subtractAmounts(session.capAmount, request.amount);

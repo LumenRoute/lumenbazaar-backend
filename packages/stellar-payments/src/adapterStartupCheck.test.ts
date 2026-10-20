@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  checkExactAdapter,
-  checkUptoAdapter,
-} from "./adapterStartupCheck.js";
+import { checkExactAdapter, checkUptoAdapter } from "./adapterStartupCheck.js";
 import { type X402StellarAdapter } from "./x402Adapter.js";
 import { type PaymentSessionService } from "./paymentSession.js";
 
@@ -94,18 +91,12 @@ describe("checkExactAdapter – startup_check_failed", () => {
 
 describe("checkExactAdapter – startup_check_timeout", () => {
   it("returns startup_check_timeout when adapter exceeds deadline", async () => {
-    const result = await checkExactAdapter(
-      slowExactAdapter(500),
-      { timeoutMs: 5 }
-    );
+    const result = await checkExactAdapter(slowExactAdapter(500), { timeoutMs: 5 });
     expect(result).toEqual({ ok: false, reason: "startup_check_timeout" });
   });
 
   it("does not include raw error or latency details in timeout result", async () => {
-    const result = await checkExactAdapter(
-      slowExactAdapter(500),
-      { timeoutMs: 5 }
-    );
+    const result = await checkExactAdapter(slowExactAdapter(500), { timeoutMs: 5 });
     const serialized = JSON.stringify(result);
     expect(serialized).not.toContain("latencyMs");
   });
@@ -149,10 +140,9 @@ describe("checkUptoAdapter – startup_check_failed", () => {
 
 describe("checkUptoAdapter – startup_check_timeout", () => {
   it("returns startup_check_timeout when service exceeds deadline", async () => {
-    const result = await checkUptoAdapter(
-      slowUptoService(500) as PaymentSessionService,
-      { timeoutMs: 5 }
-    );
+    const result = await checkUptoAdapter(slowUptoService(500) as PaymentSessionService, {
+      timeoutMs: 5
+    });
     expect(result).toEqual({ ok: false, reason: "startup_check_timeout" });
   });
 });
@@ -163,7 +153,7 @@ describe("checkExactAdapter + checkUptoAdapter independence", () => {
   it("exact failure does not affect upto result", async () => {
     const [exactResult, uptoResult] = await Promise.all([
       checkExactAdapter(throwingExactAdapter()),
-      checkUptoAdapter(aliveUptoService() as PaymentSessionService),
+      checkUptoAdapter(aliveUptoService() as PaymentSessionService)
     ]);
 
     expect(exactResult).toEqual({ ok: false, reason: "startup_check_failed" });
@@ -173,7 +163,7 @@ describe("checkExactAdapter + checkUptoAdapter independence", () => {
   it("upto failure does not affect exact result", async () => {
     const [exactResult, uptoResult] = await Promise.all([
       checkExactAdapter(aliveExactAdapter()),
-      checkUptoAdapter(throwingUptoService() as PaymentSessionService),
+      checkUptoAdapter(throwingUptoService() as PaymentSessionService)
     ]);
 
     expect(exactResult).toEqual({ ok: true });

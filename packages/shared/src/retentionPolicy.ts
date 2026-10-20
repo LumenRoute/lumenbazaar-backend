@@ -2,10 +2,10 @@ import { type PaymentStatus, type PaymentSessionStatus } from "./models.js";
 
 /**
  * Payment Data Retention and Redaction Policy
- * 
+ *
  * This file defines the retention windows, sensitive field patterns, and redaction
  * rules for payment data across the LumenRoute backend.
- * 
+ *
  * Principles:
  * 1. Financial evidence is retained indefinitely for audit and compliance
  * 2. Sensitive operational fields are redacted at storage, log, and response layers
@@ -211,9 +211,7 @@ export function shouldRedactField(fieldName: string, policy: PaymentRetentionPol
 /**
  * Determine if a payment status should trigger immediate cleanup
  */
-export function shouldCleanupStatus(
-  status: PaymentStatus | PaymentSessionStatus
-): boolean {
+export function shouldCleanupStatus(status: PaymentStatus | PaymentSessionStatus): boolean {
   return status === "expired" || status === "failed" || status === "cancelled";
 }
 
@@ -229,10 +227,7 @@ export function calculateRecordAge(createdAtIso: string): number {
 /**
  * Check if a record exceeds its retention window
  */
-export function isRecordExpired(
-  createdAtIso: string,
-  retentionWindowMs: number
-): boolean {
+export function isRecordExpired(createdAtIso: string, retentionWindowMs: number): boolean {
   return calculateRecordAge(createdAtIso) > retentionWindowMs;
 }
 
@@ -240,11 +235,14 @@ export function isRecordExpired(
  * Justification for retention windows
  */
 export const RETENTION_JUSTIFICATION = {
-  paymentAttempt: "Retained indefinitely for audit trail, replay protection, and financial reconciliation",
+  paymentAttempt:
+    "Retained indefinitely for audit trail, replay protection, and financial reconciliation",
   settlement: "Retained indefinitely as immutable blockchain evidence for dispute resolution",
   receipt: "Retained indefinitely for customer evidence and proof of payment",
   paymentSession: "Retained indefinitely for Upto scheme session history and reconciliation",
   auditLog: "Retained indefinitely for compliance, non-repudiation, and investigation",
-  stalePaymentCleanup: "Payments marked as expired after 7 days of inactivity to manage active payment lifecycle",
-  archival: "Settled payments marked as archived after 90+ days to distinguish active vs. historical records"
+  stalePaymentCleanup:
+    "Payments marked as expired after 7 days of inactivity to manage active payment lifecycle",
+  archival:
+    "Settled payments marked as archived after 90+ days to distinguish active vs. historical records"
 };

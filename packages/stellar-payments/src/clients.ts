@@ -130,7 +130,6 @@ export async function probeHorizonEndpoint(horizonUrl: string, timeoutMs = 2_000
   }
 }
 
-
 import {
   getCircuitSnapshot,
   isEndpointAvailable,

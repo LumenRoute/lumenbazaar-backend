@@ -179,17 +179,15 @@ describe("SellerApiKeyService", () => {
     await expect(service.revokeKey(sellerId, otherSellerKey.apiKey.id)).rejects.toMatchObject({
       code: "UNAUTHORIZED"
     });
-    await expect(service.rotateKey(sellerId, otherSellerKey.apiKey.id, {})).rejects.toMatchObject(
-      { code: "UNAUTHORIZED" }
-    );
+    await expect(service.rotateKey(sellerId, otherSellerKey.apiKey.id, {})).rejects.toMatchObject({
+      code: "UNAUTHORIZED"
+    });
   });
 
   it("validates key creation input", async () => {
     const { service } = createService();
 
-    await expect(
-      service.createKey(sellerId, { name: "bad", scopes: [] })
-    ).rejects.toThrow();
+    await expect(service.createKey(sellerId, { name: "bad", scopes: [] })).rejects.toThrow();
     await expect(
       service.createKey(sellerId, { name: "bad", scopes: ["admin:*"] })
     ).rejects.toThrow();

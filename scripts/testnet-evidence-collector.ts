@@ -283,11 +283,11 @@ export class ReceiptEvidenceCollector {
   collectReceiptEvidence(receipt: ReceiptResult): ReceiptEvidence {
     return {
       receiptId: receipt.id,
-      correlationId: receipt.correlationId,
+      correlationId: receipt.correlationId ?? "unknown",
       status: "finalized",
       transactionHash: receipt.transactionHash,
       ledger: receipt.ledger,
-      paymentAttemptId: receipt.paymentAttemptId,
+      paymentAttemptId: receipt.paymentAttemptId ?? "unknown",
       evidenceHash: sha256(JSON.stringify(receipt)),
       timestamp: new Date().toISOString(),
       verified: true
@@ -417,11 +417,7 @@ function extractSchemes(supportedObj: Record<string, unknown>): Array<{
 
   return kinds
     .filter(
-      (kind) =>
-        typeof kind === "object" &&
-        kind !== null &&
-        "scheme" in kind &&
-        "network" in kind
+      (kind) => typeof kind === "object" && kind !== null && "scheme" in kind && "network" in kind
     )
     .map((kind) => ({
       scheme: String((kind as Record<string, unknown>).scheme),
@@ -479,17 +475,17 @@ function extractExtensions(supportedObj: Record<string, unknown>): string[] {
 
 function extractAssetCode(assetId: string): string {
   // Asset ID format: "code:issuer:contractId" or just "USDC"
-  return assetId.split(":")[0];
+  return assetId.split(":")[0] ?? "unknown";
 }
 
 function extractAssetIssuer(assetId: string): string {
   const parts = assetId.split(":");
-  return parts.length > 1 ? parts[1] : "unknown";
+  return parts.length > 1 && parts[1] ? parts[1] : "unknown";
 }
 
 function extractAssetContractId(assetId: string): string {
   const parts = assetId.split(":");
-  return parts.length > 2 ? parts[2] : "unknown";
+  return parts.length > 2 && parts[2] ? parts[2] : "unknown";
 }
 
 function sha256(value: string): string {
@@ -499,9 +495,7 @@ function sha256(value: string): string {
 /**
  * Verify evidence collection integrity
  */
-export function verifyEvidenceIntegrity(
-  evidence: EvidenceCollection
-): {
+export function verifyEvidenceIntegrity(evidence: EvidenceCollection): {
   valid: boolean;
   errors: string[];
 } {
@@ -545,7 +539,10 @@ export function verifyEvidenceIntegrity(
   }
 
   // Verify evidence chain
-  if (!Array.isArray(evidence.integrity.evidenceChain) || evidence.integrity.evidenceChain.length === 0) {
+  if (
+    !Array.isArray(evidence.integrity.evidenceChain) ||
+    evidence.integrity.evidenceChain.length === 0
+  ) {
     errors.push("Empty or missing evidence chain");
   }
 

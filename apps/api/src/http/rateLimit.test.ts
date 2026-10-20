@@ -93,7 +93,7 @@ describe("rate limit hook", () => {
 
     expect(first.statusCode).toBe(200);
     expect(second.statusCode).toBe(429);
-    
+
     const retryAfter = second.headers["retry-after"];
     expect(retryAfter).toBeDefined();
     const retrySeconds = parseInt(retryAfter as string, 10);

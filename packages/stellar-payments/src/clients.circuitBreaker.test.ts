@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  probeHorizonEndpointsWithFailover,
-  probeRpcEndpointsWithFailover
-} from "./clients.js";
+import { probeHorizonEndpointsWithFailover, probeRpcEndpointsWithFailover } from "./clients.js";
 import {
   getCircuitSnapshot,
   recordFailure,
@@ -80,9 +77,9 @@ describe("circuit breaker + RPC failover", () => {
     recordFailure(urlA);
     recordFailure(urlA);
     recordFailure(urlA);
-    expect(getCircuitSnapshot().find((s) => s.endpoint === "https://rpc-a.testnet.example.com")?.state).toBe(
-      "open"
-    );
+    expect(
+      getCircuitSnapshot().find((s) => s.endpoint === "https://rpc-a.testnet.example.com")?.state
+    ).toBe("open");
 
     // Fast-forward past cooldown by passing an explicit cooldown of 0.
     const fetchSpy = vi
@@ -94,7 +91,9 @@ describe("circuit breaker + RPC failover", () => {
     expect(result.succeeded).toBe(true);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-    const snap = getCircuitSnapshot().find((s) => s.endpoint === "https://rpc-a.testnet.example.com");
+    const snap = getCircuitSnapshot().find(
+      (s) => s.endpoint === "https://rpc-a.testnet.example.com"
+    );
     expect(snap?.state).toBe("closed");
     expect(snap?.consecutiveFailures).toBe(0);
   });

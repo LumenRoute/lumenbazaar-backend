@@ -18,10 +18,10 @@ describe("WebhookEventService", () => {
       amount: "100000000",
       assetCode: "USDC",
       assetIssuer: "GAAAA...",
-      network: "testnet",
+      network: "stellar:testnet" as const,
       transactionHash: "abc123...",
       failureCode: null,
-      failureReason: null,
+      failureReason: null
     };
 
     const events: any[] = [];
@@ -45,10 +45,10 @@ describe("WebhookEventService", () => {
       amount: "100000000",
       assetCode: "USDC",
       assetIssuer: "GAAAA...",
-      network: "testnet",
+      network: "stellar:testnet" as const,
       transactionHash: "abc123...",
       failureCode: null,
-      failureReason: null,
+      failureReason: null
     };
 
     const events: any[] = [];
@@ -80,10 +80,10 @@ describe("WebhookEventService", () => {
       amount: "100000000",
       assetCode: "USDC",
       assetIssuer: "GAAAA...",
-      network: "testnet",
+      network: "stellar:testnet" as const,
       transactionHash: "abc123...",
       failureCode: null,
-      failureReason: null,
+      failureReason: null
     };
 
     const events: any[] = [];
@@ -107,10 +107,10 @@ describe("WebhookEventService", () => {
       amount: "100000000",
       assetCode: "USDC",
       assetIssuer: "GAAAA...",
-      network: "testnet",
+      network: "stellar:testnet" as const,
       transactionHash: null,
       failureCode: "SETTLEMENT_FAILED",
-      failureReason: "Insufficient funds",
+      failureReason: "Insufficient funds"
     };
 
     const events: any[] = [];
@@ -133,10 +133,10 @@ describe("WebhookEventService", () => {
       amount: "100000000",
       assetCode: "USDC",
       assetIssuer: "GAAAA...",
-      network: "testnet",
+      network: "stellar:testnet" as const,
       transactionHash: "abc123def456",
       failureCode: null,
-      failureReason: null,
+      failureReason: null
     };
 
     const events: any[] = [];
@@ -159,10 +159,10 @@ describe("WebhookEventService", () => {
       amount: "100000000",
       assetCode: "USDC",
       assetIssuer: "GAAAA...",
-      network: "testnet",
+      network: "stellar:testnet" as const,
       transactionHash: "abc123...",
       failureCode: null,
-      failureReason: null,
+      failureReason: null
     };
 
     const events1: any[] = [];
@@ -203,10 +203,10 @@ describe("WebhookEventService", () => {
       amount: "100000000",
       assetCode: "USDC",
       assetIssuer: "GAAAA...",
-      network: "testnet",
+      network: "stellar:testnet" as const,
       transactionHash: "abc123...",
       failureCode: null,
-      failureReason: null,
+      failureReason: null
     };
 
     const events: any[] = [];
@@ -236,10 +236,10 @@ describe("WebhookEventService", () => {
         amount: "100000000",
         assetCode: "USDC",
         assetIssuer: "GAAAA...",
-        network: "testnet",
+        network: "stellar:testnet" as const,
         transactionHash: "abc...",
         failureCode: null,
-        failureReason: null,
+        failureReason: null
       },
       {
         id: "settle_2",
@@ -249,11 +249,11 @@ describe("WebhookEventService", () => {
         amount: "50000000",
         assetCode: "USDC",
         assetIssuer: "GAAAA...",
-        network: "testnet",
+        network: "stellar:testnet" as const,
         transactionHash: null,
         failureCode: "SETTLEMENT_FAILED",
-        failureReason: "Rejected",
-      },
+        failureReason: "Rejected"
+      }
     ];
 
     for (const settlement of settlements) {
@@ -268,7 +268,7 @@ describe("WebhookEventService", () => {
 
     expect(total).toBe(2);
     expect(events).toHaveLength(2);
-    expect(events[0].eventType).toBe("settlement.failed");
-    expect(events[1].eventType).toBe("settlement.finalized");
+    expect(events[0]!.eventType).toBe("settlement.failed");
+    expect(events[1]!.eventType).toBe("settlement.finalized");
   });
 });

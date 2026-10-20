@@ -52,17 +52,14 @@ export interface WriteOutboxEventInput {
  *   });
  * });
  */
-export async function writeOutboxEvent(
-  tx: Prisma.TransactionClient,
-  input: WriteOutboxEventInput
-) {
+export async function writeOutboxEvent(tx: Prisma.TransactionClient, input: WriteOutboxEventInput) {
   return tx.outboxEvent.create({
     data: {
       id: `outbox_${randomUUID().replaceAll("-", "").slice(0, 20)}`,
       aggregateType: input.aggregateType,
       aggregateId: input.aggregateId,
       eventType: input.eventType,
-      payload: input.payload as Prisma.JsonValue,
+      payload: input.payload as Prisma.InputJsonValue,
       status: "pending",
       attemptCount: 0,
       nextAttemptAt: new Date()
@@ -177,7 +174,7 @@ export async function markOutboxEventFailed(
     data: {
       status: exceedsMaxAttempts ? "dead" : "pending",
       attemptCount: nextAttemptCount,
-      nextAttemptAt: exceedsMaxAttempts ? undefined : nextAttemptAt,
+      ...(exceedsMaxAttempts ? {} : { nextAttemptAt }),
       lastError,
       lockedBy: null,
       lockExpiresAt: null

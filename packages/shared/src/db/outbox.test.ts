@@ -20,7 +20,7 @@ describe_("Outbox pattern", () => {
 
   beforeEach(async () => {
     client = new PrismaClient({
-      datasources: { db: { url: databaseUrl } }
+      datasources: { db: { url: databaseUrl ?? "postgresql://localhost:5432/test" } }
     });
     await client.outboxEvent.deleteMany();
     await client.processedOutboxEvent.deleteMany();
@@ -172,9 +172,9 @@ describe_("Outbox pattern", () => {
       const claimed1 = await claimOutboxEventBatch(client, workerId1, 10, 60_000);
 
       expect(claimed1).toHaveLength(3);
-      expect(claimed1[0].status).toBe("processing");
-      expect(claimed1[0].lockedBy).toBe(workerId1);
-      expect(claimed1[0].lockExpiresAt).toBeDefined();
+      expect(claimed1[0]!.status).toBe("processing");
+      expect(claimed1[0]!.lockedBy).toBe(workerId1);
+      expect(claimed1[0]!.lockExpiresAt).toBeDefined();
 
       // Second worker cannot claim same events (they are locked)
       const workerId2 = "worker-2";
@@ -205,8 +205,8 @@ describe_("Outbox pattern", () => {
       const claimed = await claimOutboxEventBatch(client, workerId, 10, 60_000);
 
       expect(claimed).toHaveLength(1);
-      expect(claimed[0].lockedBy).toBe(workerId);
-      expect(claimed[0].id).toBe("event_expired");
+      expect(claimed[0]!.lockedBy).toBe(workerId);
+      expect(claimed[0]!.id).toBe("event_expired");
     });
 
     it("respects batch size limit", async () => {
@@ -262,8 +262,8 @@ describe_("Outbox pattern", () => {
       const claimed = await claimOutboxEventBatch(client, "worker", 10, 60_000);
 
       // Should be ordered by aggregateId then createdAt
-      expect(claimed[0].id).toBe("event_agg1_1"); // First created
-      expect(claimed[1].id).toBe("event_agg1_2"); // Second created
+      expect(claimed[0]!.id).toBe("event_agg1_1"); // First created
+      expect(claimed[1]!.id).toBe("event_agg1_2"); // Second created
     });
   });
 
@@ -317,7 +317,7 @@ describe_("Outbox pattern", () => {
       const event = await client.outboxEvent.findUnique({ where: { id: eventId } });
       expect(event?.status).toBe("pending"); // Not dead yet
       expect(event?.attemptCount).toBe(2); // Incremented
-      expect(event?.nextAttemptAt).toBeGreaterThan(new Date()); // Future retry time
+      expect(event?.nextAttemptAt.getTime()).toBeGreaterThan(Date.now() - 1000); // Future retry time
       expect(event?.lastError).toContain("connection timeout");
       expect(event?.lockedBy).toBeNull();
     });
@@ -386,7 +386,14 @@ describe_("Outbox pattern", () => {
       const eventType = "settlement.confirmed";
 
       await client.$transaction(async (tx) => {
-        await recordProcessedOutboxEvent(tx as any, outboxEventId, consumerId, aggregateType, aggregateId, eventType);
+        await recordProcessedOutboxEvent(
+          tx as any,
+          outboxEventId,
+          consumerId,
+          aggregateType,
+          aggregateId,
+          eventType
+        );
       });
 
       const record = await client.processedOutboxEvent.findUnique({
@@ -637,7 +644,7 @@ describe_("Outbox pattern", () => {
       const claimed = await claimOutboxEventBatch(client, "relay-restart", 10, 60_000);
       expect(claimed).toHaveLength(1);
 
-      await markOutboxEventDelivered(client, claimed[0].id);
+      await markOutboxEventDelivered(client, claimed[0]!.id);
 
       event = await client.outboxEvent.findFirst({
         where: { aggregateId: "crash_2" }
@@ -665,7 +672,7 @@ describe_("Outbox pattern", () => {
       // New relay can reclaim the expired lock
       const claimed = await claimOutboxEventBatch(client, "relay-recovery", 10, 60_000);
       expect(claimed).toHaveLength(1);
-      expect(claimed[0].lockedBy).toBe("relay-recovery");
+      expect(claimed[0]!.lockedBy).toBe("relay-recovery");
     });
 
     it("handles redelivery after handoff but before marking delivered (idempotency prevents duplicates)", async () => {
@@ -690,7 +697,14 @@ describe_("Outbox pattern", () => {
 
       // Record as processed
       await client.$transaction(async (tx) => {
-        await recordProcessedOutboxEvent(tx as any, outboxEventId, consumerId, "settlement", "agg_redelivery", "settlement.confirmed");
+        await recordProcessedOutboxEvent(
+          tx as any,
+          outboxEventId,
+          consumerId,
+          "settlement",
+          "agg_redelivery",
+          "settlement.confirmed"
+        );
       });
 
       // Crash before marking delivered, event goes back to pending

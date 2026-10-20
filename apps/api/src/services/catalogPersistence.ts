@@ -41,10 +41,7 @@ import {
   type ResourceStore,
   type UpdateResourceInput
 } from "./resources.js";
-import {
-  InMemorySearchDocumentStore,
-  type SearchDocumentStore
-} from "./search.js";
+import { InMemorySearchDocumentStore, type SearchDocumentStore } from "./search.js";
 import {
   InMemorySellerApiKeyStore,
   type SellerApiKeyRecord,
@@ -336,7 +333,10 @@ export class PrismaSellerApiKeyStore implements SellerApiKeyStore {
 export class PrismaCatalogEventStore implements CatalogEventStore {
   constructor(private readonly db: PrismaClient) {}
 
-  async createCatalogEvent(input: Omit<CatalogEvent, "id" | "createdAt">, tx?: Prisma.TransactionClient) {
+  async createCatalogEvent(
+    input: Omit<CatalogEvent, "id" | "createdAt">,
+    tx?: Prisma.TransactionClient
+  ) {
     // Use provided transaction client if available, otherwise use root client
     const client = tx ?? this.db;
     return mapCatalogEvent(
@@ -401,10 +401,10 @@ export function createCatalogPersistence(config: AppConfig) {
     config.nodeEnv !== "production" ||
     config.lumenEnv === "local"
   ) {
-  return {
-    sellerStore: new InMemorySellerStore() as SellerStore,
-    sellerApiKeyStore: new InMemorySellerApiKeyStore() as SellerApiKeyStore,
-    resourceStore: new InMemoryResourceStore() as ResourceStore,
+    return {
+      sellerStore: new InMemorySellerStore() as SellerStore,
+      sellerApiKeyStore: new InMemorySellerApiKeyStore() as SellerApiKeyStore,
+      resourceStore: new InMemoryResourceStore() as ResourceStore,
       eventStore: new InMemoryCatalogEventStore() as CatalogEventStore,
       searchDocumentStore: new InMemorySearchDocumentStore() as SearchDocumentStore,
       indexingQueue: new InMemoryResourceIndexingQueue() as ResourceIndexingQueue,

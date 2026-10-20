@@ -43,6 +43,8 @@ export type ReceiptResult = {
   ledger: number;
   status: string;
   settledAt: string;
+  correlationId?: string;
+  paymentAttemptId?: string;
 };
 
 export type PaidResourceFlowOptions = CallOptions & {

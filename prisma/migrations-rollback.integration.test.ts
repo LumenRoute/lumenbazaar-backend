@@ -2,10 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { PrismaClient } from "@prisma/client";
-import {
-  createDisposableTestDatabase,
-  runMigrations
-} from "@lumenbazaar/testkit";
+import { createDisposableTestDatabase, runMigrations } from "@lumenbazaar/testkit";
 
 const execAsync = promisify(exec);
 
@@ -275,8 +272,8 @@ describe("Database Migration Upgrades and Rollbacks", () => {
       });
 
       expect(correlatedLogs).toHaveLength(2);
-      expect(correlatedLogs[0].action).toBe("register");
-      expect(correlatedLogs[1].action).toBe("verify_domain");
+      expect(correlatedLogs[0]!.action).toBe("register");
+      expect(correlatedLogs[1]!.action).toBe("verify_domain");
     });
   });
 

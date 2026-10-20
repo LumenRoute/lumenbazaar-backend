@@ -5,8 +5,9 @@ import {
   type Settlement,
   type SettlementStatus,
   type WebhookEventType,
+  type NetworkId,
   buildWebhookPayload,
-  type WebhookPayload,
+  type WebhookPayload
 } from "@lumenbazaar/shared";
 
 /**
@@ -17,7 +18,7 @@ export const WEBHOOK_EVENT_TYPE_TO_STATUS: Record<WebhookEventType, SettlementSt
   "settlement.pending": ["pending"],
   "settlement.finalized": ["confirmed", "settled"],
   "settlement.failed": ["failed", "timed_out"],
-  "settlement.reconciled": ["settled"], // reconciliationState = "reconciled"
+  "settlement.reconciled": ["settled"] // reconciliationState = "reconciled"
 };
 
 /**
@@ -106,7 +107,7 @@ export class InMemoryWebhookEventStore implements WebhookEventStore {
       settlementId,
       status,
       payload,
-      createdAt: now,
+      createdAt: now
     });
 
     return { id, eventId, isNew: true };
@@ -139,7 +140,7 @@ export class InMemoryWebhookEventStore implements WebhookEventStore {
       eventId: e.eventId,
       eventType: e.eventType,
       status: e.status,
-      createdAt: e.createdAt,
+      createdAt: e.createdAt
     }));
 
     return { events, total: all.length };
@@ -170,9 +171,7 @@ export type WebhookEventListener = (event: {
 export class WebhookEventService {
   private readonly listeners: WebhookEventListener[] = [];
 
-  constructor(
-    private readonly store: WebhookEventStore = new InMemoryWebhookEventStore()
-  ) {}
+  constructor(private readonly store: WebhookEventStore = new InMemoryWebhookEventStore()) {}
 
   /**
    * Subscribe to webhook events.
@@ -211,7 +210,7 @@ export class WebhookEventService {
       amount: string;
       assetCode: string;
       assetIssuer: string;
-      network: string;
+      network: NetworkId;
       transactionHash: string | null;
       failureCode: string | null;
       failureReason: string | null;
@@ -247,7 +246,7 @@ export class WebhookEventService {
         settlementId: settlement.id,
         status: settlement.status,
         payload,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date().toISOString()
       };
 
       // Notify all listeners (webhook delivery workers)

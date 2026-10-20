@@ -77,7 +77,12 @@ export async function handleOutboxRelay(
         await job.log(`Failed to deliver event ${event.id}: ${errorMsg}`);
 
         // Record failure and schedule retry
-        await markOutboxEventFailed(db, event.id, error instanceof Error ? error : new Error(String(error)), MAX_RETRY_ATTEMPTS);
+        await markOutboxEventFailed(
+          db,
+          event.id,
+          error instanceof Error ? error : new Error(String(error)),
+          MAX_RETRY_ATTEMPTS
+        );
       }
     }
 
@@ -111,16 +116,20 @@ async function deliverOutboxEvent(
 
   if (event.aggregateType === "resource" && event.eventType === "resource.indexed") {
     consumerId = CONSUMER_IDS.resourceIndexing;
-  } else if (event.aggregateType === "settlement" && event.eventType === "settlement.reconciliation_enqueued") {
+  } else if (
+    event.aggregateType === "settlement" &&
+    event.eventType === "settlement.reconciliation_enqueued"
+  ) {
     consumerId = CONSUMER_IDS.settlementReconciliation;
   } else if (event.aggregateType === "receipt" && event.eventType === "receipt.status_changed") {
     consumerId = CONSUMER_IDS.receiptFinalization;
-  } else if (event.aggregateType === "catalog" && event.eventType === "catalog.resource_cataloged") {
+  } else if (
+    event.aggregateType === "catalog" &&
+    event.eventType === "catalog.resource_cataloged"
+  ) {
     consumerId = CONSUMER_IDS.catalogIndexing;
   } else {
-    throw new Error(
-      `Unknown outbox event type: ${event.aggregateType}.${event.eventType}`
-    );
+    throw new Error(`Unknown outbox event type: ${event.aggregateType}.${event.eventType}`);
   }
 
   // Deliver to handler - handler is responsible for:
@@ -164,9 +173,7 @@ async function routeAndDeliver(
     // Catalog indexing - payload should have resource details
     await deliverCatalogIndexingEvent(db, payload, consumerId, event.id, job);
   } else {
-    throw new Error(
-      `No handler for outbox event: ${aggregateType}.${eventType}`
-    );
+    throw new Error(`No handler for outbox event: ${aggregateType}.${eventType}`);
   }
 }
 
@@ -202,10 +209,19 @@ async function deliverResourceIndexingEvent(
   // This ensures if the process crashes after enqueueing but before committing,
   // the event won't be reprocessed by another relay instance.
   await db.$transaction(async (tx) => {
-    await recordProcessedOutboxEvent(tx, eventId, consumerId, "resource", resourceId, "resource.indexed");
+    await recordProcessedOutboxEvent(
+      tx,
+      eventId,
+      consumerId,
+      "resource",
+      resourceId,
+      "resource.indexed"
+    );
   });
 
-  await job.log(`Delivered resource indexing event for resource ${resourceId} version ${versionId}`);
+  await job.log(
+    `Delivered resource indexing event for resource ${resourceId} version ${versionId}`
+  );
 }
 
 /**
@@ -235,8 +251,8 @@ async function deliverSettlementReconciliationEvent(
   }
 
   // TODO: Enqueue actual settlement confirmation job
-  // Example: await settlementQueue.add(SettlementReconciliationJob { 
-  //   paymentAttemptId, settlementId, transactionHash, network, correlationId 
+  // Example: await settlementQueue.add(SettlementReconciliationJob {
+  //   paymentAttemptId, settlementId, transactionHash, network, correlationId
   // });
   // For now, this is a placeholder for the actual integration.
 
@@ -271,7 +287,9 @@ async function deliverReceiptFinalizationEvent(
 ): Promise<void> {
   const { receiptId, sellerId, status, transactionHash } = payload;
   if (!receiptId || !sellerId || !status) {
-    throw new Error("Invalid receipt finalization event payload: missing receiptId, sellerId, or status");
+    throw new Error(
+      "Invalid receipt finalization event payload: missing receiptId, sellerId, or status"
+    );
   }
 
   // Idempotency: Check if already processed
@@ -291,7 +309,14 @@ async function deliverReceiptFinalizationEvent(
   // Important: This MUST be done in the same transaction as the webhook/notification side effects
   // so that if the process crashes, the idempotency record exists and prevents reprocessing.
   await db.$transaction(async (tx) => {
-    await recordProcessedOutboxEvent(tx, eventId, consumerId, "receipt", receiptId, "receipt.status_changed");
+    await recordProcessedOutboxEvent(
+      tx,
+      eventId,
+      consumerId,
+      "receipt",
+      receiptId,
+      "receipt.status_changed"
+    );
   });
 
   await job.log(

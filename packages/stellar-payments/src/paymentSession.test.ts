@@ -163,7 +163,8 @@ function enabledConfig() {
   return loadConfig({
     ENABLE_UPTO_SCHEME: "true",
     STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID: contractId,
-    STELLAR_TESTNET_USDC_CONTRACT_ID: assetContractId
+    STELLAR_TESTNET_USDC_CONTRACT_ID: assetContractId,
+    STELLAR_TESTNET_USDC_ISSUER: localIssuerPublicKey
   });
 }
 

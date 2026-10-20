@@ -31,7 +31,9 @@ export async function handleOutboxCleanup(
   try {
     const deletedCount = await cleanupDeliveredOutboxEvents(db, retentionDays);
 
-    await job.log(`Outbox cleanup complete: deleted ${deletedCount} delivered events (retention: ${retentionDays} days)`);
+    await job.log(
+      `Outbox cleanup complete: deleted ${deletedCount} delivered events (retention: ${retentionDays} days)`
+    );
 
     return {
       deletedCount,

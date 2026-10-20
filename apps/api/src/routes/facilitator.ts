@@ -55,12 +55,16 @@ export function registerFacilitatorRoutes(app: FastifyInstance, options: Facilit
     const readinessCapabilities = readinessReport.capabilities;
 
     const registry = options.capabilityRegistry?.();
-    const exactEnabled = registry !== undefined
-      ? registry.isSupported("exact", networks[0]?.id ?? "stellar:testnet") && readinessCapabilities.exact
-      : readinessCapabilities.exact;
-    const uptoEnabled = registry !== undefined
-      ? registry.isSupported("upto", networks[0]?.id ?? "stellar:testnet") && readinessCapabilities.upto
-      : readinessCapabilities.upto;
+    const exactEnabled =
+      registry !== undefined
+        ? registry.isSupported("exact", networks[0]?.id ?? "stellar:testnet") &&
+          readinessCapabilities.exact
+        : readinessCapabilities.exact;
+    const uptoEnabled =
+      registry !== undefined
+        ? registry.isSupported("upto", networks[0]?.id ?? "stellar:testnet") &&
+          readinessCapabilities.upto
+        : readinessCapabilities.upto;
 
     const exactKinds = exactEnabled
       ? networks.map((network) => ({

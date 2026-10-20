@@ -7,7 +7,7 @@ import {
   LumenError,
   type WebhookEndpoint,
   type WebhookSecret,
-  WEBHOOK_SECRET_ROTATION_OVERLAP_SECONDS,
+  WEBHOOK_SECRET_ROTATION_OVERLAP_SECONDS
 } from "@lumenbazaar/shared";
 
 import { type AuditLogService } from "./audit.js";
@@ -32,18 +32,12 @@ export function validateWebhookUrl(urlString: string): URL {
 
   // Must use HTTPS
   if (url.protocol !== "https:") {
-    throw new LumenError(
-      "VALIDATION_FAILED",
-      "Webhook URL must use HTTPS protocol."
-    );
+    throw new LumenError("VALIDATION_FAILED", "Webhook URL must use HTTPS protocol.");
   }
 
   // Must not contain credentials
   if (url.username || url.password) {
-    throw new LumenError(
-      "VALIDATION_FAILED",
-      "Webhook URL must not contain credentials."
-    );
+    throw new LumenError("VALIDATION_FAILED", "Webhook URL must not contain credentials.");
   }
 
   // Extract hostname for IP checking
@@ -61,7 +55,7 @@ export function validateWebhookUrl(urlString: string): URL {
     /^::1$/, // IPv6 loopback
     /^fe80:/, // IPv6 link-local
     /^fc00:/, // IPv6 ULA
-    /^fd00:/, // IPv6 ULA
+    /^fd00:/ // IPv6 ULA
   ];
 
   if (privateIpPatterns.some((pattern) => pattern.test(hostname))) {
@@ -110,14 +104,14 @@ export function generateWebhookSecret(): string {
 
 export const createWebhookEndpointSchema = z.object({
   url: z.string().trim().url(),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean().default(true)
 });
 
 export type CreateWebhookEndpointInput = z.infer<typeof createWebhookEndpointSchema>;
 
 export const updateWebhookEndpointSchema = z.object({
   url: z.string().trim().url().optional(),
-  isActive: z.boolean().optional(),
+  isActive: z.boolean().optional()
 });
 
 export type UpdateWebhookEndpointInput = z.infer<typeof updateWebhookEndpointSchema>;
@@ -139,27 +133,16 @@ export type WebhookStore = {
   ) => Promise<WebhookEndpoint>;
   deleteWebhookEndpoint: (endpointId: string) => Promise<void>;
   getCurrentSecret: (endpointId: string) => Promise<WebhookSecret | undefined>;
-  rotateSecret: (
-    endpointId: string
-  ) => Promise<WebhookSecret & { secret: string }>;
-  getValidSecrets: (
-    endpointId: string
-  ) => Promise<Array<WebhookSecret & { secret?: string }>>;
-  updateLastDelivery: (
-    endpointId: string,
-    statusCode: number,
-    timestamp: Date
-  ) => Promise<void>;
+  rotateSecret: (endpointId: string) => Promise<WebhookSecret & { secret: string }>;
+  getValidSecrets: (endpointId: string) => Promise<Array<WebhookSecret & { secret?: string }>>;
+  updateLastDelivery: (endpointId: string, statusCode: number, timestamp: Date) => Promise<void>;
 };
 
 /**
  * In-memory webhook store for testing and development.
  */
 export class InMemoryWebhookStore implements WebhookStore {
-  private readonly endpoints = new Map<
-    string,
-    WebhookEndpoint & { secretId: string }
-  >();
+  private readonly endpoints = new Map<string, WebhookEndpoint & { secretId: string }>();
   private readonly secrets = new Map<string, WebhookSecret & { secret: string }>();
 
   async createWebhookEndpoint(
@@ -167,9 +150,7 @@ export class InMemoryWebhookStore implements WebhookStore {
     url: string
   ): Promise<WebhookEndpoint & { secret: string }> {
     const endpointId = `webhook_${randomUUID().replaceAll("-", "").slice(0, 24)}`;
-    const secretId = `webhook_secret_${randomUUID()
-      .replaceAll("-", "")
-      .slice(0, 24)}`;
+    const secretId = `webhook_secret_${randomUUID().replaceAll("-", "").slice(0, 24)}`;
     const secret = generateWebhookSecret();
     const now = new Date();
 
@@ -182,7 +163,7 @@ export class InMemoryWebhookStore implements WebhookStore {
       lastDeliveryStatus: null,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
-      secretId,
+      secretId
     };
 
     const webhookSecret: WebhookSecret & { secret: string } = {
@@ -192,7 +173,7 @@ export class InMemoryWebhookStore implements WebhookStore {
       isCurrent: true,
       createdAt: now.toISOString(),
       rotatedOutAt: null,
-      secret,
+      secret
     };
 
     this.endpoints.set(endpointId, endpoint);
@@ -200,7 +181,7 @@ export class InMemoryWebhookStore implements WebhookStore {
 
     return {
       ...endpoint,
-      secret,
+      secret
     };
   }
 
@@ -234,13 +215,13 @@ export class InMemoryWebhookStore implements WebhookStore {
   ): Promise<WebhookEndpoint> {
     const endpoint = this.endpoints.get(endpointId);
     if (!endpoint) {
-      throw new LumenError("WEBHOOK_ENDPOINT_NOT_FOUND", "Webhook endpoint was not found.");
+      throw new LumenError("RESOURCE_NOT_FOUND", "Webhook endpoint was not found.");
     }
 
     const updated: WebhookEndpoint & { secretId: string } = {
       ...endpoint,
       ...updates,
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     this.endpoints.set(endpointId, updated);
@@ -268,12 +249,10 @@ export class InMemoryWebhookStore implements WebhookStore {
     return undefined;
   }
 
-  async rotateSecret(
-    endpointId: string
-  ): Promise<WebhookSecret & { secret: string }> {
+  async rotateSecret(endpointId: string): Promise<WebhookSecret & { secret: string }> {
     const endpoint = this.endpoints.get(endpointId);
     if (!endpoint) {
-      throw new LumenError("WEBHOOK_ENDPOINT_NOT_FOUND", "Webhook endpoint was not found.");
+      throw new LumenError("RESOURCE_NOT_FOUND", "Webhook endpoint was not found.");
     }
 
     const now = new Date();
@@ -288,9 +267,7 @@ export class InMemoryWebhookStore implements WebhookStore {
     }
 
     // Create new current secret
-    const newSecretId = `webhook_secret_${randomUUID()
-      .replaceAll("-", "")
-      .slice(0, 24)}`;
+    const newSecretId = `webhook_secret_${randomUUID().replaceAll("-", "").slice(0, 24)}`;
     const secret = generateWebhookSecret();
     const newSecret: WebhookSecret & { secret: string } = {
       id: newSecretId,
@@ -299,7 +276,7 @@ export class InMemoryWebhookStore implements WebhookStore {
       isCurrent: true,
       createdAt: now.toISOString(),
       rotatedOutAt: null,
-      secret,
+      secret
     };
 
     this.secrets.set(newSecretId, newSecret);
@@ -309,9 +286,7 @@ export class InMemoryWebhookStore implements WebhookStore {
     return newSecret;
   }
 
-  async getValidSecrets(
-    endpointId: string
-  ): Promise<Array<WebhookSecret & { secret?: string }>> {
+  async getValidSecrets(endpointId: string): Promise<Array<WebhookSecret & { secret?: string }>> {
     const now = Date.now();
     const result: Array<WebhookSecret & { secret?: string }> = [];
 
@@ -337,11 +312,7 @@ export class InMemoryWebhookStore implements WebhookStore {
     return result;
   }
 
-  async updateLastDelivery(
-    endpointId: string,
-    statusCode: number,
-    timestamp: Date
-  ): Promise<void> {
+  async updateLastDelivery(endpointId: string, statusCode: number, timestamp: Date): Promise<void> {
     const endpoint = this.endpoints.get(endpointId);
     if (endpoint) {
       endpoint.lastDeliveryAt = timestamp.toISOString();
@@ -377,8 +348,8 @@ export class WebhookService {
       targetType: "webhook_endpoint",
       metadata: {
         url: request.url,
-        isActive: request.isActive,
-      },
+        isActive: request.isActive
+      }
     });
 
     return result;
@@ -388,10 +359,7 @@ export class WebhookService {
     const endpoint = await this.store.getWebhookEndpoint(endpointId);
 
     if (!endpoint || endpoint.sellerId !== sellerId) {
-      throw new LumenError(
-        "WEBHOOK_ENDPOINT_NOT_FOUND",
-        "Webhook endpoint was not found."
-      );
+      throw new LumenError("RESOURCE_NOT_FOUND", "Webhook endpoint was not found.");
     }
 
     return endpoint;
@@ -413,10 +381,7 @@ export class WebhookService {
     const endpoint = await this.store.getWebhookEndpoint(endpointId);
 
     if (!endpoint || endpoint.sellerId !== sellerId) {
-      throw new LumenError(
-        "WEBHOOK_ENDPOINT_NOT_FOUND",
-        "Webhook endpoint was not found."
-      );
+      throw new LumenError("RESOURCE_NOT_FOUND", "Webhook endpoint was not found.");
     }
 
     const request = updateWebhookEndpointSchema.parse(input);
@@ -426,7 +391,11 @@ export class WebhookService {
       validateWebhookUrl(request.url);
     }
 
-    const updated = await this.store.updateWebhookEndpoint(endpointId, request);
+    const patch: Partial<Pick<WebhookEndpoint, "url" | "isActive">> = {
+      ...(request.url !== undefined ? { url: request.url } : {}),
+      ...(request.isActive !== undefined ? { isActive: request.isActive } : {})
+    };
+    const updated = await this.store.updateWebhookEndpoint(endpointId, patch);
 
     await this.auditLogService?.record({
       action: "webhook.endpoint.updated",
@@ -435,8 +404,8 @@ export class WebhookService {
       targetId: endpointId,
       targetType: "webhook_endpoint",
       metadata: {
-        changes: request,
-      },
+        changes: request
+      }
     });
 
     return updated;
@@ -446,10 +415,7 @@ export class WebhookService {
     const endpoint = await this.store.getWebhookEndpoint(endpointId);
 
     if (!endpoint || endpoint.sellerId !== sellerId) {
-      throw new LumenError(
-        "WEBHOOK_ENDPOINT_NOT_FOUND",
-        "Webhook endpoint was not found."
-      );
+      throw new LumenError("RESOURCE_NOT_FOUND", "Webhook endpoint was not found.");
     }
 
     await this.store.deleteWebhookEndpoint(endpointId);
@@ -461,19 +427,19 @@ export class WebhookService {
       targetId: endpointId,
       targetType: "webhook_endpoint",
       metadata: {
-        url: endpoint.url,
-      },
+        url: endpoint.url
+      }
     });
   }
 
-  async rotateSecret(sellerId: string, endpointId: string): Promise<WebhookSecret & { secret: string }> {
+  async rotateSecret(
+    sellerId: string,
+    endpointId: string
+  ): Promise<WebhookSecret & { secret: string }> {
     const endpoint = await this.store.getWebhookEndpoint(endpointId);
 
     if (!endpoint || endpoint.sellerId !== sellerId) {
-      throw new LumenError(
-        "WEBHOOK_ENDPOINT_NOT_FOUND",
-        "Webhook endpoint was not found."
-      );
+      throw new LumenError("RESOURCE_NOT_FOUND", "Webhook endpoint was not found.");
     }
 
     const rotated = await this.store.rotateSecret(endpointId);
@@ -486,8 +452,8 @@ export class WebhookService {
       targetType: "webhook_endpoint",
       metadata: {
         newSecretId: rotated.id,
-        rotationOverlapSeconds: WEBHOOK_SECRET_ROTATION_OVERLAP_SECONDS,
-      },
+        rotationOverlapSeconds: WEBHOOK_SECRET_ROTATION_OVERLAP_SECONDS
+      }
     });
 
     return rotated;

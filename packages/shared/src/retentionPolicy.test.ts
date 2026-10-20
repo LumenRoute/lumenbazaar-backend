@@ -194,7 +194,7 @@ describe("Default Policies", () => {
     it("has reasonable stale payment threshold", () => {
       const policy = DEFAULT_TESTNET_POLICY;
 
-      expect(policy.cleanup.stalePaymentAgeMs).toBe(7 * 24 * 60 * 60 * 1000); // 7 days
+      expect(policy.retentionWindows.stalePaymentAgeMs).toBe(7 * 24 * 60 * 60 * 1000); // 7 days
     });
 
     it("has reasonable archival threshold", () => {
@@ -235,8 +235,8 @@ describe("Default Policies", () => {
     });
 
     it("has same stale payment threshold as testnet", () => {
-      expect(DEFAULT_MAINNET_POLICY.cleanup.stalePaymentAgeMs).toBe(
-        DEFAULT_TESTNET_POLICY.cleanup.stalePaymentAgeMs
+      expect(DEFAULT_MAINNET_POLICY.retentionWindows.stalePaymentAgeMs).toBe(
+        DEFAULT_TESTNET_POLICY.retentionWindows.stalePaymentAgeMs
       );
     });
 
@@ -357,14 +357,16 @@ describe("Policy Structure Validation", () => {
       const policy = DEFAULT_TESTNET_POLICY;
 
       expect(policy.cleanup.archiveThresholdMs).toBeGreaterThan(
-        policy.cleanup.stalePaymentAgeMs
+        policy.retentionWindows.stalePaymentAgeMs
       );
     });
 
     it("cleanup configuration thresholds match retention windows", () => {
       const policy = DEFAULT_TESTNET_POLICY;
 
-      expect(policy.cleanup.expiredPaymentThresholdMs).toBe(policy.retentionWindows.stalePaymentAgeMs);
+      expect(policy.cleanup.expiredPaymentThresholdMs).toBe(
+        policy.retentionWindows.stalePaymentAgeMs
+      );
       expect(policy.cleanup.archiveThresholdMs).toBe(policy.retentionWindows.archivePaymentAgeMs);
     });
 
