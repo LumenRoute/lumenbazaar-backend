@@ -281,20 +281,20 @@ jobs:
             const smoke = fs.existsSync('deployment-evidence/testnet-e2e-smoke-evidence/smoke-mode.json') 
               ? JSON.parse(fs.readFileSync('deployment-evidence/testnet-e2e-smoke-evidence/smoke-mode.json', 'utf8'))
               : null;
-            
+
             let comment = '## Testnet E2E Suite Results\n\n';
             comment += `**Security Mode**: ${{ needs.security-check.outputs.mode }}\n`;
             comment += `**Fork PR**: ${{ needs.security-check.outputs.fork-detected }}\n\n`;
-            
+
             if (smoke) {
               comment += '### Smoke Mode (Read-Only)\n';
               comment += `✅ Deployment Health: ${smoke.summary.deploymentHealthy ? 'PASS' : 'FAIL'}\n`;
               comment += `✅ API Reachable: ${smoke.summary.apiReachable ? 'PASS' : 'FAIL'}\n`;
               comment += `✅ MCP Healthy: ${smoke.summary.mcpHealthy ? 'PASS' : 'FAIL'}\n`;
             }
-            
+
             comment += '\n[View full evidence in GitHub Actions artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})';
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,

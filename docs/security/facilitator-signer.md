@@ -2,10 +2,10 @@
 
 The hosted testnet signer supports two providers:
 
--  `environment` - signs in-process using `FACILITATOR_SIGNING_KEY`. Suitable for
-   local development and single-tenant testnet deployments.
--  `cloud-kms` - delegates signing to a cloud KMS provider so private key material
-   never enters the application process. Required for hosted operators.
+- `environment` - signs in-process using `FACILITATOR_SIGNING_KEY`. Suitable for
+  local development and single-tenant testnet deployments.
+- `cloud-kms` - delegates signing to a cloud KMS provider so private key material
+  never enters the application process. Required for hosted operators.
 
 Render stores `F:ACILITATOR_SIGNING_KEY`; it must not be placed in a committed env file, build
 argument, log statement, metric, health response, or support ticket. Application configuration
@@ -23,9 +23,9 @@ and any historical signer material are never stored or accepted. Signers exist i
 four states:
 
 - `active` - receives new work.
--  `retiring` - can still sign for in-flight records during the overlap window.
--  `retired` - unusable after the overlap window closes.
--  `revoked` - forced unavailable for incident response.
+- `retiring` - can still sign for in-flight records during the overlap window.
+- `retired` - unusable after the overlap window closes.
+- `revoked` - forced unavailable for incident response.
 
 New work always uses the active signer. In-flight records preserve the key identifier and
 are signed by the same key during the overlap window. Once the overlap window closes, a
@@ -39,13 +39,13 @@ The signer provider is selected by `FACILITATOR_SIGNER_PROVIDER`. All providers
 implement the same provider-neutral contract exposed by
 `packages/stellar-payments/src/facilitatorSigner.ts`:
 
--  `getIdentity()` - returns the public account, network, key version, and signer
-   identifier. Must not return secret material.
--  `deriveAddress()` - returns the public Stellar address for the configured key.
--  `sign(payload)` - returns a signature without retrieving raw private key bytes into
-   the application process.
--  `readiness()` - reports whether the provider can sign right now.
--  `rollback()` / `revoke()` - state transitions described below.
+- `getIdentity()` - returns the public account, network, key version, and signer
+  identifier. Must not return secret material.
+- `deriveAddress()` - returns the public Stellar address for the configured key.
+- `sign(payload)` - returns a signature without retrieving raw private key bytes into
+  the application process.
+- `readiness()` - reports whether the provider can sign right now.
+- `rollback()` / `revoke()` - state transitions described below.
 
 Every provider must fail closed. Timeouts, permission denials, unknown key states, and
 material that derives to a different address than `FACILITATOR_ACCOUNT` must reject
@@ -90,7 +90,7 @@ fresh window.
    payment traffic.
 
 Startup fails closed when the KMS provider is unreachable, the key is disabled, the
- derived public address differs from `FACILITATOR_ACCOUNT`, the configured network
+derived public address differs from `FACILITATOR_ACCOUNT`, the configured network
 does not match the key's labels, or the application lacks sign permission. There is no
 fallback to `environment` signing when `FACILITATOR_SIGNER_PROVIDER=cloud-kms`.
 

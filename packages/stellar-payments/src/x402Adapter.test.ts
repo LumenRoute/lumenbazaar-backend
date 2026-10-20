@@ -479,7 +479,7 @@ describe("official x402 Stellar adapter with upstream ExactStellarScheme integra
       const payer = Keypair.random();
       const recipient = Keypair.random();
       const facilitator = Keypair.random();
-      const wrongAsset = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4";
+      const wrongAsset = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
 
       // Build transaction with wrong asset
       const transaction = new officialStellarSdk.TransactionBuilder(

@@ -94,6 +94,8 @@ import { type PaymentSessionService } from "./paymentSession.js";
  * When `service` is undefined the check immediately returns
  * `adapter_not_configured`.
  */
+import { LumenError } from "@lumenbazaar/shared";
+
 export async function checkUptoAdapter(
   service: PaymentSessionService | undefined,
   options: AdapterStartupCheckOptions = {}
@@ -110,7 +112,17 @@ export async function checkUptoAdapter(
         service
           .getSession("startup_check_sentinel_session_id_0000000000000000")
           .then(() => "responded" as const)
-          .catch(() => "responded" as const),
+          .catch((err: unknown) => {
+            if (
+              typeof err === "object" &&
+              err !== null &&
+              "code" in err &&
+              (err as { code?: unknown }).code === "RESOURCE_NOT_FOUND"
+            ) {
+              return "responded" as const;
+            }
+            throw err;
+          }),
       timeoutMs
     );
 

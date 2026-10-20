@@ -13,18 +13,21 @@ The facilitator signer configuration system provides a secure, production-ready 
 ### Location: `packages/stellar-payments/src/facilitatorSigner.ts`
 
 **Implementation:**
+
 - ✅ `EnvironmentFacilitatorSignerProvider` class (lines 36-139) implements the pluggable provider interface
 - ✅ Secrets are read via a callback function (`readSecret`) that's passed to the provider, allowing testability without real env vars
 - ✅ Secret material is never stored in the AppConfig object (only version is stored)
 - ✅ `createRuntimeFacilitatorSignerProvider()` (lines 124-141) is the factory that creates the provider at runtime
 
 **Config Schema (`packages/shared/src/config.ts`):**
+
 - ✅ `FACILITATOR_SIGNER_PROVIDER`: "disabled" | "environment" (required)
 - ✅ `FACILITATOR_SIGNER_NETWORK`: "stellar:testnet" | "stellar:pubnet" (required)
 - ✅ `FACILITATOR_SIGNING_KEY_VERSION`: optional, required in production when provider="environment"
 - ✅ Note: `FACILITATOR_SIGNING_KEY` itself is NOT in the config schema - read only at instantiation time via `process.env.FACILITATOR_SIGNING_KEY`
 
 **Environment Configuration:**
+
 - `.env.example` (local development): `FACILITATOR_SIGNER_PROVIDER=disabled` (no signer required)
 - `.env.testnet.example` (testnet): `FACILITATOR_SIGNER_PROVIDER=environment` (signer required)
 - Both include placeholder for `FACILITATOR_SIGNING_KEY=` (empty, requires real key)
@@ -37,10 +40,11 @@ The facilitator signer configuration system provides a secure, production-ready 
 readSecret: () => ({
   secret: environment.FACILITATOR_SIGNING_KEY ?? "",
   version: environment.FACILITATOR_SIGNING_KEY_VERSION ?? config.signer.keyVersion ?? ""
-})
+});
 ```
 
 This design allows:
+
 - **Production**: Reads from `process.env.FACILITATOR_SIGNING_KEY`
 - **Tests**: Pass mock `environment` object with synthetic keys
 - **Pluggable**: Factory accepts optional `environment` parameter for dependency injection
@@ -72,6 +76,7 @@ if (signer.address !== this.options.expectedAddress) {
 ```
 
 **Key Points:**
+
 - ✅ Uses Stellar SDK's Ed25519 keypair derivation
 - ✅ Compares `signer.address` (derived public key) against `expectedAddress` (config.facilitatorAccount)
 - ✅ Mismatch fails with clear, specific error message: "Facilitator signer address does not match configuration."
@@ -97,6 +102,7 @@ await assertRuntimeSignerReady(signerProvider);
 ### Location: `apps/api/src/app.ts` (lines 72-77)
 
 **Capability Detection:**
+
 ```typescript
 const paymentCapabilities = options.paymentCapabilities ?? {
   exact:
@@ -109,12 +115,12 @@ const paymentCapabilities = options.paymentCapabilities ?? {
 ```
 
 **Behavior:**
+
 - ✅ **If exact settlement is ENABLED** (signer provided + asset contractId defined):
   - `runtimeAdapter` is created (line 71)
   - `paymentCapabilities.exact = true`
   - Signer is required and validated at startup
   - App fails if signer validation fails
-  
 - ✅ **If exact settlement is DISABLED** (no signer OR no contractId):
   - `runtimeAdapter = undefined`
   - `paymentCapabilities.exact = false`
@@ -122,6 +128,7 @@ const paymentCapabilities = options.paymentCapabilities ?? {
   - App starts even without signer
 
 **Config Validation (`packages/shared/src/config.ts`, lines 244-248):**
+
 ```typescript
 if (
   env.FACILITATOR_SIGNER_PROVIDER === "environment" &&
@@ -137,16 +144,20 @@ if (
 ## 4. Redaction Discipline (Multi-Layer Protection)
 
 ### Layer 1: Config Level
+
 **Location: `packages/shared/src/config.ts`**
+
 - ✅ `FACILITATOR_SIGNING_KEY` is never added to `envSchema` or `AppConfig`
 - ✅ Only `FACILITATOR_SIGNING_KEY_VERSION` is stored (line 138)
 - ✅ Secret is read only when needed, at provider instantiation time
 - ✅ Result: Config serialization cannot leak secrets
 
 ### Layer 2: Error Messages
+
 **Location: `packages/stellar-payments/src/facilitatorSigner.ts` (lines 150-153)**
 
 All signer errors use the `signerUnavailable()` helper:
+
 - ✅ "Facilitator signing material is unavailable."
 - ✅ "Facilitator signing material is invalid."
 - ✅ "Facilitator signer has been revoked."
@@ -156,6 +167,7 @@ All signer errors use the `signerUnavailable()` helper:
 **Guarantee:** No error message contains the secret key in full, partial, or debug form
 
 ### Layer 3: Error Response Serialization
+
 **Location: `packages/shared/src/errorMapping.ts` (lines 5-44)**
 
 ```typescript
@@ -185,21 +197,24 @@ export function redactSensitiveDetails(details: Record<string, unknown>): Record
 - ✅ Applied before API responses are sent
 
 ### Layer 4: Redaction Text Utilities
+
 **Location: `packages/shared/src/redaction.ts` (lines 1-9)**
 
 Provides regex-based redaction for log outputs:
+
 - ✅ Stellar private keys (S-prefixed): `/\bS[A-Z2-7]{55}\b/gu`
 - ✅ Bearer tokens: `/\bBearer\s+[A-Za-z0-9._~+/=-]+\b/giu`
 - ✅ Key assignments: patterns for `secret=`, `password=`, etc.
 
 ### Layer 5: CI/CD Secret Masking
+
 **Location: `scripts/ci-security.ts` (lines 133-142)**
 
 ```typescript
 export function createSecretMaskingConfig() {
   return {
     maskedNames: [
-      "FACILITATOR_SIGNING_KEY",
+      "FACILITATOR_SIGNING_KEY"
       // ... other secrets
     ]
   };
@@ -211,6 +226,7 @@ export function createSecretMaskingConfig() {
 - ✅ Prevents accidental secret leaks in build logs
 
 ### Redaction Test Coverage
+
 **Location: `packages/stellar-payments/src/facilitatorSigner.test.ts` (lines 49-52)**
 
 ```typescript
@@ -245,22 +261,25 @@ if (activeNetwork === undefined || config.signer.network !== activeNetwork) {
 ### Test File: `packages/stellar-payments/src/facilitatorSigner.test.ts`
 
 **Test 1: Positive Path - Valid Signer**
+
 ```typescript
 it("loads an official signer without exposing secret material", async () => {
   const keypair = Keypair.random();
   const secret = keypair.secret();
   const provider = providerFor(keypair, () => ({ secret, version: "key-v1" }));
-  
+
   await expect(provider.getStatus()).resolves.toEqual({...});
   const signer = await provider.getSigner();
   expect(JSON.stringify(signer)).not.toContain(secret);
 });
 ```
+
 - ✅ Validates a synthetic testnet keypair loads successfully
 - ✅ Verifies `getStatus()` returns only public info
 - ✅ Confirms `JSON.stringify()` doesn't leak secret
 
 **Test 2: Negative Path - Address Mismatch**
+
 ```typescript
 it("fails closed when the signer is unavailable or has the wrong address", async () => {
   const expected = Keypair.random();
@@ -269,18 +288,20 @@ it("fails closed when the signer is unavailable or has the wrong address", async
     secret: wrongSecret,
     version: "key-v1"
   }));
-  
+
   await expect(wrongAddress.assertReady()).rejects.toMatchObject({
     code: "SETTLEMENT_FAILED",
     message: "Facilitator signer address does not match configuration."
   });
 });
 ```
+
 - ✅ Tests derived public key mismatch is caught at startup
 - ✅ Clear, specific error message
 - ✅ Error code is `SETTLEMENT_FAILED` (appropriate for signer issues)
 
 **Test 3: Negative Path - Missing Signer**
+
 ```typescript
 it("validates runtime network, address, and key availability at startup", async () => {
   const keypair = Keypair.random();
@@ -288,16 +309,18 @@ it("validates runtime network, address, and key availability at startup", async 
     FACILITATOR_SIGNING_KEY_VERSION: "key-v1"
     // FACILITATOR_SIGNING_KEY is missing
   });
-  
-  await expect(
-    assertRuntimeSignerReady(runtime)
-  ).rejects.toMatchObject({ code: "SETTLEMENT_FAILED" });
+
+  await expect(assertRuntimeSignerReady(runtime)).rejects.toMatchObject({
+    code: "SETTLEMENT_FAILED"
+  });
 });
 ```
+
 - ✅ Tests missing signer is detected at startup
 - ✅ Fails with clear error code
 
 **Test 4: Negative Path - Wrong Network**
+
 ```typescript
 expect(() =>
   createRuntimeFacilitatorSignerProvider(
@@ -309,33 +332,38 @@ expect(() =>
   )
 ).toThrow("does not match the active network");
 ```
+
 - ✅ Tests network mismatch is caught at instantiation
 
 **Test 5: Key Rotation**
+
 ```typescript
 it("refreshes rotated key versions and enforces revocation", async () => {
   const keypair = Keypair.random();
   const snapshot = { secret: keypair.secret(), version: "key-v1" };
   const provider = providerFor(keypair, () => snapshot);
-  
+
   snapshot.version = "key-v2";
   provider.rotate();
   const rotated = await provider.getSigner();
-  
+
   await expect(provider.getStatus()).resolves.toMatchObject({ keyVersion: "key-v2" });
 });
 ```
+
 - ✅ Tests key rotation detection via version bumping
 - ✅ Tests revocation/restore lifecycle
 - ✅ Synthetic testnet keypairs used throughout
 
 **Test 6: Redaction**
+
 ```typescript
 await wrongAddress.assertReady().catch((error: unknown) => {
   expect(JSON.stringify(error)).not.toContain(wrongSecret);
   expect(String(error)).not.toContain(wrongSecret);
 });
 ```
+
 - ✅ Dedicated redaction test
 - ✅ Verifies no secret exposure via multiple serialization methods
 
@@ -349,35 +377,38 @@ await wrongAddress.assertReady().catch((error: unknown) => {
 ## 8. Integration Paths
 
 ### Payment Capability Detection (`apps/api/src/app.ts`)
+
 - Signer provider → `createX402StellarAdapter()` → enables exact settlement
 - `buildApiApp()` receives signer provider in options
 - Exact settlement only enabled if signer is ready
 
 ### Readiness Service (`apps/api/src/services/readiness.ts`)
+
 - Signer readiness probe only registered when signerProvider is provided
 - Probe calls `signerProvider.assertReady()` for `/ready` endpoint
 - API reports ready only if signer is ready (when required)
 
 ### Settlement Service (`packages/stellar-payments/src/settlement.ts`)
+
 - Receives signer provider via options
 - Uses signer to sign transactions for exact settlement
 - Errors during signing are caught and converted to `SETTLEMENT_FAILED`
 
 ## Summary: All Acceptance Criteria Met
 
-| Criterion | Status | Evidence |
-|-----------|--------|----------|
-| Load signer from env or provider | ✅ | `createRuntimeFacilitatorSignerProvider()`, env schema defines `FACILITATOR_SIGNING_KEY` reading |
-| Validate derived public key matches config | ✅ | `getSigner()` compares `signer.address` vs `expectedAddress` |
-| Clear startup error on mismatch | ✅ | "Facilitator signer address does not match configuration." + error code SETTLEMENT_FAILED |
-| Fail closed if exact enabled but no signer | ✅ | Config validation + startup assertion `assertRuntimeSignerReady()` |
-| Pass if exact disabled and no signer | ✅ | Signer is optional when `FACILITATOR_SIGNER_PROVIDER=disabled` |
-| No secrets in logs | ✅ | All error messages redacted, no secret values in messages |
-| No secrets in API responses | ✅ | `toPublicError()` + `redactSensitiveDetails()` applied to all errors |
-| No secrets in JSON serialization | ✅ | Explicit tests confirm no leaks via JSON.stringify() |
-| No hardcoded real keys | ✅ | All tests use synthetic keys from `Keypair.random()` |
-| Comprehensive test coverage | ✅ | 5+ test cases covering valid, invalid, missing, rotated, network-mismatch scenarios |
-| Redaction test | ✅ | Explicit test verifying no secret exposure in error paths |
+| Criterion                                  | Status | Evidence                                                                                         |
+| ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------ |
+| Load signer from env or provider           | ✅     | `createRuntimeFacilitatorSignerProvider()`, env schema defines `FACILITATOR_SIGNING_KEY` reading |
+| Validate derived public key matches config | ✅     | `getSigner()` compares `signer.address` vs `expectedAddress`                                     |
+| Clear startup error on mismatch            | ✅     | "Facilitator signer address does not match configuration." + error code SETTLEMENT_FAILED        |
+| Fail closed if exact enabled but no signer | ✅     | Config validation + startup assertion `assertRuntimeSignerReady()`                               |
+| Pass if exact disabled and no signer       | ✅     | Signer is optional when `FACILITATOR_SIGNER_PROVIDER=disabled`                                   |
+| No secrets in logs                         | ✅     | All error messages redacted, no secret values in messages                                        |
+| No secrets in API responses                | ✅     | `toPublicError()` + `redactSensitiveDetails()` applied to all errors                             |
+| No secrets in JSON serialization           | ✅     | Explicit tests confirm no leaks via JSON.stringify()                                             |
+| No hardcoded real keys                     | ✅     | All tests use synthetic keys from `Keypair.random()`                                             |
+| Comprehensive test coverage                | ✅     | 5+ test cases covering valid, invalid, missing, rotated, network-mismatch scenarios              |
+| Redaction test                             | ✅     | Explicit test verifying no secret exposure in error paths                                        |
 
 ## Build & Test Verification
 
@@ -395,6 +426,7 @@ pnpm check
 ```
 
 ### Current Environment
+
 - Node.js: 20.9.0 (project requires 24+)
 - pnpm: 10.28.0
 - Status: Code structure verified, tests designed to run on Node 24+

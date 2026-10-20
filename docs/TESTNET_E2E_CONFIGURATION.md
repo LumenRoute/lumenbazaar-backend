@@ -9,14 +9,17 @@ Go to: **Repository Settings > Environments > New environment**
 **Environment Name:** `testnet-e2e`
 
 **Deployment branches:**
+
 - Allow specific branches: `main`
 - Allow deployments to production environments when: Keep checked
 
-**Required reviewers:** 
+**Required reviewers:**
+
 - (Optional) Add team members who must approve full e2e runs
 - Recommended: 1+ reviewer for additional security
 
 **Environment secrets:**
+
 - None required (use repository secrets instead)
 
 ### 2. Add Repository Secrets
@@ -35,6 +38,7 @@ SXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 Format: 56-character base32 string starting with 'S'
 
 Get a testnet key:
+
 1. Visit https://stellar.expert/testnet
 2. Or generate locally: https://stellar.org/developers/js-stellar-sdk
 
@@ -57,6 +61,7 @@ pnpm install
 ### 2. Generate Testnet Account
 
 Using Stellar CLI:
+
 ```bash
 # Generate keypair
 stellar keys generate
@@ -66,6 +71,7 @@ stellar keys generate
 ```
 
 Or use Node.js:
+
 ```bash
 import { Keypair } from '@stellar/stellar-sdk';
 const keypair = Keypair.random();
@@ -76,6 +82,7 @@ console.log('Public:', keypair.publicKey());
 ### 3. Configure Environment
 
 Create `.env.local` (git-ignored):
+
 ```bash
 CLIENT_PRIVATE_KEY=SXXXXXXX...
 TESTNET_MANIFEST_PATH=docs/deployment/testnet-endpoints.json
@@ -144,10 +151,12 @@ pnpm deploy:testnet:e2e:smoke
 The `.github/workflows/testnet-e2e.yml` workflow runs:
 
 **Automatic:**
+
 - Main branch push to testnet-related files
 - All PR changes to testnet-related files (smoke mode)
 
 **Manual:**
+
 - GitHub Actions > Testnet E2E > workflow_dispatch
 - Choose smoke or full mode
 - Select manifest path (optional)
@@ -181,6 +190,7 @@ For full e2e on internal PRs:
 4. Results posted as PR comment
 
 To add reviewers:
+
 - Settings > Environments > testnet-e2e > Required reviewers
 
 ### 4. Evidence Retention
@@ -201,6 +211,7 @@ gh run download <run-id> -n testnet-e2e-full-evidence
 ### 1. Workflow Status
 
 Monitor via:
+
 - GitHub Actions tab in repository
 - Commit status checks on PRs
 - GitHub CLI: `gh run list --workflow testnet-e2e.yml`
@@ -208,6 +219,7 @@ Monitor via:
 ### 2. Evidence Metrics
 
 Extract from evidence JSON:
+
 ```bash
 # Get execution duration
 jq '.summary.totalDuration' deployment-evidence/e2e-full.json
@@ -242,6 +254,7 @@ curl -X POST https://monitoring.example.com/events \
 
 **Cause:** Secret not set in repository  
 **Solution:**
+
 1. Go to Settings > Secrets and variables > Actions
 2. Add `CLIENT_PRIVATE_KEY` secret
 3. Retry workflow
@@ -250,6 +263,7 @@ curl -X POST https://monitoring.example.com/events \
 
 **Cause:** Expected behavior for fork PRs  
 **Solution:**
+
 - This is intentional security protection
 - Fork PRs cannot run full e2e (no funded operations from untrusted code)
 - Maintainers can approve for internal PRs
@@ -258,6 +272,7 @@ curl -X POST https://monitoring.example.com/events \
 
 **Cause:** Manifest path incorrect or file missing  
 **Solution:**
+
 1. Create `docs/deployment/testnet-endpoints.json`
 2. Use `--manifest` flag with correct path
 3. Or set `TESTNET_MANIFEST_PATH` env var
@@ -266,6 +281,7 @@ curl -X POST https://monitoring.example.com/events \
 
 **Cause:** Key not in Ed25519 format  
 **Solution:**
+
 1. Key must be 56-character base32 string
 2. Must start with 'S'
 3. Generate via: https://stellar.org/developers/js-stellar-sdk
@@ -274,6 +290,7 @@ curl -X POST https://monitoring.example.com/events \
 
 **Cause:** Testnet endpoints unreachable  
 **Solution:**
+
 1. Verify API URLs in manifest
 2. Check firewall/network access
 3. Verify API deployment is healthy
@@ -284,12 +301,14 @@ curl -X POST https://monitoring.example.com/events \
 ### 1. Credential Management
 
 **Do:**
+
 - ✅ Store `CLIENT_PRIVATE_KEY` in GitHub Actions secrets
 - ✅ Use separate testnet key (not production)
 - ✅ Rotate keys quarterly
 - ✅ Audit access logs
 
 **Don't:**
+
 - ❌ Commit credentials to repository
 - ❌ Paste keys in workflow files
 - ❌ Use production keys for testing
@@ -306,6 +325,7 @@ if (isForkPullRequest) {
 ```
 
 This is enforced at multiple levels:
+
 1. Workflow job condition: `needs.security-check.outputs.safe-for-funded == 'true'`
 2. Script validation: `isSafeForFundedOperations()`
 3. Secret masking: Secrets not available in fork jobs
@@ -313,12 +333,14 @@ This is enforced at multiple levels:
 ### 3. Audit Logging
 
 All executions are logged with:
+
 - CI environment context
 - Security decisions
 - Execution mode
 - Trust level
 
 Access via:
+
 ```bash
 # Generate audit log
 pnpm deploy:testnet:e2e:validate
@@ -330,12 +352,14 @@ pnpm deploy:testnet:e2e:validate
 ### 4. Evidence Integrity
 
 Evidence includes:
+
 - Commit hashes (proves code version)
 - Transaction hashes (proves on-chain execution)
 - Receipt IDs (proves finalization)
 - Cryptographic signatures
 
 Validate via:
+
 ```bash
 # Verify evidence completeness
 jq '.integrity' deployment-evidence/e2e-full.json
@@ -352,24 +376,21 @@ Automate manifest creation from deployment:
 
 ```typescript
 // scripts/generate-testnet-manifest.ts
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile } from "fs/promises";
 
 const manifest = {
-  environment: 'testnet',
-  status: 'deployed',
+  environment: "testnet",
+  status: "deployed",
   commits: {
     api: process.env.API_COMMIT,
     worker: process.env.WORKER_COMMIT,
     mcp: process.env.MCP_COMMIT,
     paidResource: process.env.PAID_RESOURCE_COMMIT
-  },
+  }
   // ... rest of manifest
 };
 
-await writeFile(
-  'docs/deployment/testnet-endpoints.json',
-  JSON.stringify(manifest, null, 2)
-);
+await writeFile("docs/deployment/testnet-endpoints.json", JSON.stringify(manifest, null, 2));
 ```
 
 ### 2. Conditional Evidence Storage
@@ -400,7 +421,7 @@ environments:
   testnet-staging:
     manifest: docs/deployment/staging-endpoints.json
     secrets: [STAGING_PRIVATE_KEY]
-  
+
   testnet-prod:
     manifest: docs/deployment/prod-endpoints.json
     secrets: [PROD_PRIVATE_KEY]

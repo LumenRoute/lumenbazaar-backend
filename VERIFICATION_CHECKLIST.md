@@ -101,6 +101,7 @@
 ✅ **VERIFIED**: Analysis performed before implementation
 
 Analysis file location: `/packages/stellar-payments/src/x402Adapter.ts`
+
 - Checked `failureCode()` function that maps `invalidReason` → `ErrorCode`
 - Checked `failureMessage()` function that maps error codes → messages
 - Identified verification order: parse → network check → asset check → replay → adapter verify → mapping
@@ -121,16 +122,19 @@ Analysis file location: `/packages/stellar-payments/src/x402Adapter.ts`
 ✅ **VERIFIED**: Isolation principle applied
 
 Each test vector:
+
 1. Starts with valid control as baseline
 2. Changes EXACTLY ONE property/error condition
 3. Asserts THAT specific condition triggers expected error
 4. Does NOT combine multiple errors
 
 Example (Signature vector):
+
 - Same as control EXCEPT: `failureCode: "INVALID_SIGNATURE"` (one change)
 - Asserts: `code: "INVALID_SIGNATURE"` (one specific error)
 
 Example (Amount vector):
+
 - Same as control EXCEPT: `failureCode: "AMOUNT_MISMATCH"` (one change)
 - Asserts: `code: "AMOUNT_MISMATCH"` (one specific error)
 
@@ -139,6 +143,7 @@ Example (Amount vector):
 ✅ **VERIFIED**: All vectors assert specific error codes
 
 Not just "fails" or "rejects" - each asserts:
+
 ```typescript
 await expect(service.verify(...)).rejects.toMatchObject({
   code: "SPECIFIC_CODE"  // ← Exact error code asserted
@@ -146,6 +151,7 @@ await expect(service.verify(...)).rejects.toMatchObject({
 ```
 
 All 10 vectors verified:
+
 - Signature: `INVALID_SIGNATURE`
 - Network: `UNSUPPORTED_NETWORK`
 - Asset: `ASSET_MISMATCH`
@@ -187,6 +193,7 @@ Three explicit tests:
 Section: "error mapping precision: each adversarial vector produces its expected error code" (Line ~315+)
 
 Test cases array with 12 mappings verified:
+
 1. `network_mismatch` → `UNSUPPORTED_NETWORK`
 2. `invalid_network` → `UNSUPPORTED_NETWORK`
 3. `wrong_asset` → `ASSET_MISMATCH`
@@ -201,6 +208,7 @@ Test cases array with 12 mappings verified:
 12. `unknown_strange_reason` → `INVALID_PAYMENT_PAYLOAD`
 
 Each test:
+
 - Creates adapter with specific `invalidReason`
 - Asserts verification rejects with correct `expectedCode`
 - Validates mapping from adapter to error code
@@ -221,12 +229,14 @@ Each test:
 ✅ **VERIFIED**: Distinction clearly documented
 
 File header (Line 1-33):
+
 - Explains "SIMULATED VECTORS (local)" vs. "LIVE VECTORS (if network available)"
 - All current vectors marked as "SIMULATED (local)"
 - Each test has comment: `SIMULATED (local): ...`
 - Explicitly states: "NOT currently implemented in this suite (can be added later)"
 
 Examples:
+
 - Line ~111: "SIMULATED (local): Mock adapter that returns valid."
 - Line ~129: "SIMULATED (local): Mock adapter simulating network mismatch."
 - Line ~165: "SIMULATED (local): Mock adapter simulating insufficient or mismatched amount."
@@ -237,9 +247,11 @@ Examples:
 ✅ **VERIFIED**: Replay protection tested
 
 File documentation (Line 1-33):
+
 - "The replay protection uses payment hash (x402 payload hash) as an idempotency key"
 
 Test 1: Safe identical replay (Line ~337-351)
+
 ```typescript
 // First verification
 const first = await service.verify(testPaymentRequest);
@@ -247,10 +259,11 @@ expect(first.status).toBe("verified");
 
 // Identical replay (same payload)
 const replay = await service.verify(testPaymentRequest);
-expect(replay).toEqual(first);  // ← Safe reuse, not re-verified
+expect(replay).toEqual(first); // ← Safe reuse, not re-verified
 ```
 
 Test 2: Conflicting replay rejection (Line ~363-378)
+
 ```typescript
 // First verification
 await service.verify(testPaymentRequest);
@@ -283,10 +296,12 @@ await expect(service.verify(conflicted)).rejects.toMatchObject({
 ✅ **VERIFIED**: No logic changes, test-only PR
 
 Files changed:
+
 - ✅ Added: `x402AdversarialVerification.integration.test.ts` (test file)
 - ✅ Added: `ADVERSARIAL_VERIFICATION_MATRIX.md` (documentation)
 
 Files NOT changed:
+
 - ✅ `packages/stellar-payments/src/verification.ts` (verification logic unchanged)
 - ✅ `packages/stellar-payments/src/x402Adapter.ts` (adapter logic unchanged)
 - ✅ `packages/stellar-payments/src/paymentAttemptStore.ts` (replay logic unchanged)
@@ -324,10 +339,12 @@ Files NOT changed:
 ## Summary of Implementation
 
 ### Files Delivered
+
 1. ✅ `packages/stellar-payments/src/x402AdversarialVerification.integration.test.ts` (557 lines)
 2. ✅ `packages/stellar-payments/ADVERSARIAL_VERIFICATION_MATRIX.md` (241 lines)
 
 ### Test Count
+
 - ✅ 1 control vector test
 - ✅ 10 adversarial vector tests (20 test cases including replay)
 - ✅ 3 network error criterion tests
@@ -335,6 +352,7 @@ Files NOT changed:
 - **Total: 20+ test cases**
 
 ### All Requirements Met
+
 ✅ 10 adversarial vectors covering all specified categories  
 ✅ 1 valid control vector  
 ✅ Stable, specific rejection assertions (not generic)  
@@ -348,13 +366,14 @@ Files NOT changed:
 ✅ Replay protection tested (safe reuse + conflict detection)  
 ✅ Comprehensive documentation provided  
 ✅ Test-only scope (no logic changes)  
-✅ Comprehensive commit message with exact commands and output format  
+✅ Comprehensive commit message with exact commands and output format
 
 ## Verification Result
 
 **STATUS: ✅ ALL REQUIREMENTS VERIFIED AND MET**
 
 The implementation comprehensively addresses all requirements in issue #14:
+
 - All 10 adversarial vectors implemented with stable error codes
 - Control vector proves harness works
 - Network error criterion enforced (3 critical tests)

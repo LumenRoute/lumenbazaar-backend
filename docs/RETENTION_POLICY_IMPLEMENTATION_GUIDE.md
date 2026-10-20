@@ -57,7 +57,7 @@ await auditLog.record({
   targetId: paymentAttemptId,
   metadata: {
     amount: "100.00",
-    network: "stellar:testnet",
+    network: "stellar:testnet"
     // Don't include sensitive fields; redactionService handles it
     // paymentHash: "...", // Would be redacted anyway
   }
@@ -83,11 +83,13 @@ try {
 These fields are automatically redacted at storage and output layers:
 
 **Secrets/Credentials:**
+
 - `secret`, `seed`, `private`, `token`, `authorization`, `password`
 - `api_key`, `api-key`, `private_key`, `private-key`
 - `signing_key`, `signing-key`
 
 **Payment Identifiers (linkable to user activity):**
+
 - `paymentHash`, `payment_hash`
 - `idempotencyKey`, `idempotency_key`
 - `transactionHash`, `transaction_hash`
@@ -96,6 +98,7 @@ These fields are automatically redacted at storage and output layers:
 - `usageHash`, `usage_hash`
 
 **Sensitive Value Patterns (in error messages and logs):**
+
 - Bearer tokens: `Bearer eyJhbGciOiJIUzI1NiI...`
 - Stellar secret keys: `S[A-Z2-7]{55}`
 - Key-value pairs: `api_key=sk_live_...`, `secret:value`
@@ -107,6 +110,7 @@ These fields are automatically redacted at storage and output layers:
 ### Default Policies
 
 Testnet (development):
+
 ```typescript
 import { DEFAULT_TESTNET_POLICY } from "@lumenbazaar/shared";
 
@@ -117,6 +121,7 @@ import { DEFAULT_TESTNET_POLICY } from "@lumenbazaar/shared";
 ```
 
 Mainnet (production):
+
 ```typescript
 import { DEFAULT_MAINNET_POLICY } from "@lumenbazaar/shared";
 
@@ -129,17 +134,17 @@ import { DEFAULT_MAINNET_POLICY } from "@lumenbazaar/shared";
 ### Custom Configuration
 
 ```typescript
-import { 
-  initializeRedactionService, 
-  DEFAULT_TESTNET_POLICY, 
-  PaymentRetentionPolicy 
+import {
+  initializeRedactionService,
+  DEFAULT_TESTNET_POLICY,
+  PaymentRetentionPolicy
 } from "@lumenbazaar/shared";
 
 const customPolicy: PaymentRetentionPolicy = {
   ...DEFAULT_TESTNET_POLICY,
   cleanup: {
     ...DEFAULT_TESTNET_POLICY.cleanup,
-    stalePaymentAgeMs: 3 * 24 * 60 * 60 * 1000,  // 3 days instead of 7
+    stalePaymentAgeMs: 3 * 24 * 60 * 60 * 1000, // 3 days instead of 7
     archiveThresholdMs: 60 * 24 * 60 * 60 * 1000, // 60 days instead of 90
     batchSize: 25, // Smaller batches
     enableExpiredCleanup: true,
@@ -174,6 +179,7 @@ await handleStalePaymentCleanup(job, prismaClient);
 ```
 
 **Outcome:**
+
 - Marks payment as `status: "expired"`
 - Sets `failureCode: "AUTH_EXPIRED"`
 - Creates AuditLog entry: `action: "payment.attempt.expired"`
@@ -196,6 +202,7 @@ await handleStalePaymentCleanup(job, prismaClient);
 ```
 
 **Outcome:**
+
 - Creates AuditLog entry: `action: "payment.retention.reviewed"`
 - Records retention reason: `"financial_evidence_required"`
 - No deletion (indefinite retention for compliance)
@@ -217,6 +224,7 @@ await handleStalePaymentCleanup(job, prismaClient);
 ```
 
 **Outcome:**
+
 - Creates CatalogEvent: `type: "payment_archived"`
 - Records archival timestamp and metadata
 - Original payment records remain in database
@@ -421,10 +429,7 @@ const suspiciousLogs = await db.auditLog.findMany({
 
 // 2. Verify no secrets in error logs
 const redactionService = getGlobalRedactionService();
-const sensitivePatterns = [
-  /Bearer\s+[A-Za-z0-9._~+/=-]+/,
-  /\bS[A-Z2-7]{55}\b/
-];
+const sensitivePatterns = [/Bearer\s+[A-Za-z0-9._~+/=-]+/, /\bS[A-Z2-7]{55}\b/];
 
 for (const log of suspiciousLogs) {
   const metadata = JSON.stringify(log.metadata);
@@ -538,7 +543,7 @@ Adjust in policy config if needed:
 ```typescript
 {
   cleanup: {
-    batchSize: 25 // Process 25 records per iteration
+    batchSize: 25; // Process 25 records per iteration
   }
 }
 ```
@@ -581,4 +586,3 @@ CREATE INDEX idx_audit_log_actor
 - **Full Documentation**: `docs/PAYMENT_DATA_RETENTION.md`
 - **Unit Tests**: `packages/shared/src/retentionPolicy.test.ts`, `packages/shared/src/redactionService.test.ts`
 - **Integration Tests**: `apps/api/src/services/redactionPolicy.integration.test.ts`, `apps/worker/src/stalePaymentCleanup.integration.test.ts`
-

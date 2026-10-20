@@ -225,7 +225,7 @@ describe("readiness service – degraded combinations", () => {
   it("all healthy → ok: true, all ready", async () => {
     const service = createReadinessService(
       loadConfig({ LUMEN_ENV: "testnet" }),
-      { exact: false, upto: false },
+      { exact: true, upto: false },
       probes()
     );
 

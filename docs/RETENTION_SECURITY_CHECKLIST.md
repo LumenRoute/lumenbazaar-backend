@@ -289,6 +289,7 @@ metrics.gauge("audit_log.recent_actions", recentCount);
 **Do NOT delete records.** Immutability is a security feature.
 
 1. **Preserve Evidence**
+
    ```sql
    -- Take backup before any changes
    CREATE TABLE audit_log_backup AS SELECT * FROM audit_log;
@@ -296,6 +297,7 @@ metrics.gauge("audit_log.recent_actions", recentCount);
    ```
 
 2. **Identify Scope**
+
    ```sql
    -- Find which payments/actors were affected
    SELECT DISTINCT correlation_id, actor_id, actor_type, action
@@ -305,6 +307,7 @@ metrics.gauge("audit_log.recent_actions", recentCount);
    ```
 
 3. **Verify Redaction Status**
+
    ```sql
    -- Check if sensitive data was stored
    SELECT * FROM audit_log
@@ -314,6 +317,7 @@ metrics.gauge("audit_log.recent_actions", recentCount);
    ```
 
 4. **Document Timeline**
+
    ```typescript
    const timeline = await db.auditLog.findMany({
      where: { createdAt: { gte: incidentStart, lte: incidentEnd } },
@@ -364,8 +368,7 @@ async function verifyCertification() {
   console.log("✓ Metadata redaction verified:", redacted);
 
   // 3. Test error message redaction
-  const errorMsg =
-    "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test";
+  const errorMsg = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test";
   const redactedError = redaction.redactErrorMessage(errorMsg);
   console.log("✓ Error redaction verified:", redactedError);
 
@@ -399,4 +402,3 @@ await verifyCertification();
 - **Redaction Service**: `packages/shared/src/redactionService.ts`
 - **Audit Service**: `apps/api/src/services/audit.ts`
 - **Cleanup Worker**: `apps/worker/src/workers/stalePaymentCleanup.ts`
-

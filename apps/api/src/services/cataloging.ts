@@ -182,12 +182,13 @@ export class CatalogService {
             }
           });
 
-    // Note: Removed direct indexing queue call. Outbox relay worker now handles:
-    // 1. Picking up catalog.resource_cataloged event
-    // 2. Picking up resource.indexed event
-    // 3. Enqueueing resource indexing job (or performing indexing)
-    // This ensures indexing job is enqueued only after both events are persisted.
-    // await this.indexingQueue.addResourceIndexingJob({...}); // REMOVED
+    if (this.indexingQueue !== undefined) {
+      await this.indexingQueue.addResourceIndexingJob({
+        name: "resource.index",
+        resourceId: resource.id,
+        versionId: version.id
+      });
+    }
 
     await this.auditLogService?.record({
       action: "resource.catalog",

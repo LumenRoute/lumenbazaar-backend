@@ -20,11 +20,13 @@ This PR implements a transactional outbox pattern to prevent database state and 
 ## What Changed
 
 ### Database Schema
+
 - Added `OutboxEvent` table: Durable event storage with retry tracking and leasing
 - Added `ProcessedOutboxEvent` table: Idempotency tracking to prevent duplicate processing
 - Added migration: `prisma/migrations/0009_outbox_events/`
 
 ### Core Implementation
+
 - New `packages/shared/src/db/outbox.ts`: Outbox functions
   - `writeOutboxEvent()`: Type-safe transaction-scoped event writer
   - `claimOutboxEventBatch()`: Row-level locking with lease expiry
@@ -35,6 +37,7 @@ This PR implements a transactional outbox pattern to prevent database state and 
   - `cleanupDeliveredOutboxEvents()`: Retention cleanup
 
 ### Workers
+
 - New `apps/worker/src/workers/outboxRelay.ts`: Event relay with consumer handlers
   - Resource indexing handler
   - Settlement reconciliation handler
@@ -47,26 +50,32 @@ This PR implements a transactional outbox pattern to prevent database state and 
 ### Producers Updated (Removed Direct Queue Publishing)
 
 **Settlement (`packages/stellar-payments/src/prismaPaymentPersistence.ts`)**
+
 - `recordConfirmed()`: Now writes `receipt.status_changed` event instead of calling `notifyReceiptStatusChange()`
 - `recordFailed()`: Now writes `settlement.reconciliation_enqueued` event if reconciliation needed
 
 **Settlement Reconciliation (`packages/stellar-payments/src/settlement.ts`)**
+
 - Removed direct `reconciliationScheduler.enqueue()` call
 - Reconciliation now triggered via outbox relay
 
 **Catalog (`apps/api/src/services/cataloging.ts`)**
+
 - `catalog()`: Now writes both `catalog.resource_cataloged` and `resource.indexed` events atomically
 - Removed direct `indexingQueue.addResourceIndexingJob()` call
 - Resource indexing now triggered via outbox relay
 
 **Catalog Persistence (`apps/api/src/services/catalogPersistence.ts`)**
+
 - `createCatalogEvent()`: Now accepts optional transaction client for transactional writes
 
 ### Worker Setup (`apps/worker/src/worker.ts`, `apps/worker/src/queues.ts`)
+
 - Registered outbox relay worker on `outbox-relay` queue
 - Registered outbox cleanup worker on `outbox-cleanup` queue
 
 ### Documentation
+
 - New `docs/OUTBOX_PATTERN.md`: Comprehensive pattern guide
 - New `ISSUE_37_IMPLEMENTATION.md`: Implementation summary
 - New `ISSUE_37_CHANGES.md`: Detailed file changes
@@ -76,7 +85,7 @@ This PR implements a transactional outbox pattern to prevent database state and 
 ✅ **At-least-once**: Events are delivered at least once  
 ✅ **Idempotent**: Consumers track processed events, preventing duplicates on redelivery  
 ✅ **Per-aggregate ordered**: Events for same aggregate delivered in creation order  
-✅ **Crash-safe**: Worker leases expire, allowing recovery after crashes  
+✅ **Crash-safe**: Worker leases expire, allowing recovery after crashes
 
 ## Testing
 
@@ -131,14 +140,14 @@ Comprehensive test suite (`packages/shared/src/db/outbox.test.ts`, 19 tests):
 ✅ Bounded retries (10) with exponential backoff  
 ✅ Dead-letter with manual requeue support  
 ✅ Retention policy (30 days, configurable)  
-✅ Complete documentation  
+✅ Complete documentation
 
 ## Backward Compatibility
 
 ✅ No breaking changes to public APIs  
 ✅ Database migration is additive (new tables only)  
 ✅ Existing code continues to work  
-✅ No new runtime dependencies  
+✅ No new runtime dependencies
 
 ## Performance Impact
 
@@ -159,20 +168,24 @@ Comprehensive test suite (`packages/shared/src/db/outbox.test.ts`, 19 tests):
 ## Files for Review
 
 ### Critical Files (Architecture & Logic)
+
 1. `packages/shared/src/db/outbox.ts` - Core outbox implementation
 2. `apps/worker/src/workers/outboxRelay.ts` - Relay worker logic
 3. `packages/stellar-payments/src/prismaPaymentPersistence.ts` - Settlement producer
 4. `apps/api/src/services/cataloging.ts` - Catalog producer
 
 ### Tests
+
 1. `packages/shared/src/db/outbox.test.ts` - Test suite
 
 ### Documentation
+
 1. `docs/OUTBOX_PATTERN.md` - Pattern guide and recovery procedures
 2. `ISSUE_37_IMPLEMENTATION.md` - Implementation summary
 3. `ISSUE_37_CHANGES.md` - Detailed changes
 
 ### Integration
+
 1. `apps/worker/src/worker.ts` - Worker registration
 2. `apps/worker/src/queues.ts` - Queue configuration
 
@@ -187,6 +200,7 @@ Comprehensive test suite (`packages/shared/src/db/outbox.test.ts`, 19 tests):
 ## Operator Procedures
 
 ### View Pending Events
+
 ```sql
 SELECT * FROM "OutboxEvent"
 WHERE status = 'pending'
@@ -194,6 +208,7 @@ ORDER BY nextAttemptAt ASC;
 ```
 
 ### View Dead-Letter Events
+
 ```sql
 SELECT id, lastError, attemptCount, payload
 FROM "OutboxEvent"
@@ -202,6 +217,7 @@ ORDER BY createdAt DESC;
 ```
 
 ### Manual Requeue
+
 ```sql
 UPDATE "OutboxEvent"
 SET status = 'pending', attemptCount = 0, nextAttemptAt = NOW(), lastError = NULL

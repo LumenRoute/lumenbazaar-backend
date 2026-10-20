@@ -36,35 +36,37 @@ This PR adds a comprehensive adversarial verification integration test matrix th
 ❌ **NOT Changed**: Verification pipeline logic  
 ❌ **NOT Changed**: Error codes or error handling  
 ❌ **NOT Changed**: OpenAPI specifications  
-❌ **NOT Changed**: Database migrations  
+❌ **NOT Changed**: Database migrations
 
 ## Test Vectors
 
 ### Control Vector
+
 - **Test**: "accepts a valid exact payment with correct signature, network, asset, amount, recipient, source, and expiry"
 - **Expected**: Passes verification, status="verified"
 - **Purpose**: Proves test harness can succeed
 
 ### Adversarial Vectors (10)
 
-| # | Vector | Expected Rejection | Description |
-|---|--------|-------------------|-------------|
-| 1 | Signature | `INVALID_SIGNATURE` | Invalid or wrong-key signature |
-| 2 | Network | `UNSUPPORTED_NETWORK` | Mismatched network passphrase |
-| 3 | Asset | `ASSET_MISMATCH` | Wrong asset/issuer |
-| 4 | Amount | `AMOUNT_MISMATCH` | Insufficient/mismatched amount |
-| 5 | Recipient | `RECIPIENT_MISMATCH` | Wrong destination account |
-| 6 | Operation Count | `INVALID_PAYMENT_PAYLOAD` | Extra/unexpected operations |
-| 7 | Source Account | `INVALID_PAYMENT_PAYLOAD` | Wrong source/payer |
-| 8 | Expiry | `AUTH_EXPIRED` | Expired/invalid time bounds |
-| 9 | Fee | `SETTLEMENT_FAILED` | Insufficient/manipulated fee |
-| 10 | Replay | SAFE REUSE or `REPLAY_DETECTED` | Resubmitted transaction |
+| #   | Vector          | Expected Rejection              | Description                    |
+| --- | --------------- | ------------------------------- | ------------------------------ |
+| 1   | Signature       | `INVALID_SIGNATURE`             | Invalid or wrong-key signature |
+| 2   | Network         | `UNSUPPORTED_NETWORK`           | Mismatched network passphrase  |
+| 3   | Asset           | `ASSET_MISMATCH`                | Wrong asset/issuer             |
+| 4   | Amount          | `AMOUNT_MISMATCH`               | Insufficient/mismatched amount |
+| 5   | Recipient       | `RECIPIENT_MISMATCH`            | Wrong destination account      |
+| 6   | Operation Count | `INVALID_PAYMENT_PAYLOAD`       | Extra/unexpected operations    |
+| 7   | Source Account  | `INVALID_PAYMENT_PAYLOAD`       | Wrong source/payer             |
+| 8   | Expiry          | `AUTH_EXPIRED`                  | Expired/invalid time bounds    |
+| 9   | Fee             | `SETTLEMENT_FAILED`             | Insufficient/manipulated fee   |
+| 10  | Replay          | SAFE REUSE or `REPLAY_DETECTED` | Resubmitted transaction        |
 
 ### Network Error Handling (Critical Criterion)
 
 **Acceptance Criterion**: "Network error is never interpreted as valid"
 
 Tests verify:
+
 1. RPC/transport failures → `SETTLEMENT_FAILED` (not success)
 2. Finality timeouts → `SETTLEMENT_FAILED` (not fallback)
 3. Malformed responses → `SETTLEMENT_FAILED` (not silent acceptance)
@@ -72,6 +74,7 @@ Tests verify:
 ### Error Mapping Precision Tests (12+)
 
 Validate `failureCode()` function mappings:
+
 - `network_mismatch` → `UNSUPPORTED_NETWORK`
 - `invalid_network` → `UNSUPPORTED_NETWORK`
 - `wrong_asset` → `ASSET_MISMATCH`
@@ -89,7 +92,9 @@ Validate `failureCode()` function mappings:
 ## Key Implementation Details
 
 ### Mock Adapter Strategy
+
 All vectors use **SIMULATED/LOCAL mock adapters**:
+
 - No RPC calls to Stellar testnet
 - Deterministic, fast test execution
 - Validates error mapping logic
@@ -97,16 +102,20 @@ All vectors use **SIMULATED/LOCAL mock adapters**:
 - Marked with `SIMULATED (local)` in test comments
 
 ### Local vs. Live Evidence
+
 - **Simulated (Local)**: ✅ All 10 adversarial vectors + control (current PR)
 - **Live Evidence**: Future enhancement (would use real @x402/stellar against testnet)
 
 ### Isolation Principle
+
 Each vector differs from control in **exactly ONE dimension**:
+
 - Ensures rejections are due to targeted failure mode
 - Prevents cascading errors masking root cause
 - Makes test intent clear and maintainable
 
 ### Test Data
+
 - All synthetic/testnet data
 - Random keypairs generated fresh
 - Uses `testPaymentRequest` fixture
@@ -114,7 +123,9 @@ Each vector differs from control in **exactly ONE dimension**:
 - **NO production accounts, NO secrets committed**
 
 ### Replay Protection Validation
+
 Tests verify replay protection mechanism:
+
 1. First verification: stored with payment hash key
 2. Identical replay: safely reused (hash matches)
 3. Conflicting replay: rejected with `REPLAY_DETECTED` (hash matches, requirements differ)
@@ -160,6 +171,7 @@ Total: 20+ test cases pass
 ## Documentation
 
 ### Primary Documentation
+
 - **File**: `packages/stellar-payments/ADVERSARIAL_VERIFICATION_MATRIX.md`
 - **Contents**:
   - Overview of each vector
@@ -171,6 +183,7 @@ Total: 20+ test cases pass
   - Future work
 
 ### In-Code Documentation
+
 - File header: Comprehensive explanation of test strategy
 - Test comments: `SIMULATED (local)` markers for local vs. live distinction
 - Each vector: Purpose, target failure mode, expected rejection
@@ -211,6 +224,7 @@ Total: 20+ test cases pass
 ## Scope Adherence
 
 ✅ **Meets All Requirements**:
+
 - [x] 10 adversarial vectors covering all specified categories
 - [x] 1 valid control vector
 - [x] Stable, specific rejection assertions (not generic "fails")

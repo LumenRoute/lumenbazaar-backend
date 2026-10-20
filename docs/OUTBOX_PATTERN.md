@@ -19,16 +19,20 @@ A separate **outbox relay worker** periodically claims batches of pending events
 The outbox tracks four aggregate types and their event types:
 
 ### Settlement Events
+
 - **`settlement.confirmed`**: Recorded when a payment settlement succeeds
 - **`settlement.reconciliation_enqueued`**: Triggers settlement reconciliation job when a settlement requires later confirmation
 
 ### Receipt Events
+
 - **`receipt.status_changed`**: Notifies downstream systems (webhooks, notifications) when a receipt status changes
 
 ### Resource Events
+
 - **`resource.indexed`**: Triggers resource indexing and search document creation when a resource is created or updated
 
 ### Catalog Events
+
 - **`catalog.resource_cataloged`**: Tracks successful resource cataloging for audit and analytics
 
 ## Database Schema
@@ -126,6 +130,7 @@ async recordConfirmed(input: ConfirmedPaymentStateInput) {
 ### Payload Safety
 
 Payloads must:
+
 - Include **only allowlisted fields**. Never spread entire records.
 - Exclude secrets, private keys, signed payloads, and authorization tokens.
 - Be JSON-serializable.
@@ -148,6 +153,7 @@ The outbox relay worker (`apps/worker/src/workers/outboxRelay.ts`) processes pen
 ### Crash Recovery
 
 If the relay worker crashes:
+
 - Claimed events remain locked with an expiry timestamp.
 - When the lease expires, other workers can reclaim the rows via `SELECT ... FOR UPDATE SKIP LOCKED`.
 - Re-delivery is safe because consumer handlers record a `ProcessedOutboxEvent` before marking delivered, so duplicates are deduplicated.
@@ -192,11 +198,7 @@ Scheduled daily (or on-demand):
 import { handleOutboxCleanup } from "@lumenbazaar/shared";
 
 // Run cleanup
-const deletedCount = await handleOutboxCleanup(
-  job,
-  config,
-  { db: prismaClient }
-);
+const deletedCount = await handleOutboxCleanup(job, config, { db: prismaClient });
 ```
 
 ## Dead-Letter Inspection and Requeue

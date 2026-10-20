@@ -92,6 +92,8 @@ describe("CatalogService", () => {
         walletAddress: localIssuerPublicKey,
         domain: "seller.example"
       });
+      const challenge = await sellerService.verifyDomain(seller.id, {});
+      await sellerService.verifyDomain(seller.id, { evidence: challenge.challenge });
 
       const config = loadConfig({});
       const resourceService = new ResourceService(config, sellerService);
@@ -115,11 +117,13 @@ describe("CatalogService", () => {
       const seller1 = await sellerService.createSeller({
         displayName: "Seller 1",
         walletAddress: localIssuerPublicKey,
-        domain: "seller1.example"
+        domain: "seller.example"
       });
+      const challenge = await sellerService.verifyDomain(seller1.id, {});
+      await sellerService.verifyDomain(seller1.id, { evidence: challenge.challenge });
       const seller2 = await sellerService.createSeller({
         displayName: "Seller 2",
-        walletAddress: `G${localIssuerPublicKey.slice(1)}`,
+        walletAddress: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
         domain: "seller2.example"
       });
 
@@ -166,6 +170,8 @@ describe("CatalogService", () => {
         walletAddress: localIssuerPublicKey,
         domain: "seller.example"
       });
+      const challenge = await sellerService.verifyDomain(seller.id, {});
+      await sellerService.verifyDomain(seller.id, { evidence: challenge.challenge });
 
       const config = loadConfig({});
       const resourceService = new ResourceService(config, sellerService);

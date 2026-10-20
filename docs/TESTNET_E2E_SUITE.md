@@ -13,6 +13,7 @@ pnpm deploy:testnet:e2e:smoke
 ```
 
 This validates:
+
 - API health and readiness
 - MCP server availability
 - Network configuration
@@ -31,6 +32,7 @@ pnpm deploy:testnet:e2e:full
 ```
 
 This validates:
+
 - Payment flow execution
 - Settlement confirmation
 - Receipt finalization
@@ -42,21 +44,26 @@ This validates:
 ### Core Modules
 
 #### 1. **testnet-e2e-suite.ts** - Main Orchestrator
+
 Coordinates all e2e testing activities.
 
 **Key Functions:**
+
 - `runTestnetE2ESmoke()` - Read-only deployment health checks
 - `runTestnetE2ESuite()` - Full payment flow with replay verification
 - `createOfficialTestnetSigner()` - Creates Ed25519 signer for test payments
 
 **Evidence Types:**
+
 - `TestnetE2ESmokeModeEvidence` - Deployment health summary
 - `TestnetE2ESuiteEvidence` - Complete flow evidence with replay data
 
 #### 2. **testnet-evidence-collector.ts** - Evidence Collection
+
 Gathers cryptographic proof of all operations.
 
 **Collectors:**
+
 - `APIDeploymentEvidenceCollector` - API commit, version, capabilities
 - `NetworkEvidenceCollector` - Network health and configuration
 - `AssetPaymentEvidenceCollector` - Payment requirements and assets
@@ -64,12 +71,15 @@ Gathers cryptographic proof of all operations.
 - `ReceiptEvidenceCollector` - Receipt finalization proof
 
 **Validation:**
+
 - `verifyEvidenceIntegrity()` - Validates evidence completeness and format
 
 #### 3. **ci-security.ts** - Security Validation
+
 Prevents unsafe execution and masks secrets.
 
 **Security Functions:**
+
 - `detectCIEnvironment()` - Identifies GitHub Actions context
 - `validateTestnetE2ESecurityContext()` - Enforces smoke-only on forks
 - `isSafeForFundedOperations()` - Blocks untrusted funded operations
@@ -84,11 +94,13 @@ Prevents unsafe execution and masks secrets.
 **Credentials Required:** None  
 **Funded Operations:** No  
 **Use Cases:**
+
 - PR validation (all PRs)
 - Deployment monitoring
 - Pre-flight checks
 
 **Output:** `TestnetE2ESmokeModeEvidence`
+
 ```json
 {
   "checkedAt": "2024-10-16T...",
@@ -111,17 +123,20 @@ Prevents unsafe execution and masks secrets.
 **Credentials Required:** `CLIENT_PRIVATE_KEY` (Stellar testnet private key)  
 **Funded Operations:** Yes (creates actual transactions)  
 **Use Cases:**
+
 - Main branch deployment verification
 - Pre-release validation
 - Manual testnet testing
 
 **Execution Restrictions:**
+
 - ✅ Allowed: Main branch pushes
 - ✅ Allowed: Internal PRs (with manual approval)
 - ❌ Blocked: Fork pull requests
 - ❌ Blocked: Local development (unless explicitly enabled)
 
 **Output:** `TestnetE2ESuiteEvidence`
+
 ```json
 {
   "checkedAt": "2024-10-16T...",
@@ -188,6 +203,7 @@ pnpm deploy:testnet:e2e:validate
 ```
 
 Output includes:
+
 - CI environment context
 - Security validation results
 - Credential presence
@@ -196,6 +212,7 @@ Output includes:
 ## GitHub Actions Workflow
 
 ### Workflow File
+
 `.github/workflows/testnet-e2e.yml`
 
 ### Triggers
@@ -238,10 +255,12 @@ security-check (always runs)
 ### Evidence Retention
 
 All evidence artifacts are uploaded and retained for **90 days**:
+
 - `testnet-e2e-smoke-evidence/smoke-mode.json`
 - `testnet-e2e-full-evidence/e2e-full.json`
 
 Access via:
+
 - GitHub Actions artifacts UI
 - API: `/repos/:owner/:repo/actions/runs/:id/artifacts`
 
@@ -250,11 +269,13 @@ Access via:
 ### Setup
 
 1. **Install dependencies**
+
    ```bash
    pnpm install
    ```
 
 2. **Create testnet account** (or use existing)
+
    ```bash
    # Generate keypair for testnet
    # Fund account via Stellar testnet faucet
@@ -271,17 +292,20 @@ Access via:
 ### Running Locally
 
 **Smoke mode (no credentials):**
+
 ```bash
 pnpm deploy:testnet:e2e:smoke --manifest docs/deployment/testnet-endpoints.json
 ```
 
 **Full e2e (with credentials):**
+
 ```bash
 export CLIENT_PRIVATE_KEY="your_private_key"
 pnpm deploy:testnet:e2e:full --manifest docs/deployment/testnet-endpoints.json
 ```
 
 **Output:**
+
 ```bash
 # Evidence saved to
 deployment-evidence/e2e-smoke.json
@@ -293,14 +317,17 @@ deployment-evidence/e2e-full.json
 ### Environment Variables
 
 #### Deployment
+
 - `TESTNET_MANIFEST_PATH` - Path to testnet endpoints manifest (default: `docs/deployment/testnet-endpoints.json`)
 - `TESTNET_E2E_OUTPUT` - Output path for evidence (default: `deployment-evidence/e2e-suite.json`)
 
 #### Credentials (Full Mode Only)
+
 - `CLIENT_PRIVATE_KEY` - Stellar testnet private key (Ed25519 format)
 - Must be set in GitHub Actions secrets, not in .env
 
 #### CI Context (Auto-detected)
+
 - `GITHUB_ACTIONS` - Set to "true" in GitHub Actions
 - `GITHUB_EVENT_NAME` - "push", "pull_request", "workflow_dispatch"
 - `GITHUB_HEAD_REF` - Branch name (for fork detection)
@@ -310,6 +337,7 @@ deployment-evidence/e2e-full.json
 **Location:** `docs/deployment/testnet-endpoints.json`
 
 **Schema:**
+
 ```json
 {
   "environment": "testnet",
@@ -354,6 +382,7 @@ deployment-evidence/e2e-full.json
 ### Evidence Chain
 
 Full e2e evidence records:
+
 1. API commit hash
 2. Migration run ID
 3. Payment requirement hash
@@ -384,28 +413,28 @@ cat deployment-evidence/e2e-full.json | jq '.firstFlow.receipt'
 
 ### Smoke Mode Failures
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| "API health endpoint returned HTTP 500" | API unreachable | Check API URL in manifest |
-| "Paid resource omitted PAYMENT-REQUIRED" | Missing x402 header | Verify paid resource implements HTTP 402 |
-| "Paid resource did not return official v2 challenge" | Wrong x402 version | Ensure API uses x402 v2 spec |
+| Error                                                | Cause               | Solution                                 |
+| ---------------------------------------------------- | ------------------- | ---------------------------------------- |
+| "API health endpoint returned HTTP 500"              | API unreachable     | Check API URL in manifest                |
+| "Paid resource omitted PAYMENT-REQUIRED"             | Missing x402 header | Verify paid resource implements HTTP 402 |
+| "Paid resource did not return official v2 challenge" | Wrong x402 version  | Ensure API uses x402 v2 spec             |
 
 ### Full E2E Failures
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| "CLIENT_PRIVATE_KEY is required" | Credentials missing | Set secret in GitHub or environment |
-| "Full e2e mode is not allowed on fork pull requests" | Fork PR detected | Expected behavior - fork PRs use smoke only |
-| "Receipt is not finalized" | Settlement incomplete | Check Stellar network status |
-| "Replay was not rejected" | Settlement not idempotent | Database issue - check persistence layer |
+| Error                                                | Cause                     | Solution                                    |
+| ---------------------------------------------------- | ------------------------- | ------------------------------------------- |
+| "CLIENT_PRIVATE_KEY is required"                     | Credentials missing       | Set secret in GitHub or environment         |
+| "Full e2e mode is not allowed on fork pull requests" | Fork PR detected          | Expected behavior - fork PRs use smoke only |
+| "Receipt is not finalized"                           | Settlement incomplete     | Check Stellar network status                |
+| "Replay was not rejected"                            | Settlement not idempotent | Database issue - check persistence layer    |
 
 ### Local Testing Issues
 
-| Issue | Solution |
-|-------|----------|
-| "Network error" when running locally | Check internet connection, proxy settings |
-| "Invalid private key format" | Ensure Ed25519 format, 56 char base32 string |
-| "Manifest not found" | Use `--manifest` flag or create file |
+| Issue                                | Solution                                     |
+| ------------------------------------ | -------------------------------------------- |
+| "Network error" when running locally | Check internet connection, proxy settings    |
+| "Invalid private key format"         | Ensure Ed25519 format, 56 char base32 string |
+| "Manifest not found"                 | Use `--manifest` flag or create file         |
 
 ## Best Practices
 
@@ -489,7 +518,7 @@ pnpm deploy:testnet:probe --manifest docs/deployment/testnet-endpoints.json
 ### Custom Payment Signer
 
 ```typescript
-import { createOfficialTestnetSigner } from './scripts/testnet-e2e-suite.js';
+import { createOfficialTestnetSigner } from "./scripts/testnet-e2e-suite.js";
 
 const signer = createOfficialTestnetSigner(process.env.CLIENT_PRIVATE_KEY);
 const payload = await signer(requirements, { url: resourceUrl });
@@ -498,7 +527,7 @@ const payload = await signer(requirements, { url: resourceUrl });
 ### Extend Evidence Collection
 
 ```typescript
-import { EvidenceCollector } from './scripts/testnet-evidence-collector.js';
+import { EvidenceCollector } from "./scripts/testnet-evidence-collector.js";
 
 const collector = new EvidenceCollector();
 const evidence = await collector.collectFullEvidence(

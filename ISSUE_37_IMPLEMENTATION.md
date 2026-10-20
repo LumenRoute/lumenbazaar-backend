@@ -49,25 +49,25 @@ Core functions for outbox operations:
   - Uses explicit field mapping (no record spreading)
   - Validates no secrets in payload
 
-- **`claimOutboxEventBatch(client, workerId, batchSize, leaseDurationMs)`**: 
+- **`claimOutboxEventBatch(client, workerId, batchSize, leaseDurationMs)`**:
   - Uses `SELECT ... FOR UPDATE SKIP LOCKED` for row-level locking
   - Prevents multiple workers from claiming same event
   - Returns events ordered by aggregate for per-aggregate ordering
 
 - **`markOutboxEventDelivered(client, eventId)`**: Marks event successfully delivered
 
-- **`markOutboxEventFailed(client, eventId, error, maxAttempts)`**: 
+- **`markOutboxEventFailed(client, eventId, error, maxAttempts)`**:
   - Schedules retry with exponential backoff
   - Moves to dead-letter after max attempts
   - Redacts sensitive data from error messages
 
-- **`recordProcessedOutboxEvent(tx, outboxEventId, consumerId, ...)`**: 
+- **`recordProcessedOutboxEvent(tx, outboxEventId, consumerId, ...)`**:
   - Records idempotency tracking in transaction
   - Prevents duplicate processing on redelivery
 
 - **`isOutboxEventProcessed(client, outboxEventId, consumerId)`**: Idempotency check
 
-- **`cleanupDeliveredOutboxEvents(client, retentionDays)`**: 
+- **`cleanupDeliveredOutboxEvents(client, retentionDays)`**:
   - Deletes delivered events older than retention period
   - Preserves dead-letter events indefinitely
 
@@ -99,14 +99,17 @@ Runs daily (or on-demand) to clean up delivered events:
 **Removed direct "commit-then-publish" calls; replaced with outbox writes:**
 
 #### Settlement (packages/stellar-payments/src/prismaPaymentPersistence.ts)
+
 - **`recordConfirmed()`**: Writes `receipt.status_changed` event in transaction
 - **`recordFailed()`**: Writes `settlement.reconciliation_enqueued` event if reconciliation needed
 
 #### Settlement Reconciliation (packages/stellar-payments/src/settlement.ts)
+
 - **`recordFailedSettlement()`**: Removed direct `reconciliationScheduler.enqueue()` call
   - Reconciliation is now triggered via outbox relay picking up `settlement.reconciliation_enqueued` event
 
 #### Catalog (apps/api/src/services/cataloging.ts)
+
 - **`CatalogService.catalog()`**: Writes both:
   - `catalog.resource_cataloged` event
   - `resource.indexed` event
@@ -115,6 +118,7 @@ Runs daily (or on-demand) to clean up delivered events:
   - Indexing is now triggered via outbox relay
 
 #### Catalog Persistence (apps/api/src/services/catalogPersistence.ts)
+
 - **`PrismaCatalogEventStore.createCatalogEvent()`**: Accepts optional transaction client for transactional writes
 
 ## Implementation Details
@@ -207,29 +211,35 @@ Tests use real database (requires `SHARED_DB_TEST_DATABASE_URL` environment vari
 ## Files Modified
 
 ### Prisma
+
 - `prisma/schema.prisma` - Added `OutboxEvent` and `ProcessedOutboxEvent` models
 - `prisma/migrations/0009_outbox_events/migration.sql` - Migration script
 
 ### Shared Package
+
 - `packages/shared/src/db/outbox.ts` - Core outbox writer and relay functions
 - `packages/shared/src/db/outbox.test.ts` - Comprehensive test suite
 - `packages/shared/src/index.ts` - Exported outbox functions
 
 ### Stellar Payments Package
+
 - `packages/stellar-payments/src/prismaPaymentPersistence.ts` - Updated `recordConfirmed()` and `recordFailed()` to write outbox events
 - `packages/stellar-payments/src/settlement.ts` - Removed direct reconciliation enqueueing (now via outbox)
 
 ### API Service
+
 - `apps/api/src/services/cataloging.ts` - Updated `catalog()` to write outbox events, removed direct indexing queue call
 - `apps/api/src/services/catalogPersistence.ts` - Updated `PrismaCatalogEventStore.createCatalogEvent()` to accept transaction client
 
 ### Worker
+
 - `apps/worker/src/workers/outboxRelay.ts` - New relay worker with consumer handlers and idempotency checks
 - `apps/worker/src/workers/outboxCleanup.ts` - New cleanup worker
 - `apps/worker/src/worker.ts` - Integrated outbox relay and cleanup workers
 - `apps/worker/src/queues.ts` - Added outbox relay and cleanup queues
 
 ### Documentation
+
 - `docs/OUTBOX_PATTERN.md` - Comprehensive pattern documentation
 
 ## Constraints Met

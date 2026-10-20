@@ -14,6 +14,7 @@ This document describes the adversarial verification test matrix added in issue 
 **Location**: `packages/stellar-payments/src/x402AdversarialVerification.integration.test.ts`
 
 **Test Count**: 20+ test cases covering:
+
 - 1 control vector (valid payment)
 - 10 adversarial attack vectors
 - 3 network-error acceptance criterion tests
@@ -24,60 +25,70 @@ This document describes the adversarial verification test matrix added in issue 
 Each vector targets a single failure mode in the verification pipeline. All vectors are isolated: they differ from the valid control in exactly ONE dimension.
 
 ### 1. Signature Attack
+
 - **Target**: Invalid or wrong-key signature
 - **Expected Rejection**: `INVALID_SIGNATURE`
 - **Simulated**: Yes (local mock adapter)
 - **Description**: Payment authorization is signed with an unauthorized key or the signature has been tampered with
 
 ### 2. Network Mismatch
+
 - **Target**: Transaction signed with wrong network passphrase
 - **Expected Rejection**: `UNSUPPORTED_NETWORK`
 - **Simulated**: Yes (local mock adapter)
 - **Description**: Mainnet-signed transaction submitted against testnet verification, or vice versa
 
 ### 3. Asset Mismatch
+
 - **Target**: Payment in different asset than expected
 - **Expected Rejection**: `ASSET_MISMATCH`
 - **Simulated**: Yes (local mock adapter)
 - **Description**: Wrong issuer or wrong asset code in payment operation
 
 ### 4. Amount Mismatch
+
 - **Target**: Insufficient or mismatched amount
 - **Expected Rejection**: `AMOUNT_MISMATCH`
 - **Simulated**: Yes (local mock adapter)
 - **Description**: Payment amount below required or different from what was quoted/expected
 
 ### 5. Recipient Mismatch
+
 - **Target**: Payment to wrong destination account
 - **Expected Rejection**: `RECIPIENT_MISMATCH`
 - **Simulated**: Yes (local mock adapter)
 - **Description**: Destination account differs from expected payee
 
 ### 6. Operation Count Attack
+
 - **Target**: Extra/unexpected operations in transaction
 - **Expected Rejection**: `INVALID_PAYMENT_PAYLOAD`
 - **Simulated**: Yes (local mock adapter)
 - **Description**: Transaction contains additional operations beyond the expected payment op, testing that verification doesn't just check for "contains a valid payment" while ignoring injected operations
 
 ### 7. Source Account Mismatch
+
 - **Target**: Wrong source account (incorrect payer)
 - **Expected Rejection**: `INVALID_PAYMENT_PAYLOAD`
 - **Simulated**: Yes (local mock adapter)
 - **Description**: Transaction source account mismatched from expected signer/payer identity
 
 ### 8. Expiry Attack
+
 - **Target**: Expired or invalid time bounds
 - **Expected Rejection**: `AUTH_EXPIRED`
 - **Simulated**: Yes (local mock adapter)
 - **Description**: Transaction with expired ledger bounds or missing/invalid time bounds
 
 ### 9. Fee Attack
+
 - **Target**: Insufficient or manipulated fee
 - **Expected Rejection**: `SETTLEMENT_FAILED`
 - **Simulated**: Yes (local mock adapter)
 - **Description**: Transaction fee below network minimum or otherwise manipulated. Fee issues typically emerge during RPC simulation.
 
 ### 10. Replay Attack
+
 - **Target**: Resubmitted previously-valid transaction
 - **Expected Rejection**: Safe reuse OR `REPLAY_DETECTED` on conflicting requirements
 - **Simulated**: Yes (local mock adapter)
@@ -90,16 +101,19 @@ The acceptance criterion states: **"Network error is never interpreted as valid"
 Three tests verify this criterion:
 
 ### Test 1: RPC/Transport Failure
+
 Simulates: Timeout, connection refused, network unreachable
 Expected: `SETTLEMENT_FAILED` rejection, NOT success
 Code: Adapter returns error; verification service propagates rejection
 
 ### Test 2: Finality Resolution Timeout
+
 Simulates: Stellar RPC finality check times out or becomes unavailable
 Expected: `SETTLEMENT_FAILED` rejection, NOT fallback to success
 Code: Adapter's settlement resolution fails; service does NOT default to valid
 
 ### Test 3: Malformed Adapter Response
+
 Simulates: Official verifier returns incompatible or incomplete response
 Expected: `SETTLEMENT_FAILED` rejection, NOT silent acceptance
 Code: Response validation catches structural issues; service rejects incompatible responses
@@ -109,6 +123,7 @@ Code: Response validation catches structural issues; service rejects incompatibl
 All vectors in this suite use **SYNTHETIC/TESTNET DATA ONLY**. They are marked distinctly in test comments:
 
 ### Simulated (Local) Vectors
+
 - **Implementation**: Mock adapter that simulates verification outcomes without RPC calls
 - **Speed**: Fast, deterministic
 - **Dependencies**: None (no network calls)
@@ -117,6 +132,7 @@ All vectors in this suite use **SYNTHETIC/TESTNET DATA ONLY**. They are marked d
 - **Examples**: All 10 adversarial vectors + control vector
 
 ### Live Vectors (Future)
+
 - **Implementation**: Would use real `@x402/stellar ExactStellarScheme` against testnet
 - **Speed**: Slower (depends on Stellar testnet RPC)
 - **Dependencies**: `@x402/stellar` library + testnet access
@@ -182,6 +198,7 @@ pnpm test -- --watch packages/stellar-payments/src/x402AdversarialVerification.i
 ### Test Data
 
 All test data is synthetic/testnet:
+
 - Uses `testPaymentRequest` fixture from `@lumenbazaar/testkit`
 - Testnet asset contract: `testAssetContractId` (from testkit)
 - Testnet configuration: `testnetConfig`
@@ -191,7 +208,9 @@ All test data is synthetic/testnet:
 ## Implementation Notes
 
 ### Mock Adapter Strategy
+
 Rather than making real RPC calls to the Stellar testnet, the test suite uses a mock adapter that:
+
 1. Simulates each specific failure mode
 2. Returns the expected `invalidReason` and error code
 3. Allows fast, deterministic test execution
@@ -200,7 +219,9 @@ Rather than making real RPC calls to the Stellar testnet, the test suite uses a 
 This approach is sufficient to validate the pipeline's handling of each failure mode. Future work can add live testnet vectors if end-to-end validation with real Stellar transactions is needed.
 
 ### Replay Protection Mechanism
+
 The verification service uses **payment hash idempotency key** for replay protection:
+
 1. Hash is computed from the canonicalized x402 payload
 2. First verification: payload is verified through the adapter, stored with hash
 3. Identical replay: hash matches → same payment attempt is reused (no re-verification)
@@ -211,6 +232,7 @@ This ensures safe replay handling while catching attacks where the same transact
 ## Scope
 
 This PR is **test-only**:
+
 - **NO changes** to the verification pipeline logic
 - **NO changes** to error codes or error handling
 - **NO changes** to OpenAPI specifications or database migrations

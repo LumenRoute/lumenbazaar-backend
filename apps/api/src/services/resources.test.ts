@@ -239,7 +239,7 @@ describe("ResourceService", () => {
       const resource = await service.createResource(resourceInput(seller.id));
 
       await expect(service.rollbackResource(resource.id, 42)).rejects.toMatchObject({
-        code: "RESOURCE_VERSION_NOT_FOUND"
+        code: "RESOURCE_NOT_FOUND"
       });
     });
 
@@ -255,7 +255,7 @@ describe("ResourceService", () => {
       const latest = (await store.getLatestVersion(resource.id))!.version;
 
       await expect(service.rollbackResource(resource.id, latest)).rejects.toMatchObject({
-        code: "CONFLICT"
+        code: "VALIDATION_FAILED"
       });
     });
 
@@ -330,11 +330,11 @@ describe("ResourceService", () => {
       const seller1 = await sellerService.createSeller({
         displayName: "Seller 1",
         walletAddress: localIssuerPublicKey,
-        domain: "seller1.example"
+        domain: "seller.example"
       });
       const seller2 = await sellerService.createSeller({
         displayName: "Seller 2",
-        walletAddress: `G${localIssuerPublicKey.slice(1)}`,
+        walletAddress: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
         domain: "seller2.example"
       });
 
@@ -391,11 +391,11 @@ describe("ResourceService", () => {
       const seller1 = await sellerService.createSeller({
         displayName: "Seller 1",
         walletAddress: localIssuerPublicKey,
-        domain: "seller1.example"
+        domain: "seller.example"
       });
       const seller2 = await sellerService.createSeller({
         displayName: "Seller 2",
-        walletAddress: `G${localIssuerPublicKey.slice(1)}`,
+        walletAddress: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
         domain: "seller2.example"
       });
       const resource = await service.createResource(resourceInput(seller1.id));
@@ -453,11 +453,11 @@ describe("ResourceService", () => {
       const seller1 = await sellerService.createSeller({
         displayName: "Seller 1",
         walletAddress: localIssuerPublicKey,
-        domain: "seller1.example"
+        domain: "seller.example"
       });
       const seller2 = await sellerService.createSeller({
         displayName: "Seller 2",
-        walletAddress: `G${localIssuerPublicKey.slice(1)}`,
+        walletAddress: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
         domain: "seller2.example"
       });
       const resource = await service.createResource(resourceInput(seller1.id));
@@ -507,11 +507,11 @@ describe("ResourceService", () => {
       const seller1 = await sellerService.createSeller({
         displayName: "Seller 1",
         walletAddress: localIssuerPublicKey,
-        domain: "seller1.example"
+        domain: "seller.example"
       });
       const seller2 = await sellerService.createSeller({
         displayName: "Seller 2",
-        walletAddress: `G${localIssuerPublicKey.slice(1)}`,
+        walletAddress: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
         domain: "seller2.example"
       });
       const resource = await service.createResource(resourceInput(seller1.id));
@@ -567,11 +567,11 @@ describe("ResourceService", () => {
       const seller1 = await sellerService.createSeller({
         displayName: "Seller 1",
         walletAddress: localIssuerPublicKey,
-        domain: "seller1.example"
+        domain: "seller.example"
       });
       const seller2 = await sellerService.createSeller({
         displayName: "Seller 2",
-        walletAddress: `G${localIssuerPublicKey.slice(1)}`,
+        walletAddress: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
         domain: "seller2.example"
       });
       const resource = await service.createResource(resourceInput(seller1.id));

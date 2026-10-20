@@ -262,6 +262,7 @@ describe("WebhookEventService", () => {
         settlement.status === "confirmed" ? "settlement.finalized" : "settlement.failed",
         settlement
       );
+      await new Promise((r) => setTimeout(r, 5));
     }
 
     const { events, total } = await service.listWebhookEvents("seller_123", 100, 0);

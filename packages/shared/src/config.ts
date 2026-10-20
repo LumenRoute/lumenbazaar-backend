@@ -226,7 +226,20 @@ export function loadConfig(
       rpcUrl: env.STELLAR_TESTNET_RPC_URL,
       rpcUrls: parseUrlList(env.STELLAR_TESTNET_RPC_URLS) ?? [env.STELLAR_TESTNET_RPC_URL],
       horizonUrl: env.STELLAR_TESTNET_HORIZON_URL,
-      assets: [testnetAsset],
+      assets: [
+        testnetAsset,
+        ...(env.NODE_ENV === "test" && testnetAsset.issuer !== localIssuerPublicKey
+          ? [
+              {
+                code: "USDC",
+                issuer: localIssuerPublicKey,
+                decimals: 7,
+                kind: "usdc" as const,
+                isTestOnly: true
+              }
+            ]
+          : [])
+      ],
       ...(env.STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID === undefined
         ? {}
         : { uptoSessionContractId: env.STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID })

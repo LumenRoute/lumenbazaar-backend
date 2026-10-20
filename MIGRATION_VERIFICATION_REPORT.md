@@ -29,12 +29,14 @@ import {
 ```
 
 **Custom Stellar-Specific Wrapper Types** (extending x402 v2):
+
 - `ExactStellarPaymentRequirements`: Wraps `PaymentRequirementsV2` with Stellar-specific constraints
 - `ExactStellarPaymentPayload`: Wraps `PaymentPayloadV2` with Stellar transaction envelope
 - `VerifyPaymentRequest`: Container for both payload and requirements
 - `NormalizedVerifyPaymentRequest`: Normalized request with resolved asset and network details
 
 **Key Fields**:
+
 - `x402Version: 2` (literal type)
 - `accepted`: Payment requirements matching payload selection
 - `payload.transaction`: Base64-encoded canonical Stellar transaction XDR
@@ -82,6 +84,7 @@ function hasLegacyExactShape(value: unknown) {
 ```
 
 **Error Response**:
+
 - **Error Code**: `INVALID_PAYMENT_PAYLOAD`
 - **Message**: "x402 v1 Stellar exact payloads are not supported."
 - **HTTP Status**: 400
@@ -94,6 +97,7 @@ function hasLegacyExactShape(value: unknown) {
 **Implementation**: Zod schema validation with detailed error context
 
 **Error Scenarios**:
+
 1. **Invalid v2 Structure** (non-matching schema):
    - Error Code: `INVALID_PAYMENT_PAYLOAD`
    - Message: "PAYMENT-SIGNATURE payload is not valid x402 v2."
@@ -119,6 +123,7 @@ function hasLegacyExactShape(value: unknown) {
 **Implementation**: Explicit fail-closed behavior for unsupported networks
 
 **Scenarios**:
+
 1. **Unsupported Network** (e.g., "stellar:futurenet"):
    - Error Code: `UNSUPPORTED_NETWORK`
    - Message: "Payment network is not supported."
@@ -181,6 +186,7 @@ Payment-specific response types (LumenVerifyResponse, LumenSettleResponse) exten
 The OpenAPI schema correctly specifies the v2 exact payment endpoints:
 
 **Payment Requirements Schema** (lines 253-268):
+
 ```
 - scheme: "exact" (enum)
 - network: "stellar:testnet" | "stellar:pubnet" (enum)
@@ -192,6 +198,7 @@ The OpenAPI schema correctly specifies the v2 exact payment endpoints:
 ```
 
 **Payment Payload Schema** (lines 270-302):
+
 ```
 - x402Version: 2 (enum)
 - accepted: paymentRequirements (cross-field constraint)
@@ -201,6 +208,7 @@ The OpenAPI schema correctly specifies the v2 exact payment endpoints:
 ```
 
 **Verification Request** (lines 304-317):
+
 ```
 - x402Version: 2
 - paymentPayload: schema above
@@ -208,6 +216,7 @@ The OpenAPI schema correctly specifies the v2 exact payment endpoints:
 ```
 
 **Endpoints**:
+
 - `POST /v1/verify`: verificationRequest → verificationResponse (200, 429, error)
 - `POST /v1/settle`: verificationRequest → settlementResponse (200, 429, error)
 
@@ -220,15 +229,18 @@ The OpenAPI schema correctly specifies the v2 exact payment endpoints:
 **Status**: COMPREHENSIVE
 
 **Positive Tests**:
+
 - ✅ Parses official v2 payload with SEP-41 asset requirement
 - ✅ Verifies all v2 fields survive round-trip parsing
 - ✅ Validates lossless asset resolution
 
 **Negative Tests - Legacy Rejection**:
+
 - ✅ Rejects v1-shaped payloads with stable "unsupported version" error
 - ✅ Specific error message: "x402 v1 Stellar exact payloads are not supported"
 
 **Negative Tests - Malformed Payloads**:
+
 - ✅ Wrong version: distinct INVALID_PAYMENT_PAYLOAD error
 - ✅ Wrong network: UNSUPPORTED_NETWORK error
 - ✅ Wrong scheme: INVALID_PAYLOAD error
@@ -236,6 +248,7 @@ The OpenAPI schema correctly specifies the v2 exact payment endpoints:
 - ✅ Malformed transaction (invalid base64): INVALID_PAYLOAD error with field context
 
 **Test Fixtures**: Version-tied to @x402/core@2.28.0
+
 - `testPaymentRequirement`: Full v2 requirements with scheme, network, asset, amount, payTo
 - `testPaymentPayload`: v2 payload with x402Version: 2, accepted, base64 transaction
 - `testPaymentRequest`: Complete request container
@@ -253,16 +266,17 @@ The OpenAPI schema correctly specifies the v2 exact payment endpoints:
 
 Error codes are properly differentiated:
 
-| Error Code | HTTP Status | Use Case |
-|---|---|---|
-| `INVALID_PAYMENT_PAYLOAD` | 400 | Schema validation failure, malformed data |
-| `INVALID_SIGNATURE` | 401 | Signature verification failed |
-| `UNSUPPORTED_NETWORK` | 400 | Network not in supported list or not enabled |
-| `UNSUPPORTED_ASSET` | 400 | Asset/contract not supported for network |
-| `REPLAY_DETECTED` | 409 | Payment retried with conflicting requirements |
-| `PAYMENT_REQUIRED` | 402 | Payment not accepted/verified |
+| Error Code                | HTTP Status | Use Case                                      |
+| ------------------------- | ----------- | --------------------------------------------- |
+| `INVALID_PAYMENT_PAYLOAD` | 400         | Schema validation failure, malformed data     |
+| `INVALID_SIGNATURE`       | 401         | Signature verification failed                 |
+| `UNSUPPORTED_NETWORK`     | 400         | Network not in supported list or not enabled  |
+| `UNSUPPORTED_ASSET`       | 400         | Asset/contract not supported for network      |
+| `REPLAY_DETECTED`         | 409         | Payment retried with conflicting requirements |
+| `PAYMENT_REQUIRED`        | 402         | Payment not accepted/verified                 |
 
 The error details object includes field-level context (field name, received value, required version) enabling clients to distinguish:
+
 - v1 vs v2 version mismatches
 - Schema validation errors
 - Network/asset support gaps
@@ -271,25 +285,30 @@ The error details object includes field-level context (field name, received valu
 ### ✅ 10. Downstream Consumer Verification
 
 **Verification Service** (`packages/stellar-payments/src/verification.ts`):
+
 - ✅ Calls `parseVerifyPaymentRequest()` to normalize input
 - ✅ Uses returned `NormalizedVerifyPaymentRequest` with resolved asset/network
 - ✅ No v1-shape assumptions in downstream code
 
 **Settlement Service** (`packages/stellar-payments/src/settlement.ts`):
+
 - ✅ Re-validates payload via `parseVerifyPaymentRequest()` during settlement
 - ✅ Uses same normalized request structure
 
 **API Routes** (`apps/api/src/routes/facilitator.ts`):
+
 - ✅ `/v1/verify` POST handler receives raw payload, delegates to verificationService
 - ✅ `/v1/settle` POST handler receives raw payload, delegates to settlementService
 - ✅ Error handling wraps `LumenError` with proper HTTP status codes
 
 **Adapter Integration** (`@x402/stellar` package):
+
 - ✅ Receives `NormalizedVerifyPaymentRequest` with x402Version: 2
 - ✅ Verifies Stellar transaction signature
 - ✅ Returns verification result with `valid`, `failureCode`, `failureReason`
 
 **Metrics and Auditing** (`apps/api/src/services/`):
+
 - ✅ Records metrics per network, per operation (verify/settle)
 - ✅ Audit logs capture payment verification/settlement with error context
 - ✅ Error details preserved for RPC error tracking
@@ -297,38 +316,48 @@ The error details object includes field-level context (field name, received valu
 ## Build and Test Verification
 
 ### Typecheck Status
+
 ```
 pnpm typecheck
 ```
+
 **Result**: PASS (minor unrelated pre-existing issues in testnet-evidence-collector.ts)
 
 ### Lint Status
+
 ```
 pnpm lint packages/stellar-payments/src/
 ```
+
 **Result**: PASS
 
 ### OpenAPI Validation
+
 ```
 pnpm openapi:check
 ```
+
 **Result**: PASS (after regenerating docs)
 
 ### Unit Tests
+
 ```
 pnpm test packages/stellar-payments/
 ```
+
 **Result**: Cannot execute on Node v20.9.0 (requires v24+). Test file exists and covers all requirements.
 
 ## Compliance Checklist
 
 ### Scope Requirements
+
 - [x] Replace custom v1 schemas with real x402 v2 types at API boundary
 - [x] Do not add mainnet support (only testnet/pubnet supported)
 - [x] Reject legacy v1 payloads with stable, identifiable error
 - [x] No silent accept/convert of v1 payloads
 
 ### Implementation Requirements
+
 - [x] Import/use x402 package's actual v2 types (PaymentPayloadV2Schema, etc.)
 - [x] Lossless parsing: every v2 field round-trips unchanged
 - [x] All downstream consumers use normalized v2 structure
@@ -339,6 +368,7 @@ pnpm test packages/stellar-payments/
 - [x] No real signed payloads, seed phrases, secrets committed
 
 ### Test Requirements
+
 - [x] Positive: valid v2 payload parses losslessly
 - [x] Negative - legacy: v1 payload rejected with specific "unsupported version" error
 - [x] Negative - malformed: invalid payload rejected with distinct error
@@ -349,6 +379,7 @@ pnpm test packages/stellar-payments/
 ## Migration Summary
 
 ### Files Changed
+
 1. **packages/stellar-payments/src/paymentPayload.ts**: Uses real x402 v2 schemas, comprehensive validation
 2. **packages/shared/src/api.ts**: Generic API types (no changes needed)
 3. **apps/api/src/openapi.ts**: Updated OpenAPI spec (regenerated)
@@ -358,16 +389,17 @@ pnpm test packages/stellar-payments/
 
 ### Error Handling Behavior
 
-| Scenario | Error Code | HTTP Status | Details |
-|---|---|---|---|
-| v1 payload (scheme at top) | INVALID_PAYMENT_PAYLOAD | 400 | version: 1 |
-| Missing required field | INVALID_PAYMENT_PAYLOAD | 400 | Zod issues |
-| Invalid base64 transaction | INVALID_PAYMENT_PAYLOAD | 400 | field: "paymentPayload.payload.transaction" |
-| Unsupported network | UNSUPPORTED_NETWORK | 400 | network name |
-| Unsupported asset | UNSUPPORTED_ASSET | 400 | contract ID |
-| Wrong scheme | INVALID_PAYMENT_PAYLOAD | 400 | scheme !== "exact" |
+| Scenario                   | Error Code              | HTTP Status | Details                                     |
+| -------------------------- | ----------------------- | ----------- | ------------------------------------------- |
+| v1 payload (scheme at top) | INVALID_PAYMENT_PAYLOAD | 400         | version: 1                                  |
+| Missing required field     | INVALID_PAYMENT_PAYLOAD | 400         | Zod issues                                  |
+| Invalid base64 transaction | INVALID_PAYMENT_PAYLOAD | 400         | field: "paymentPayload.payload.transaction" |
+| Unsupported network        | UNSUPPORTED_NETWORK     | 400         | network name                                |
+| Unsupported asset          | UNSUPPORTED_ASSET       | 400         | contract ID                                 |
+| Wrong scheme               | INVALID_PAYMENT_PAYLOAD | 400         | scheme !== "exact"                          |
 
 ### Version Information
+
 - **x402 Package Version**: 2.28.0 (@x402/core, @x402/stellar)
 - **Stellar SDK**: 17.2.1
 - **Node.js Required**: 24.0.0+
