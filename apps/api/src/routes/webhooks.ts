@@ -8,10 +8,7 @@ export type WebhookRouteOptions = {
   webhookService?: WebhookService;
 };
 
-export function registerWebhookRoutes(
-  app: FastifyInstance,
-  options: WebhookRouteOptions = {}
-) {
+export function registerWebhookRoutes(app: FastifyInstance, options: WebhookRouteOptions = {}) {
   const webhookService = options.webhookService ?? new WebhookService();
 
   /**
@@ -20,14 +17,8 @@ export function registerWebhookRoutes(
    * Returns the endpoint and a one-time secret (shown only once).
    */
   app.post("/v1/sellers/:sellerId/webhooks", async (request) => {
-    const params = parseParams(
-      request,
-      z.object({ sellerId: z.string().min(1) })
-    );
-    return webhookService.createWebhookEndpoint(
-      params.sellerId,
-      parseBody(request, z.unknown())
-    );
+    const params = parseParams(request, z.object({ sellerId: z.string().min(1) }));
+    return webhookService.createWebhookEndpoint(params.sellerId, parseBody(request, z.unknown()));
   });
 
   /**
@@ -35,22 +26,15 @@ export function registerWebhookRoutes(
    * List all webhook endpoints for a seller (paginated).
    */
   app.get("/v1/sellers/:sellerId/webhooks", async (request) => {
-    const params = parseParams(
-      request,
-      z.object({ sellerId: z.string().min(1) })
-    );
+    const params = parseParams(request, z.object({ sellerId: z.string().min(1) }));
     const query = parseQuery(
       request,
       z.object({
         limit: z.coerce.number().int().min(1).max(100).default(20),
-        offset: z.coerce.number().int().min(0).default(0),
+        offset: z.coerce.number().int().min(0).default(0)
       })
     );
-    return webhookService.listWebhookEndpoints(
-      params.sellerId,
-      query.limit,
-      query.offset
-    );
+    return webhookService.listWebhookEndpoints(params.sellerId, query.limit, query.offset);
   });
 
   /**
@@ -63,7 +47,7 @@ export function registerWebhookRoutes(
       request,
       z.object({
         sellerId: z.string().min(1),
-        endpointId: z.string().min(1),
+        endpointId: z.string().min(1)
       })
     );
     return webhookService.getWebhookEndpoint(params.sellerId, params.endpointId);
@@ -78,7 +62,7 @@ export function registerWebhookRoutes(
       request,
       z.object({
         sellerId: z.string().min(1),
-        endpointId: z.string().min(1),
+        endpointId: z.string().min(1)
       })
     );
     return webhookService.updateWebhookEndpoint(
@@ -97,7 +81,7 @@ export function registerWebhookRoutes(
       request,
       z.object({
         sellerId: z.string().min(1),
-        endpointId: z.string().min(1),
+        endpointId: z.string().min(1)
       })
     );
     await webhookService.deleteWebhookEndpoint(params.sellerId, params.endpointId);
@@ -109,51 +93,45 @@ export function registerWebhookRoutes(
    * Rotate the webhook secret. The new secret is returned (shown only once).
    * The previous secret remains valid for WEBHOOK_SECRET_ROTATION_OVERLAP_SECONDS.
    */
-  app.post(
-    "/v1/sellers/:sellerId/webhooks/:endpointId/rotate-secret",
-    async (request) => {
-      const params = parseParams(
-        request,
-        z.object({
-          sellerId: z.string().min(1),
-          endpointId: z.string().min(1),
-        })
-      );
-      return webhookService.rotateSecret(params.sellerId, params.endpointId);
-    }
-  );
+  app.post("/v1/sellers/:sellerId/webhooks/:endpointId/rotate-secret", async (request) => {
+    const params = parseParams(
+      request,
+      z.object({
+        sellerId: z.string().min(1),
+        endpointId: z.string().min(1)
+      })
+    );
+    return webhookService.rotateSecret(params.sellerId, params.endpointId);
+  });
 
   /**
    * GET /v1/sellers/:sellerId/webhooks/:endpointId/deliveries
    * List webhook delivery attempts for an endpoint (paginated).
    * Shows status, timestamp, latency, and error details (never response bodies or secrets).
    */
-  app.get(
-    "/v1/sellers/:sellerId/webhooks/:endpointId/deliveries",
-    async (request) => {
-      const params = parseParams(
-        request,
-        z.object({
-          sellerId: z.string().min(1),
-          endpointId: z.string().min(1),
-        })
-      );
-      const query = parseQuery(
-        request,
-        z.object({
-          limit: z.coerce.number().int().min(1).max(100).default(20),
-          offset: z.coerce.number().int().min(0).default(0),
-        })
-      );
+  app.get("/v1/sellers/:sellerId/webhooks/:endpointId/deliveries", async (request) => {
+    const params = parseParams(
+      request,
+      z.object({
+        sellerId: z.string().min(1),
+        endpointId: z.string().min(1)
+      })
+    );
+    const query = parseQuery(
+      request,
+      z.object({
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+        offset: z.coerce.number().int().min(0).default(0)
+      })
+    );
 
-      // TODO: Verify seller owns endpoint
-      // TODO: Return paginated delivery history (redacted)
-      return {
-        deliveries: [],
-        total: 0,
-      };
-    }
-  );
+    // TODO: Verify seller owns endpoint
+    // TODO: Return paginated delivery history (redacted)
+    return {
+      deliveries: [],
+      total: 0
+    };
+  });
 
   /**
    * GET /v1/sellers/:sellerId/webhooks/events
@@ -164,21 +142,21 @@ export function registerWebhookRoutes(
     const params = parseParams(
       request,
       z.object({
-        sellerId: z.string().min(1),
+        sellerId: z.string().min(1)
       })
     );
     const query = parseQuery(
       request,
       z.object({
         limit: z.coerce.number().int().min(1).max(100).default(20),
-        offset: z.coerce.number().int().min(0).default(0),
+        offset: z.coerce.number().int().min(0).default(0)
       })
     );
 
     // TODO: Return paginated webhook events for seller
     return {
       events: [],
-      total: 0,
+      total: 0
     };
   });
 }

@@ -32,7 +32,7 @@ describe("RPC Finality Retry Logic", () => {
       })
     };
 
-    fetchSpy = vi.spyOn(global, "fetch").mockResolvedValueOnce(mockResponse as Record<string, unknown>);
+    fetchSpy = vi.spyOn(global, "fetch").mockResolvedValueOnce(mockResponse as unknown as Response);
 
     const result = await resolveRpcFinalityTestable({
       rpcUrl: "http://localhost:8000/soroban/rpc",
@@ -40,7 +40,7 @@ describe("RPC Finality Retry Logic", () => {
     });
 
     expect(result.status).toBe("confirmed");
-    expect(result.ledger).toBe(12345678);
+    expect((result as { ledger?: number }).ledger).toBe(12345678);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -54,7 +54,7 @@ describe("RPC Finality Retry Logic", () => {
       })
     };
 
-    fetchSpy = vi.spyOn(global, "fetch").mockResolvedValueOnce(mockResponse as Record<string, unknown>);
+    fetchSpy = vi.spyOn(global, "fetch").mockResolvedValueOnce(mockResponse as unknown as Response);
 
     const result = await resolveRpcFinalityTestable({
       rpcUrl: "http://localhost:8000/soroban/rpc",
@@ -87,9 +87,9 @@ describe("RPC Finality Retry Logic", () => {
 
     fetchSpy = vi
       .spyOn(global, "fetch")
-      .mockResolvedValueOnce(pendingResponse as Record<string, unknown>)
-      .mockResolvedValueOnce(pendingResponse as Record<string, unknown>)
-      .mockResolvedValueOnce(confirmedResponse as Record<string, unknown>);
+      .mockResolvedValueOnce(pendingResponse as unknown as Response)
+      .mockResolvedValueOnce(pendingResponse as unknown as Response)
+      .mockResolvedValueOnce(confirmedResponse as unknown as Response);
 
     const result = await resolveRpcFinalityTestable({
       rpcUrl: "http://localhost:8000/soroban/rpc",
@@ -97,7 +97,7 @@ describe("RPC Finality Retry Logic", () => {
     });
 
     expect(result.status).toBe("confirmed");
-    expect(result.ledger).toBe(87654321);
+    expect((result as { ledger?: number }).ledger).toBe(87654321);
     expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 
@@ -114,7 +114,7 @@ describe("RPC Finality Retry Logic", () => {
     // Mock 20 pending responses (max attempts)
     fetchSpy = vi.spyOn(global, "fetch");
     for (let i = 0; i < 20; i += 1) {
-      fetchSpy.mockResolvedValueOnce(pendingResponse as Record<string, unknown>);
+      fetchSpy.mockResolvedValueOnce(pendingResponse as unknown as Response);
     }
 
     const result = await resolveRpcFinalityTestable({
@@ -142,7 +142,7 @@ describe("RPC Finality Retry Logic", () => {
     fetchSpy = vi
       .spyOn(global, "fetch")
       .mockRejectedValueOnce(networkError)
-      .mockResolvedValueOnce(successResponse as Record<string, unknown>);
+      .mockResolvedValueOnce(successResponse as unknown as Response);
 
     const result = await resolveRpcFinalityTestable({
       rpcUrl: "http://localhost:8000/soroban/rpc",
@@ -150,7 +150,7 @@ describe("RPC Finality Retry Logic", () => {
     });
 
     expect(result.status).toBe("confirmed");
-    expect(result.ledger).toBe(99999);
+    expect((result as { ledger?: number }).ledger).toBe(99999);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
@@ -172,8 +172,8 @@ describe("RPC Finality Retry Logic", () => {
 
     fetchSpy = vi
       .spyOn(global, "fetch")
-      .mockResolvedValueOnce(errorResponse as Record<string, unknown>)
-      .mockResolvedValueOnce(successResponse as Record<string, unknown>);
+      .mockResolvedValueOnce(errorResponse as unknown as Response)
+      .mockResolvedValueOnce(successResponse as unknown as Response);
 
     const result = await resolveRpcFinalityTestable({
       rpcUrl: "http://localhost:8000/soroban/rpc",
@@ -181,7 +181,7 @@ describe("RPC Finality Retry Logic", () => {
     });
 
     expect(result.status).toBe("confirmed");
-    expect(result.ledger).toBe(55555);
+    expect((result as { ledger?: number }).ledger).toBe(55555);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
@@ -205,8 +205,8 @@ describe("RPC Finality Retry Logic", () => {
 
     fetchSpy = vi
       .spyOn(global, "fetch")
-      .mockResolvedValueOnce(invalidResponse as Record<string, unknown>)
-      .mockResolvedValueOnce(validResponse as Record<string, unknown>);
+      .mockResolvedValueOnce(invalidResponse as unknown as Response)
+      .mockResolvedValueOnce(validResponse as unknown as Response);
 
     const result = await resolveRpcFinalityTestable({
       rpcUrl: "http://localhost:8000/soroban/rpc",
@@ -214,7 +214,7 @@ describe("RPC Finality Retry Logic", () => {
     });
 
     expect(result.status).toBe("confirmed");
-    expect(result.ledger).toBe(11111);
+    expect((result as { ledger?: number }).ledger).toBe(11111);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
@@ -258,7 +258,7 @@ describe("RPC Finality Retry Logic", () => {
     // Verify exponential backoff: 100ms, 200ms, 400ms, 800ms, etc (capped at 2000ms)
     const expectedDelays = [100, 200, 400, 800, 1600];
     delayTimings.forEach((delay, index) => {
-      expect(delay).toBeLessThanOrEqual(expectedDelays[index]);
+      expect(delay).toBeLessThanOrEqual(expectedDelays[index]!);
     });
   });
 });

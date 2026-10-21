@@ -48,7 +48,8 @@ const optionalNonEmptyStringEnv = z
  * Issuer: Circle's official testnet USDC issuer (https://developers.circle.com/stablecoins/quickstarts/transfer-usdc-stellar)
  * For Soroban contract ID, use `stellar contract id asset USDC:<issuer>` on testnet.
  */
-const STELLAR_TESTNET_USDC_ISSUER_OFFICIAL = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+const STELLAR_TESTNET_USDC_ISSUER_OFFICIAL =
+  "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 
 /**
  * Configuration key for selecting testnet exact payment asset.
@@ -87,7 +88,7 @@ const envSchema = z.object({
   ENABLE_UPTO_SCHEME: booleanEnv.default(false),
   DEFAULT_ASSET_CODE: z.string().min(1).max(12).default("USDC"),
   STELLAR_TESTNET_RPC_URL: z.string().url().default("https://soroban-testnet.stellar.org"),
-    STELLAR_TESTNET_RPC_URLS: z.string().optional(),
+  STELLAR_TESTNET_RPC_URLS: z.string().optional(),
   STELLAR_TESTNET_HORIZON_URL: z.string().url().default("https://horizon-testnet.stellar.org"),
   /**
    * Official testnet USDC issuer: Circle's public testnet issuer.
@@ -106,7 +107,7 @@ const envSchema = z.object({
   TESTNET_LBT_CONTRACT_ID: optionalNonEmptyStringEnv,
   STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID: optionalNonEmptyStringEnv,
   STELLAR_PUBNET_RPC_URL: z.string().url().default("https://mainnet.sorobanrpc.com"),
-    STELLAR_PUBNET_RPC_URLS: z.string().optional(),
+  STELLAR_PUBNET_RPC_URLS: z.string().optional(),
   STELLAR_PUBNET_HORIZON_URL: z.string().url().default("https://horizon.stellar.org"),
   /**
    * Pubnet USDC issuer. Must be explicitly configured for mainnet deployment.
@@ -184,10 +185,10 @@ export function loadConfig(
 ): AppConfig {
   const env = envSchema.parse(input);
   const defaultAssetCode = env.DEFAULT_ASSET_CODE.toUpperCase();
-  
+
   // Determine which testnet asset configuration to use
   const testnetAssetKind = testnetAssetConfigKey(env);
-  
+
   // Build testnet asset configuration based on TESTNET_ASSET selection
   let testnetAsset: SupportedAsset;
   if (testnetAssetKind === "usdc") {
@@ -225,7 +226,20 @@ export function loadConfig(
       rpcUrl: env.STELLAR_TESTNET_RPC_URL,
       rpcUrls: parseUrlList(env.STELLAR_TESTNET_RPC_URLS) ?? [env.STELLAR_TESTNET_RPC_URL],
       horizonUrl: env.STELLAR_TESTNET_HORIZON_URL,
-      assets: [testnetAsset],
+      assets: [
+        testnetAsset,
+        ...(env.NODE_ENV === "test" && testnetAsset.issuer !== localIssuerPublicKey
+          ? [
+              {
+                code: "USDC",
+                issuer: localIssuerPublicKey,
+                decimals: 7,
+                kind: "usdc" as const,
+                isTestOnly: true
+              }
+            ]
+          : [])
+      ],
       ...(env.STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID === undefined
         ? {}
         : { uptoSessionContractId: env.STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID })

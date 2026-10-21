@@ -6,14 +6,12 @@ import {
   hashWebhookSecret,
   WebhookService,
   createWebhookEndpointSchema,
-  updateWebhookEndpointSchema,
+  updateWebhookEndpointSchema
 } from "./webhooks.js";
 
 describe("webhook URL validation (SSRF protection)", () => {
   it("rejects HTTP URLs", () => {
-    expect(() => validateWebhookUrl("http://example.com/webhook")).toThrow(
-      /HTTPS/
-    );
+    expect(() => validateWebhookUrl("http://example.com/webhook")).toThrow(/HTTPS/);
   });
 
   it("rejects URLs with credentials", () => {
@@ -23,33 +21,21 @@ describe("webhook URL validation (SSRF protection)", () => {
   });
 
   it("rejects localhost", () => {
-    expect(() => validateWebhookUrl("https://localhost:8000/webhook")).toThrow(
-      /localhost/
-    );
+    expect(() => validateWebhookUrl("https://localhost:8000/webhook")).toThrow(/localhost/);
   });
 
   it("rejects loopback IP addresses", () => {
-    expect(() => validateWebhookUrl("https://127.0.0.1/webhook")).toThrow(
-      /private/
-    );
+    expect(() => validateWebhookUrl("https://127.0.0.1/webhook")).toThrow(/private/);
   });
 
   it("rejects private IP ranges", () => {
-    expect(() => validateWebhookUrl("https://192.168.1.100/webhook")).toThrow(
-      /private/
-    );
-    expect(() => validateWebhookUrl("https://10.0.0.1/webhook")).toThrow(
-      /private/
-    );
-    expect(() => validateWebhookUrl("https://172.16.0.1/webhook")).toThrow(
-      /private/
-    );
+    expect(() => validateWebhookUrl("https://192.168.1.100/webhook")).toThrow(/private/);
+    expect(() => validateWebhookUrl("https://10.0.0.1/webhook")).toThrow(/private/);
+    expect(() => validateWebhookUrl("https://172.16.0.1/webhook")).toThrow(/private/);
   });
 
   it("rejects link-local addresses", () => {
-    expect(() => validateWebhookUrl("https://169.254.1.1/webhook")).toThrow(
-      /private/
-    );
+    expect(() => validateWebhookUrl("https://169.254.1.1/webhook")).toThrow(/private/);
   });
 
   it("accepts valid HTTPS URLs", () => {
@@ -84,13 +70,10 @@ describe("webhook secret generation and hashing", () => {
 describe("WebhookService", () => {
   it("creates webhook endpoints", async () => {
     const service = new WebhookService();
-    const result = await service.createWebhookEndpoint(
-      "seller_123",
-      {
-        url: "https://api.example.com/webhook",
-        isActive: true,
-      }
-    );
+    const result = await service.createWebhookEndpoint("seller_123", {
+      url: "https://api.example.com/webhook",
+      isActive: true
+    });
 
     expect(result.id).toBeDefined();
     expect(result.url).toBe("https://api.example.com/webhook");
@@ -102,10 +85,10 @@ describe("WebhookService", () => {
   it("lists webhook endpoints for a seller", async () => {
     const service = new WebhookService();
     const seller1 = await service.createWebhookEndpoint("seller_1", {
-      url: "https://api1.example.com/webhook",
+      url: "https://api1.example.com/webhook"
     });
     const seller2 = await service.createWebhookEndpoint("seller_2", {
-      url: "https://api2.example.com/webhook",
+      url: "https://api2.example.com/webhook"
     });
 
     const { endpoints: list1, total: total1 } = await service.listWebhookEndpoints(
@@ -120,20 +103,20 @@ describe("WebhookService", () => {
     );
 
     expect(total1).toBe(1);
-    expect(list1[0].id).toBe(seller1.id);
+    expect(list1[0]!.id).toBe(seller1.id);
     expect(total2).toBe(1);
-    expect(list2[0].id).toBe(seller2.id);
+    expect(list2[0]!.id).toBe(seller2.id);
   });
 
   it("updates webhook endpoint", async () => {
     const service = new WebhookService();
     const endpoint = await service.createWebhookEndpoint("seller_123", {
-      url: "https://api.example.com/webhook",
+      url: "https://api.example.com/webhook"
     });
 
     const updated = await service.updateWebhookEndpoint("seller_123", endpoint.id, {
       isActive: false,
-      url: "https://api2.example.com/webhook",
+      url: "https://api2.example.com/webhook"
     });
 
     expect(updated.isActive).toBe(false);
@@ -143,21 +126,19 @@ describe("WebhookService", () => {
   it("deletes webhook endpoint", async () => {
     const service = new WebhookService();
     const endpoint = await service.createWebhookEndpoint("seller_123", {
-      url: "https://api.example.com/webhook",
+      url: "https://api.example.com/webhook"
     });
 
     await service.deleteWebhookEndpoint("seller_123", endpoint.id);
 
-    const retrieved = await service
-      .getStore()
-      .getWebhookEndpoint(endpoint.id);
+    const retrieved = await service.getStore().getWebhookEndpoint(endpoint.id);
     expect(retrieved).toBeUndefined();
   });
 
   it("rotates webhook secrets with overlap window", async () => {
     const service = new WebhookService();
     const endpoint = await service.createWebhookEndpoint("seller_123", {
-      url: "https://api.example.com/webhook",
+      url: "https://api.example.com/webhook"
     });
 
     const oldSecret = endpoint.secret;
@@ -174,12 +155,10 @@ describe("WebhookService", () => {
   it("prevents unauthorized access", async () => {
     const service = new WebhookService();
     const endpoint = await service.createWebhookEndpoint("seller_1", {
-      url: "https://api.example.com/webhook",
+      url: "https://api.example.com/webhook"
     });
 
-    await expect(
-      service.getWebhookEndpoint("seller_2", endpoint.id)
-    ).rejects.toThrow(LumenError);
+    await expect(service.getWebhookEndpoint("seller_2", endpoint.id)).rejects.toThrow(LumenError);
   });
 
   it("validates URL format on creation", async () => {
@@ -187,7 +166,7 @@ describe("WebhookService", () => {
 
     await expect(
       service.createWebhookEndpoint("seller_123", {
-        url: "not a url",
+        url: "not a url"
       })
     ).rejects.toThrow();
   });
@@ -197,12 +176,12 @@ describe("schema validation", () => {
   it("validates create webhook endpoint input", () => {
     const valid = {
       url: "https://api.example.com/webhook",
-      isActive: true,
+      isActive: true
     };
     expect(() => createWebhookEndpointSchema.parse(valid)).not.toThrow();
 
     const invalid = {
-      url: "not-a-url",
+      url: "not-a-url"
     };
     expect(() => createWebhookEndpointSchema.parse(invalid)).toThrow();
   });

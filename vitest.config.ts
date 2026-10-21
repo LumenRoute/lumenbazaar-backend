@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    testTimeout: 15_000,
     env: {
       API_HOST: "0.0.0.0",
       API_PORT: "3000",

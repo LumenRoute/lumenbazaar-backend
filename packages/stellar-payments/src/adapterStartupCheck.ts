@@ -94,6 +94,8 @@ import { type PaymentSessionService } from "./paymentSession.js";
  * When `service` is undefined the check immediately returns
  * `adapter_not_configured`.
  */
+import { LumenError } from "@lumenbazaar/shared";
+
 export async function checkUptoAdapter(
   service: PaymentSessionService | undefined,
   options: AdapterStartupCheckOptions = {}
@@ -110,7 +112,17 @@ export async function checkUptoAdapter(
         service
           .getSession("startup_check_sentinel_session_id_0000000000000000")
           .then(() => "responded" as const)
-          .catch(() => "responded" as const),
+          .catch((err: unknown) => {
+            if (
+              typeof err === "object" &&
+              err !== null &&
+              "code" in err &&
+              (err as { code?: unknown }).code === "RESOURCE_NOT_FOUND"
+            ) {
+              return "responded" as const;
+            }
+            throw err;
+          }),
       timeoutMs
     );
 
@@ -131,10 +143,7 @@ export async function checkUptoAdapter(
  * Returns `"timeout"` if the timer fires first.  Raw errors from `fn` are
  * re-thrown so the caller can classify them as startup_check_failed.
  */
-async function raceTimeout<T>(
-  fn: () => Promise<T>,
-  timeoutMs: number
-): Promise<T | "timeout"> {
+async function raceTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<T | "timeout"> {
   return new Promise<T | "timeout">((resolve, reject) => {
     const id = setTimeout(() => resolve("timeout"), timeoutMs);
 
@@ -160,7 +169,7 @@ async function raceTimeout<T>(
 import type {
   ExactStellarPaymentPayload,
   ExactStellarPaymentRequirements,
-  NormalizedVerifyPaymentRequest,
+  NormalizedVerifyPaymentRequest
 } from "./paymentPayload.js";
 
 /** All-zeros sentinel Stellar public key (not a real key). */

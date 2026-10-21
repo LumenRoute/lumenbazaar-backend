@@ -206,20 +206,27 @@ function fakeKms(
   options: { delayMs?: number; permissionDenied?: boolean } = {}
 ): KmsAdapter & { rawKeyReads: number } {
   const adapter = {
+    providerId: "fake-kms",
     network: "stellar:testnet",
-    provider: "kms",
     rawKeyReads: 0,
+    async assertReady() {},
+    async getAddress() {
+      return keypair.publicKey();
+    },
+    async getKeyId() {
+      return "kms-key-v1";
+    },
     async getPublicKey() {
       return { address: keypair.publicKey(), keyVersion: "kms-key-v1" };
     },
-    async sign() {
+    async sign(payload: Uint8Array) {
       if (options.delayMs) {
         await new Promise((resolve) => setTimeout(resolve, options.delayMs));
       }
       if (options.permissionDenied) {
         throw Object.assign(new Error("AccessDenied"), { name: "AccessDeniedException" });
       }
-      return { signature: keypair.sign(Buffer.from("payload")), keyVersion: "kms-key-v1" };
+      return keypair.sign(payload);
     }
   };
   return adapter;

@@ -93,7 +93,11 @@ describe("probeRpcEndpoint", () => {
   it("throws when the request times out (AbortError)", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockRejectedValue(Object.assign(new Error("The operation was aborted."), { name: "AbortError" }))
+      vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("The operation was aborted."), { name: "AbortError" })
+        )
     );
 
     await expect(probeRpcEndpoint("https://soroban-testnet.stellar.org", 1)).rejects.toThrow();
@@ -101,10 +105,7 @@ describe("probeRpcEndpoint", () => {
 
   it("does not include raw error messages in re-thrown errors from underlying fetch", async () => {
     const secretMessage = "connect ECONNREFUSED postgresql://admin:S3cr3t@prod.example.com";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error(secretMessage))
-    );
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error(secretMessage)));
 
     // The probe function itself re-throws directly from fetch — the test verifies
     // that the *readiness service* is the layer that redacts. Here we confirm the
@@ -127,7 +128,9 @@ describe("probeHorizonEndpoint", () => {
       })
     );
 
-    await expect(probeHorizonEndpoint("https://horizon-testnet.stellar.org")).resolves.toBeUndefined();
+    await expect(
+      probeHorizonEndpoint("https://horizon-testnet.stellar.org")
+    ).resolves.toBeUndefined();
   });
 
   it("throws when Horizon returns a non-2xx HTTP status", async () => {
@@ -147,7 +150,11 @@ describe("probeHorizonEndpoint", () => {
   it("throws when the request times out (AbortError)", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockRejectedValue(Object.assign(new Error("The operation was aborted."), { name: "AbortError" }))
+      vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("The operation was aborted."), { name: "AbortError" })
+        )
     );
 
     await expect(probeHorizonEndpoint("https://horizon-testnet.stellar.org", 1)).rejects.toThrow();

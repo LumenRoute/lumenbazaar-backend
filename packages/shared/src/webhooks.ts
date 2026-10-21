@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { SettlementStatus, NetworkId } from "./models.js";
+import type { SettlementStatus } from "./models.js";
+import type { NetworkId } from "./networks.js";
 
 /**
  * Webhook event schema version.
@@ -35,7 +36,7 @@ const ALLOWED_PAYLOAD_FIELDS = [
   "assetIssuer",
   "transactionHash",
   "failureCode",
-  "failureReason",
+  "failureReason"
 ] as const;
 
 export type AllowedPayloadField = (typeof ALLOWED_PAYLOAD_FIELDS)[number];
@@ -51,19 +52,12 @@ export const webhookPayloadSchema = z.object({
     "settlement.pending",
     "settlement.finalized",
     "settlement.failed",
-    "settlement.reconciled",
+    "settlement.reconciled"
   ]),
   timestamp: z.string().datetime().describe("ISO 8601 timestamp (UTC)"),
   paymentId: z.string().describe("Payment attempt ID"),
   settlementId: z.string().describe("Settlement record ID"),
-  status: z.enum([
-    "pending",
-    "submitted",
-    "confirmed",
-    "settled",
-    "timed_out",
-    "failed",
-  ] as const),
+  status: z.enum(["pending", "submitted", "confirmed", "settled", "timed_out", "failed"] as const),
   network: z.string().describe("Network identifier (testnet, mainnet)"),
   amount: z.string().describe("Settlement amount in stroops"),
   assetCode: z.string().describe("Stellar asset code"),
@@ -72,14 +66,8 @@ export const webhookPayloadSchema = z.object({
     .string()
     .optional()
     .describe("Stellar transaction hash (null until confirmed)"),
-  failureCode: z
-    .string()
-    .optional()
-    .describe("Machine-readable failure code if status is failed"),
-  failureReason: z
-    .string()
-    .optional()
-    .describe("Human-readable failure reason if status is failed"),
+  failureCode: z.string().optional().describe("Machine-readable failure code if status is failed"),
+  failureReason: z.string().optional().describe("Human-readable failure reason if status is failed")
 });
 
 export type WebhookPayload = z.infer<typeof webhookPayloadSchema>;
@@ -122,7 +110,7 @@ export function buildWebhookPayload(
     network: settlement.network,
     amount: settlement.amount,
     assetCode: settlement.assetCode,
-    assetIssuer: settlement.assetIssuer,
+    assetIssuer: settlement.assetIssuer
   };
 
   // Only include optional fields if they have values

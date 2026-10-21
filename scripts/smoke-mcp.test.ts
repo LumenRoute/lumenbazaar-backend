@@ -68,24 +68,20 @@ describe("MCP smoke script", () => {
     TIMEOUT_MS + 5_000
   );
 
-  it(
-    "fails (pass=false) when the server refuses the connection",
-    async () => {
-      // Use a port that is definitely not listening.
-      const output = await runMcpSmoke(
-        "http://127.0.0.1:1", // port 1 is privileged and always refused
-        2_000,
-        "dead-sha"
-      );
+  it("fails (pass=false) when the server refuses the connection", async () => {
+    // Use a port that is definitely not listening.
+    const output = await runMcpSmoke(
+      "http://127.0.0.1:1", // port 1 is privileged and always refused
+      2_000,
+      "dead-sha"
+    );
 
-      expect(output.pass).toBe(false);
-      // The initialize step must be recorded as failed
-      const initStep = output.steps.find((s) => s.step === "initialize");
-      expect(initStep).toBeDefined();
-      expect(initStep?.pass).toBe(false);
-    },
-    10_000
-  );
+    expect(output.pass).toBe(false);
+    // The initialize step must be recorded as failed
+    const initStep = output.steps.find((s) => s.step === "initialize");
+    expect(initStep).toBeDefined();
+    expect(initStep?.pass).toBe(false);
+  }, 10_000);
 
   it(
     "fails when the server returns an MCP error for inspect_budget",
@@ -105,9 +101,7 @@ describe("MCP smoke script", () => {
 
       // Spy on McpPaymentToolService.prototype.inspectBudget so it throws,
       // which causes the MCP server to return isError=true to the client.
-      const { McpPaymentToolService } = await import(
-        "../apps/mcp-server/src/paymentTools.js"
-      );
+      const { McpPaymentToolService } = await import("../apps/mcp-server/src/paymentTools.js");
       const inspectSpy = vi
         .spyOn(McpPaymentToolService.prototype, "inspectBudget")
         .mockImplementation(() => {
@@ -149,9 +143,8 @@ describe("MCP smoke script", () => {
       });
 
       const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
-      const { StreamableHTTPClientTransport } = await import(
-        "@modelcontextprotocol/sdk/client/streamableHttp.js"
-      );
+      const { StreamableHTTPClientTransport } =
+        await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
 
       const transport = new StreamableHTTPClientTransport(new URL(server.url));
       const client = new Client({ name: "paid-gate-test", version: "0.1.0" });

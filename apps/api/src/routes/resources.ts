@@ -57,7 +57,11 @@ export function registerResourceRoutes(app: FastifyInstance, options: ResourceRo
       request,
       z.object({ id: z.string().min(1), version: z.coerce.number().int().positive() })
     );
-    return options.resourceService.rollbackResource(params.id, params.version, getSellerContext(request));
+    return options.resourceService.rollbackResource(
+      params.id,
+      params.version,
+      getSellerContext(request)
+    );
   });
 
   app.get("/v1/sellers/:sellerId/resources", async (request) => {
@@ -67,7 +71,9 @@ export function registerResourceRoutes(app: FastifyInstance, options: ResourceRo
   });
 }
 
-function getSellerContext(request: FastifyRequest): { sellerId: string; auditable: boolean } | undefined {
+function getSellerContext(
+  request: FastifyRequest
+): { sellerId: string; auditable: boolean } | undefined {
   const principal = (request as any).sellerApiKeyPrincipal as SellerApiKeyPrincipal | undefined;
   if (principal === undefined) {
     return undefined;

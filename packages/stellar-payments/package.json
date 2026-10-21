@@ -8,11 +8,11 @@
   },
   "dependencies": {
     "@lumenbazaar/shared": "workspace:*",
+    "@stellar/stellar-sdk": "17.2.1",
     "@x402/core": "2.28.0",
     "@x402/stellar": "2.28.0"
   },
   "devDependencies": {
-    "@lumenbazaar/testkit": "workspace:*",
-    "@stellar/stellar-sdk": "17.2.1"
+    "@lumenbazaar/testkit": "workspace:*"
   }
 }

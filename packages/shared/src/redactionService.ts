@@ -201,9 +201,7 @@ export function getGlobalRedactionService(): RedactionService {
 /**
  * Initialize the global redaction service with a specific policy
  */
-export function initializeRedactionService(
-  policy: PaymentRetentionPolicy
-): RedactionService {
+export function initializeRedactionService(policy: PaymentRetentionPolicy): RedactionService {
   const service = new RedactionService(policy);
   setGlobalRedactionService(service);
   return service;

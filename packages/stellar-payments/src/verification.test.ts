@@ -210,10 +210,7 @@ describe("PaymentVerificationService", () => {
             createEd25519Signer(facilitator.secret(), "stellar:testnet")
           ]);
 
-          const response = await scheme.verify(
-            input.paymentPayload,
-            input.paymentRequirements
-          );
+          const response = await scheme.verify(input.paymentPayload, input.paymentRequirements);
 
           // Map response using adapter pattern
           if (response.isValid === true && typeof response.payer === "string") {
@@ -303,10 +300,7 @@ describe("PaymentVerificationService", () => {
             createEd25519Signer(facilitator.secret(), "stellar:testnet")
           ]);
 
-          const response = await scheme.verify(
-            input.paymentPayload,
-            input.paymentRequirements
-          );
+          const response = await scheme.verify(input.paymentPayload, input.paymentRequirements);
 
           if (response.isValid === true && typeof response.payer === "string") {
             return { valid: true, adapter: "@x402/stellar" };

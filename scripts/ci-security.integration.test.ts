@@ -151,10 +151,7 @@ describe("Secret Masking Configuration", () => {
     process.env.CLIENT_PRIVATE_KEY = "secret_key_12345";
     process.env.FACILITATOR_SIGNING_KEY = "signing_key_67890";
 
-    const config = createSecretMaskingConfig([
-      "CLIENT_PRIVATE_KEY",
-      "FACILITATOR_SIGNING_KEY"
-    ]);
+    const config = createSecretMaskingConfig(["CLIENT_PRIVATE_KEY", "FACILITATOR_SIGNING_KEY"]);
 
     expect(config.secrets).toHaveLength(2);
     expect(config.maskPatterns).toHaveLength(2);
@@ -173,10 +170,7 @@ describe("Secret Masking Configuration", () => {
     delete process.env.CLIENT_PRIVATE_KEY;
     delete process.env.FACILITATOR_SIGNING_KEY;
 
-    const config = createSecretMaskingConfig([
-      "CLIENT_PRIVATE_KEY",
-      "FACILITATOR_SIGNING_KEY"
-    ]);
+    const config = createSecretMaskingConfig(["CLIENT_PRIVATE_KEY", "FACILITATOR_SIGNING_KEY"]);
 
     expect(config.secrets).toHaveLength(0);
     expect(config.maskPatterns).toHaveLength(0);

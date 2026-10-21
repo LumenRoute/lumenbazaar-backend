@@ -13,7 +13,10 @@ describe("payment session routes", () => {
   it("keeps capped sessions behind deployment configuration", async () => {
     const app = buildApiApp({
       logger: false,
-      config: loadConfig({ ENABLE_UPTO_SCHEME: "true" })
+      config: loadConfig({
+        ENABLE_UPTO_SCHEME: "true",
+        STELLAR_TESTNET_USDC_ISSUER: localIssuerPublicKey
+      })
     });
 
     const response = await app.inject({
@@ -181,7 +184,8 @@ function enabledConfig() {
   return loadConfig({
     ENABLE_UPTO_SCHEME: "true",
     STELLAR_TESTNET_UPTO_SESSION_CONTRACT_ID: contractId,
-    STELLAR_TESTNET_USDC_CONTRACT_ID: assetContractId
+    STELLAR_TESTNET_USDC_CONTRACT_ID: assetContractId,
+    STELLAR_TESTNET_USDC_ISSUER: localIssuerPublicKey
   });
 }
 

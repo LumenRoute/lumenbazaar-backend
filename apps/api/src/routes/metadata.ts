@@ -55,7 +55,12 @@ export function registerMetadataRoutes(app: FastifyInstance, options: MetadataRo
     options.metrics.setDependencyStatus("redis", report.checks.redis.status === "ready");
     options.metrics.setDependencyStatus("rpc", report.checks.stellarRpc.status === "ready");
     options.metrics.setDependencyStatus("horizon", report.checks.horizon.status === "ready");
-    options.metrics.setDependencyStatus("signer", report.checks.signer.status !== "unavailable" && report.checks.signer.status !== "timeout" && report.checks.signer.status !== "not_configured");
+    options.metrics.setDependencyStatus(
+      "signer",
+      report.checks.signer.status !== "unavailable" &&
+        report.checks.signer.status !== "timeout" &&
+        report.checks.signer.status !== "not_configured"
+    );
     reply.code(report.ok ? 200 : 503);
     return report;
   });

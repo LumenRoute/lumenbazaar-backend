@@ -158,7 +158,10 @@ export function createStaticReadinessService(
   return {
     async evaluate() {
       const ok = Object.values(checks).every(
-        (check) => check.status !== "unavailable" && check.status !== "timeout" && check.status !== "not_configured"
+        (check) =>
+          check.status !== "unavailable" &&
+          check.status !== "timeout" &&
+          check.status !== "not_configured"
       );
       return {
         ok,
@@ -226,11 +229,15 @@ export function createRuntimeReadinessProbes(
       }
     },
     async stellarRpc() {
-      const response = await fetchWithTimeout(network.rpcUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getLatestLedger" })
-      }, probeTimeoutMs);
+      const response = await fetchWithTimeout(
+        network.rpcUrl,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getLatestLedger" })
+        },
+        probeTimeoutMs
+      );
       if (!response.ok) {
         throw new Error(`Stellar RPC returned HTTP ${response.status}.`);
       }
@@ -326,7 +333,9 @@ class ProbeTimeoutError extends Error {
 function isAbortError(err: unknown): boolean {
   return (
     err instanceof Error &&
-    (err.name === "AbortError" || err.name === "TimeoutError" || err.message === "The operation was aborted.")
+    (err.name === "AbortError" ||
+      err.name === "TimeoutError" ||
+      err.message === "The operation was aborted.")
   );
 }
 
@@ -334,7 +343,11 @@ function notConfigured(): ReadinessCheck {
   return { status: "not_configured", reason: "probe_not_registered" };
 }
 
-async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs: number = defaultProbeTimeoutMs) {
+async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+  timeoutMs: number = defaultProbeTimeoutMs
+) {
   const signal = AbortSignal.timeout(timeoutMs);
   return fetch(url, { ...init, signal });
 }

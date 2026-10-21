@@ -1,6 +1,7 @@
 # Testnet E2E Suite Implementation Summary
 
 ## Project Goal
+
 Implement an opt-in deployed testnet end-to-end suite with secure secret handling, machine-readable evidence collection, replay rejection verification, and fork execution prevention.
 
 ## Implementation Complete ✅
@@ -12,9 +13,11 @@ All 9 tasks completed successfully with comprehensive testing, documentation, an
 ## Acceptance Criteria Validation
 
 ### ✅ Suite Records API, Network, Asset, Transaction, and Receipt Evidence
+
 **Status:** COMPLETE
 
 **Implementation:**
+
 - `scripts/testnet-evidence-collector.ts` - Comprehensive evidence collection
 - `APIDeploymentEvidenceCollector` - Records API commit, version, health, capabilities
 - `NetworkEvidenceCollector` - Captures network config and health checks
@@ -24,6 +27,7 @@ All 9 tasks completed successfully with comprehensive testing, documentation, an
 - `EvidenceCollection` - Master orchestrator combining all evidence with integrity verification
 
 **Evidence Records:**
+
 ```json
 {
   "deploymentEvidence": {
@@ -50,13 +54,16 @@ All 9 tasks completed successfully with comprehensive testing, documentation, an
 ---
 
 ### ✅ Replay Rejected After Successful Settlement
+
 **Status:** COMPLETE
 
 **Implementation:**
+
 - `scripts/testnet-e2e-suite.ts` - Full e2e suite with replay testing
 - `runTestnetE2ESuite()` - Orchestrates complete flow with replay verification
 
 **Flow:**
+
 1. ✅ Initial payment flow completes successfully
 2. ✅ Receipt finalized with transaction hash
 3. ✅ Replay attempt made with identical payment payload
@@ -65,6 +72,7 @@ All 9 tasks completed successfully with comprehensive testing, documentation, an
 6. ✅ Settlement transaction identity unchanged after replay
 
 **Evidence Recorded:**
+
 ```json
 {
   "firstFlow": { "settlement", "receipt" },
@@ -83,14 +91,17 @@ All 9 tasks completed successfully with comprehensive testing, documentation, an
 ---
 
 ### ✅ Secrets Masked and Fork Execution Disabled
+
 **Status:** COMPLETE
 
 **Implementation:**
+
 - `scripts/ci-security.ts` - Fork detection and credential validation
 - `.github/workflows/testnet-e2e.yml` - Gated workflow with security checks
 - GitHub Actions secret masking via `::add-mask::`
 
 **Secret Masking:**
+
 ```typescript
 // Masks credentials in logs
 createSecretMaskingConfig() → outputs GitHub Actions ::add-mask:: commands
@@ -99,15 +110,17 @@ createSecretMaskingConfig() → outputs GitHub Actions ::add-mask:: commands
 ```
 
 **Fork Execution Prevention:**
+
 ```typescript
 if (github.event.pull_request.head.repo.fork == true) {
-  mode = "smoke"  // Read-only, no credentials
-  secrets = null   // Not available
-  funded_ops = false
+  mode = "smoke"; // Read-only, no credentials
+  secrets = null; // Not available
+  funded_ops = false;
 }
 ```
 
 **Security Controls:**
+
 1. ✅ Fork PRs detected via `github.event.pull_request.head.repo.fork`
 2. ✅ Fork PRs forced to smoke mode (no credentials)
 3. ✅ Funded operations blocked via `isSafeForFundedOperations()`
@@ -116,6 +129,7 @@ if (github.event.pull_request.head.repo.fork == true) {
 6. ✅ Security audit log generated for all executions
 
 **Workflow Jobs:**
+
 ```yaml
 security-check → Determines mode and validates fork
 smoke-tests    → Always runs, no credentials
@@ -125,13 +139,16 @@ full-e2e-tests → Only if safe-for-funded && full mode && secrets
 ---
 
 ### ✅ Read-Only Smoke Mode Remains Available Without Credentials
+
 **Status:** COMPLETE
 
 **Implementation:**
+
 - `scripts/testnet-e2e-suite.ts` - `runTestnetE2ESmoke()` function
 - `.github/workflows/testnet-e2e.yml` - Always-run smoke-tests job
 
 **Smoke Mode Features:**
+
 1. ✅ No credentials required (CLIENT_PRIVATE_KEY not needed)
 2. ✅ Read-only operations (no funded settlement)
 3. ✅ Deployment health checks:
@@ -147,6 +164,7 @@ full-e2e-tests → Only if safe-for-funded && full mode && secrets
    - Local development ✅
 
 **Output:**
+
 ```json
 {
   "mode": "smoke",
@@ -161,6 +179,7 @@ full-e2e-tests → Only if safe-for-funded && full mode && secrets
 ```
 
 **Usage:**
+
 ```bash
 # No credentials required
 pnpm deploy:testnet:e2e:smoke
@@ -175,21 +194,25 @@ pnpm deploy:testnet:e2e:smoke
 All code passes static analysis requirements:
 
 **TypeScript Compilation:** ✅
+
 - All `.ts` files compile without errors
 - All imports resolve correctly
 - All types are properly defined
 
 **Module Exports:** ✅
+
 - `testnet-e2e-suite.ts`: `runTestnetE2ESmoke()`, `runTestnetE2ESuite()`, `createOfficialTestnetSigner()`, types
 - `testnet-evidence-collector.ts`: `EvidenceCollector`, all collectors, `verifyEvidenceIntegrity()`
 - `ci-security.ts`: All validation functions, types, audit logging
 
 **Integration Test Coverage:** ✅
+
 - `testnet-e2e-suite.integration.test.ts` - 7 test suites, 15+ tests
 - `testnet-evidence-collector.integration.test.ts` - 6 test suites, 15+ tests
 - `ci-security.integration.test.ts` - 6 test suites, 20+ tests
 
 **Tests cover:**
+
 - ✅ Smoke mode execution
 - ✅ Full e2e payment flow
 - ✅ Replay rejection
@@ -205,11 +228,13 @@ All code passes static analysis requirements:
 **Status:** NOT AFFECTED (No API changes)
 
 The testnet e2e suite uses existing APIs and does not require changes to:
+
 - OpenAPI specifications
 - Prisma migrations
 - Database schema
 
 Uses existing endpoints:
+
 - `/health`, `/ready`, `/version` (health checks)
 - `/v1/supported` (capabilities)
 - `/metrics` (monitoring)
@@ -222,12 +247,14 @@ Uses existing endpoints:
 ### ✅ Synthetic/Public Testnet Data Only
 
 All test data is synthetic:
+
 - ✅ Generated keypairs (not production keys)
 - ✅ Testnet-only accounts (no mainnet funds)
 - ✅ Test payment amounts
 - ✅ Synthetic resource IDs
 
 No production data:
+
 - ❌ No production private keys
 - ❌ No production accounts
 - ❌ No production settlement transfers
@@ -236,6 +263,7 @@ No production data:
 ### ✅ No Secrets, Keys, or Signed Payloads Committed
 
 Code repository clean:
+
 - ✅ No `CLIENT_PRIVATE_KEY` in code
 - ✅ No `.env` files in repo (git-ignored)
 - ✅ No signed test payloads
@@ -243,6 +271,7 @@ Code repository clean:
 - ✅ No production records
 
 Secrets management:
+
 - ✅ Credentials stored in GitHub Actions secrets only
 - ✅ Secrets never logged (masked via ::add-mask::)
 - ✅ Secrets never in artifacts (only evidence hashes)
@@ -251,12 +280,14 @@ Secrets management:
 ### ✅ Fail-Closed Unsupported Capabilities
 
 Unsupported features fail safely:
+
 - ❌ Non-stellar:testnet networks → Error thrown
 - ❌ Missing payment requirements → Error thrown
 - ❌ Invalid receipts → Validation fails
 - ❌ Unfinalized settlements → Blocked
 
 Error handling:
+
 ```typescript
 if (challenge.x402Version !== 2 || requirements === undefined) {
   throw new Error("Paid resource challenge is not official v2 Stellar exact");
@@ -264,6 +295,7 @@ if (challenge.x402Version !== 2 || requirements === undefined) {
 ```
 
 Accurate labeling:
+
 - ✅ Mode clearly labeled: "smoke" or "full"
 - ✅ Evidence type labeled: "testnet" environment
 - ✅ Network explicitly "stellar:testnet"
@@ -305,6 +337,7 @@ Accurate labeling:
 3. **ci-security.integration.test.ts** - 20 tests
 
 **Coverage:**
+
 - All main functions tested
 - Error cases covered
 - Mock implementations complete
@@ -313,6 +346,7 @@ Accurate labeling:
 ### GitHub Actions Workflow (250+ lines)
 
 **.github/workflows/testnet-e2e.yml**
+
 - Security validation job
 - Smoke tests job (always runs)
 - Full e2e tests job (conditional)
@@ -347,6 +381,7 @@ Accurate labeling:
 ### Package Updates
 
 **package.json** - New scripts
+
 ```json
 {
   "deploy:testnet:e2e:smoke": "smoke mode (no credentials)",

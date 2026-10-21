@@ -250,7 +250,7 @@ export async function runTestnetE2ESuite(
   } catch (error) {
     replayError = {
       message: String(error),
-      code: extractErrorCode(String(error))
+      code: extractErrorCode(String(error)) ?? "UNKNOWN"
     };
   }
 

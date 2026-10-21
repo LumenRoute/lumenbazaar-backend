@@ -21,7 +21,11 @@ export function computeSha256(content: string | Buffer): string {
 export function resolveTargetCommit(checkOnly: boolean, existingCommit?: string): string {
   const commitArgIndex = process.argv.indexOf("--commit");
   if (commitArgIndex !== -1 && process.argv[commitArgIndex + 1]) {
-    return process.argv[commitArgIndex + 1];
+    return process.argv[commitArgIndex + 1]!;
+  }
+
+  if (checkOnly && existingCommit && existingCommit !== "unspecified") {
+    return existingCommit;
   }
 
   if (checkOnly && existingCommit && existingCommit !== "unspecified") {

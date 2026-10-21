@@ -1,7 +1,11 @@
 import { Redis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { InMemoryRateLimitCounterStore, RateLimitService, RedisRateLimitCounterStore } from "./rateLimit.js";
+import {
+  InMemoryRateLimitCounterStore,
+  RateLimitService,
+  RedisRateLimitCounterStore
+} from "./rateLimit.js";
 
 const redisUrl = process.env.RATE_LIMIT_TEST_REDIS_URL;
 const describeRedis = redisUrl === undefined ? describe.skip : describe;
@@ -90,17 +94,17 @@ describeRedis("Redis rate limiting", () => {
 
     // Facilitator limit: 2 per 60 seconds
     // Seller limit: 1 per 60 seconds (configured in createService)
-    const fac1 = await services[0].consume(facilitatorRequest);
-    const fac2 = await services[1].consume(facilitatorRequest);
-    const fac3 = await services[0].consume(facilitatorRequest);
+    const fac1 = await services[0]!.consume(facilitatorRequest);
+    const fac2 = await services[1]!.consume(facilitatorRequest);
+    const fac3 = await services[0]!.consume(facilitatorRequest);
 
     expect(fac1.allowed).toBe(true);
     expect(fac2.allowed).toBe(true);
     expect(fac3.allowed).toBe(false); // Third facilitator request blocked
 
     // Seller requests are independent and have their own limit
-    const sel1 = await services[0].consume(sellerRequest);
-    const sel2 = await services[1].consume(sellerRequest);
+    const sel1 = await services[0]!.consume(sellerRequest);
+    const sel2 = await services[1]!.consume(sellerRequest);
 
     expect(sel1.allowed).toBe(true);
     expect(sel2.allowed).toBe(false); // Second seller request blocked (limit: 1)
@@ -118,8 +122,8 @@ describeRedis("Redis rate limiting", () => {
 
     const allowed = results.filter((r) => r.allowed);
     expect(allowed.length).toBe(2);
-    expect(allowed[0].remaining).toBe(1); // 2 allowed, 1 remaining after first
-    expect(allowed[1].remaining).toBe(0); // 2 allowed, 0 remaining after second
+    expect(allowed[0]!.remaining).toBe(1); // 2 allowed, 1 remaining after first
+    expect(allowed[1]!.remaining).toBe(0); // 2 allowed, 0 remaining after second
 
     const blocked = results.find((r) => !r.allowed);
     expect(blocked?.remaining).toBe(0); // All quota consumed

@@ -62,9 +62,11 @@ try {
 ```
 
 **Parameters:**
+
 - `baseUrl` - PostgreSQL maintenance database URL (defaults to `postgres` database)
 
 **Returns:**
+
 - `databaseUrl` - Connection string for the test database
 - `cleanup` - Async function to drop the database
 - `dbName` - Generated unique database name
@@ -81,10 +83,12 @@ if (success) {
 ```
 
 **Parameters:**
+
 - `databaseUrl` - Database connection string
 - `schemaPath` - Path to `prisma/schema.prisma` (defaults to `prisma/schema.prisma`)
 
 **Returns:**
+
 - `success` - Boolean indicating migration success
 - `stdout` - Command output
 - `stderr` - Error output if any
@@ -98,6 +102,7 @@ const { success, dbName, databaseUrl } = await verifyMigrationsApplyFromEmpty();
 ```
 
 **Returns:**
+
 - `success` - Boolean indicating verification success
 - `dbName` - Name of the temporary test database
 - `databaseUrl` - Connection string (valid during migration only)
@@ -116,6 +121,7 @@ const isEnforced = await verifyDatabaseConstraint(
 ```
 
 **Parameters:**
+
 - `prismaClient` - Connected PrismaClient instance
 - `tableName` - Table name to test
 - `fixtureData` - Object with field values
@@ -194,6 +200,7 @@ pnpm prisma:migrations:test
 ```
 
 This runs:
+
 1. Migration verification (creates empty database and runs all migrations)
 2. Integration tests on fresh database
 
@@ -279,13 +286,15 @@ When testing fixture data and constraints:
 ```typescript
 // 1. Create a seller (parent table)
 const seller = await client.seller.create({
-  data: { /* ... */ }
+  data: {
+    /* ... */
+  }
 });
 
 // 2. Create a resource with foreign key
 const resource = await client.resource.create({
   data: {
-    sellerId: seller.id,
+    sellerId: seller.id
     // ... other required fields
   }
 });
@@ -294,7 +303,7 @@ const resource = await client.resource.create({
 await expect(
   client.resource.create({
     data: {
-      sellerId: "invalid-id", // Foreign key violation
+      sellerId: "invalid-id" // Foreign key violation
       // ...
     }
   })

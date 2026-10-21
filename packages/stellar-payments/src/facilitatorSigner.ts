@@ -28,6 +28,7 @@ export type SignerStatus = {
   network: NetworkId;
   provider: "environment" | "kms";
   retireAt?: string;
+  retiring?: ReadonlyArray<{ keyId: SignerKeyId; address?: string; retireAt: number }>;
 };
 
 export type SignerAuditEvent = {
@@ -64,7 +65,10 @@ export type KmsFacilitatorSignerOptions = {
   retireWindowMs?: number;
   // Clock injection for testability.
   now?: () => number;
+  timeoutMs?: number;
 };
+
+export type KmsAdapter = KmsSignerAdapter;
 
 /**
  * Provider-neutral KMS adapter contract. Implementations must never return raw
@@ -81,6 +85,8 @@ export type KmsSignerAdapter = {
   getKeyId(): Promise<SignerKeyId>;
   // Sign a message digest/bytes via KMS. Must not return private key material.
   sign(payload: Uint8Array): Promise<Uint8Array>;
+  // Optional network identifier to validate against configuration at startup.
+  readonly network?: string;
 };
 
 export type EnvironmentFacilitatorSignerOptions = {
@@ -123,12 +129,21 @@ export class KmsFacilitatorSignerProvider implements FacilitatorSignerProvider {
   constructor(private readonly options: KmsFacilitatorSignerOptions) {
     this.retireWindowMs = options.retireWindowMs ?? DEFAULT_RETIRE_WINDOW_MS;
     this.now = options.now ?? (() => Date.now());
-    this.timeoutMs = DEFAULT_KMS_TIMEOUT_MS;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_KMS_TIMEOUT_MS;
   }
 
   async assertReady(): Promise<void> {
+    if (
+      this.options.adapter.network !== undefined &&
+      this.options.adapter.network !== this.options.network
+    ) {
+      throw signerUnavailable("KMS signer network does not match configuration.");
+    }
     try {
-      await this.withTimeout(this.options.adapter.assertReady(), "KMS provider readiness check timed out.");
+      await this.withTimeout(
+        this.options.adapter.assertReady(),
+        "KMS provider readiness check timed out."
+      );
     } catch (error) {
       throw this.mapKmsError(error, "KMS provider readiness check failed.");
     }
@@ -190,7 +205,16 @@ export class KmsFacilitatorSignerProvider implements FacilitatorSignerProvider {
       provider: "kms",
       ...(retiring === undefined
         ? {}
-        : { retireAt: new Date(retiring.retireAt).toISOString() })
+        : {
+            retireAt: new Date(retiring.retireAt).toISOString(),
+            retiring: [
+              {
+                keyId: retiring.keyId,
+                address: retiring.signer.address,
+                retireAt: retiring.retireAt
+              }
+            ]
+          })
     };
   }
 
@@ -258,14 +282,15 @@ export class KmsFacilitatorSignerProvider implements FacilitatorSignerProvider {
       version: retiring.version,
       keyId: retiring.keyId
     };
-    this.retiring = current === undefined
-      ? undefined
-      : {
-          signer: current.signer,
-          version: current.version,
-          keyId: current.keyId,
-          retireAt: this.now() + this.retireWindowMs
-        };
+    this.retiring =
+      current === undefined
+        ? undefined
+        : {
+            signer: current.signer,
+            version: current.version,
+            keyId: current.keyId,
+            retireAt: this.now() + this.retireWindowMs
+          };
     this.record({
       type: "rotation_rolled_back",
       keyId: retiring.keyId,
@@ -317,7 +342,10 @@ export class KmsFacilitatorSignerProvider implements FacilitatorSignerProvider {
 
   private async readKeyId(): Promise<SignerKeyId> {
     try {
-      const keyId = await this.withTimeout(this.options.adapter.getKeyId(), "KMS key id lookup timed out.");
+      const keyId = await this.withTimeout(
+        this.options.adapter.getKeyId(),
+        "KMS key id lookup timed out."
+      );
       if (keyId.length === 0) {
         throw signerUnavailable("KMS key id is unavailable.");
       }
@@ -330,7 +358,10 @@ export class KmsFacilitatorSignerProvider implements FacilitatorSignerProvider {
   private async buildSigner(keyId: SignerKeyId): Promise<FacilitatorStellarSigner> {
     let address: string;
     try {
-      address = await this.withTimeout(this.options.adapter.getAddress(), "KMS address derivation timed out.");
+      address = await this.withTimeout(
+        this.options.adapter.getAddress(),
+        "KMS address derivation timed out."
+      );
     } catch (error) {
       throw this.mapKmsError(error, "KMS address derivation failed.");
     }
@@ -354,7 +385,7 @@ export class KmsFacilitatorSignerProvider implements FacilitatorSignerProvider {
           throw this.mapKmsError(error, "KMS signing failed.");
         }
       }
-    } as FacilitatorStellarSigner;
+    } as unknown as FacilitatorStellarSigner;
 
     if (!isFacilitatorStellarSigner(signer)) {
       throw signerUnavailable("Facilitator signer does not implement the required interface.");
@@ -381,7 +412,11 @@ export class KmsFacilitatorSignerProvider implements FacilitatorSignerProvider {
       return error;
     }
     const code = extractErrorCode(error);
-    if (code === "AccessDenied" || code === "AccessDeniedException" || code === "PermissionDenied") {
+    if (
+      code === "AccessDenied" ||
+      code === "AccessDeniedException" ||
+      code === "PermissionDenied"
+    ) {
       return signerUnavailable("KMS permission denied.");
     }
     if (code === "TimeoutError" || code === "RequestTimeout" || code === "ThrottlingException") {
@@ -481,7 +516,16 @@ export class EnvironmentFacilitatorSignerProvider implements FacilitatorSignerPr
       provider: "environment",
       ...(retiring === undefined
         ? {}
-        : { retireAt: new Date(retiring.retireAt).toISOString() })
+        : {
+            retireAt: new Date(retiring.retireAt).toISOString(),
+            retiring: [
+              {
+                keyId: retiring.keyId,
+                address: retiring.signer.address,
+                retireAt: retiring.retireAt
+              }
+            ]
+          })
     };
   }
 
@@ -563,14 +607,15 @@ export class EnvironmentFacilitatorSignerProvider implements FacilitatorSignerPr
       version: retiring.version,
       keyId: retiring.keyId
     };
-    this.retiring = current === undefined
-      ? undefined
-      : {
-          signer: current.signer,
-          version: current.version,
-          keyId: current.keyId,
-          retireAt: this.now() + this.retireWindowMs
-        };
+    this.retiring =
+      current === undefined
+        ? undefined
+        : {
+            signer: current.signer,
+            version: current.version,
+            keyId: current.keyId,
+            retireAt: this.now() + this.retireWindowMs
+          };
     this.record({
       type: "rotation_rolled_back",
       keyId: retiring.keyId,
@@ -690,10 +735,12 @@ export function createRuntimeFacilitatorSignerProvider(
     throw signerUnavailable("Facilitator signer network does not match the active network.");
   }
 
-  const retireWindowMs =
-    config.signer.overlapSeconds > 0
-      ? config.signer.overlapSeconds * 1000
-      : undefined;
+  const overlapSeconds =
+    "overlapSeconds" in config.signer &&
+    typeof (config.signer as Record<string, unknown>).overlapSeconds === "number"
+      ? ((config.signer as Record<string, unknown>).overlapSeconds as number)
+      : 0;
+  const retireWindowMs = overlapSeconds > 0 ? overlapSeconds * 1000 : undefined;
 
   if (config.signer.provider === "kms") {
     // KMS is configured but no adapter is wired here; fail closed rather than
@@ -707,8 +754,7 @@ export function createRuntimeFacilitatorSignerProvider(
     ...(retireWindowMs === undefined ? {} : { retireWindowMs }),
     readSecret: () => ({
       secret: environment.FACILITATOR_SIGNING_KEY ?? "",
-      version:
-        environment.FACILITATOR_SIGNING_KEY_VERSION ?? config.signer.keyVersion ?? ""
+      version: environment.FACILITATOR_SIGNING_KEY_VERSION ?? config.signer.keyVersion ?? ""
     })
   });
 }

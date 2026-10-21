@@ -59,7 +59,7 @@ describe("APIDeploymentEvidenceCollector", () => {
     });
 
     const collector = new APIDeploymentEvidenceCollector();
-    const evidence = await collector.collectFromAPI("https://api.test.com", mockFetch);
+    const evidence = await collector.collectFromAPI("https://api.test.com", mockFetch as never);
 
     expect(evidence.commit).toMatch(/^[a-f0-9]{40}$/);
     expect(evidence.environment).toBe("testnet");
@@ -108,7 +108,7 @@ describe("NetworkEvidenceCollector", () => {
       "stellar:testnet",
       "https://rpc.test.com",
       "https://horizon.test.com",
-      mockFetch
+      mockFetch as never
     );
 
     expect(evidence.network).toBe("stellar:testnet");
@@ -129,7 +129,7 @@ describe("NetworkEvidenceCollector", () => {
       "stellar:testnet",
       "https://rpc.test.com",
       "https://horizon.test.com",
-      mockFetch
+      mockFetch as never
     );
 
     expect(evidence.healthCheck.isHealthy).toBe(false);
@@ -143,7 +143,9 @@ describe("AssetPaymentEvidenceCollector", () => {
       network: "stellar:testnet",
       asset: "USDC:GDZST3...:CAQAAE5...",
       amount: "1.0000000",
-      payTo: "GBY..."
+      payTo: "GBY...",
+      maxTimeoutSeconds: 60,
+      extra: {}
     };
 
     const collector = new AssetPaymentEvidenceCollector();
@@ -185,13 +187,9 @@ describe("ReceiptEvidenceCollector", () => {
       correlationId: "corr_456",
       paymentAttemptId: "attempt_789",
       status: "finalized",
+      settledAt: new Date().toISOString(),
       transactionHash: "e".repeat(64),
-      ledger: 123456,
-      timestamp: new Date().toISOString(),
-      network: "stellar:testnet",
-      amount: "1.0000000",
-      assetCode: "USDC",
-      assetIssuer: "GDZST3..."
+      ledger: 123456
     };
 
     const collector = new ReceiptEvidenceCollector();
@@ -211,10 +209,9 @@ describe("EvidenceCollector - Master Orchestrator", () => {
   it("should collect full evidence chain", async () => {
     const mockFetch = vi.fn(async (url: string) => {
       if (url.includes("/version")) {
-        return new Response(
-          JSON.stringify({ commit: "a".repeat(40), app: "api" }),
-          { status: 200 }
-        );
+        return new Response(JSON.stringify({ commit: "a".repeat(40), app: "api" }), {
+          status: 200
+        });
       }
       if (url.includes("/v1/supported")) {
         return new Response(
@@ -239,14 +236,16 @@ describe("EvidenceCollector - Master Orchestrator", () => {
       network: "stellar:testnet",
       asset: "USDC:GDZST3...:CAQAAE5...",
       amount: "1.0000000",
-      payTo: "GBY..."
+      payTo: "GBY...",
+      maxTimeoutSeconds: 60,
+      extra: {}
     };
 
     const paymentPayload = {
-      x402Version: 2,
+      x402Version: 2 as const,
       resource: { url: "https://example.com" },
       accepted: requirements,
-      payload: "signed_data"
+      payload: { transaction: "signed_data" }
     };
 
     const receipt: ReceiptResult = {
@@ -254,13 +253,9 @@ describe("EvidenceCollector - Master Orchestrator", () => {
       correlationId: "corr_456",
       paymentAttemptId: "attempt_789",
       status: "finalized",
+      settledAt: new Date().toISOString(),
       transactionHash: "e".repeat(64),
-      ledger: 123456,
-      timestamp: new Date().toISOString(),
-      network: "stellar:testnet",
-      amount: "1.0000000",
-      assetCode: "USDC",
-      assetIssuer: "GDZST3..."
+      ledger: 123456
     };
 
     const probeEvidence = {
@@ -272,8 +267,8 @@ describe("EvidenceCollector - Master Orchestrator", () => {
         paidResource: "d".repeat(40)
       },
       migrationRunId: "mig_123",
-      officialV2Challenge: true,
-      supportedExactTestnet: true
+      officialV2Challenge: true as const,
+      supportedExactTestnet: true as const
     };
 
     const collector = new EvidenceCollector();
@@ -283,7 +278,7 @@ describe("EvidenceCollector - Master Orchestrator", () => {
       requirements,
       paymentPayload,
       receipt,
-      mockFetch
+      mockFetch as never
     );
 
     expect(evidence.collectedAt).toBeDefined();
@@ -305,13 +300,9 @@ describe("Evidence Integrity Verification", () => {
       correlationId: "corr_456",
       paymentAttemptId: "attempt_789",
       status: "finalized",
+      settledAt: new Date().toISOString(),
       transactionHash: "e".repeat(64),
-      ledger: 123456,
-      timestamp: new Date().toISOString(),
-      network: "stellar:testnet",
-      amount: "1.0000000",
-      assetCode: "USDC",
-      assetIssuer: "GDZST3..."
+      ledger: 123456
     };
 
     const receiptEvidence: ReceiptEvidence = {
@@ -399,13 +390,7 @@ describe("Evidence Integrity Verification", () => {
       },
       integrity: {
         collectionIntegrityHash: "c".repeat(64),
-        evidenceChain: [
-          "a".repeat(40),
-          "mig_123",
-          "d".repeat(64),
-          "e".repeat(64),
-          "receipt_123"
-        ]
+        evidenceChain: ["a".repeat(40), "mig_123", "d".repeat(64), "e".repeat(64), "receipt_123"]
       }
     };
 

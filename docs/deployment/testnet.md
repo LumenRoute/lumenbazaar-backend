@@ -68,13 +68,13 @@ All other HTTP methods on `/mcp` return `405 Method Not Allowed`.
 
 Supporting utility routes (all `GET` only):
 
-| Path       | Description                                         |
-|------------|-----------------------------------------------------|
+| Path       | Description                                           |
+| ---------- | ----------------------------------------------------- |
 | `/health`  | Process liveness — always 200 while the process is up |
 | `/ready`   | Backend readiness — 200 when API is up; 503 otherwise |
-| `/version` | Service version, git commit, and environment        |
-| `/schema`  | JSON schema document of all available MCP tools     |
-| `/metrics` | Prometheus text metrics                             |
+| `/version` | Service version, git commit, and environment          |
+| `/schema`  | JSON schema document of all available MCP tools       |
+| `/metrics` | Prometheus text metrics                               |
 
 ## Transport and CORS Settings
 
@@ -108,10 +108,10 @@ The repo ships a `render.yaml` at the root that defines two Render web services
 (`lumenbazaar-backend` and `lumenbazaar-mcp`) built from the shared `Dockerfile`.
 The only difference between the two services is the `dockerCommand` override:
 
-| Service                | `dockerCommand`        |
-|------------------------|------------------------|
-| `lumenbazaar-backend`  | `pnpm start:api`       |
-| `lumenbazaar-mcp`      | `pnpm start:mcp:http`  |
+| Service               | `dockerCommand`       |
+| --------------------- | --------------------- |
+| `lumenbazaar-backend` | `pnpm start:api`      |
+| `lumenbazaar-mcp`     | `pnpm start:mcp:http` |
 
 Render reads `render.yaml` on first import or after you click **Sync** in the
 dashboard. Both services use the same Docker image (built from the repo root) which
@@ -119,24 +119,24 @@ contains the full monorepo, so only one image build is needed.
 
 **Required secret/non-default env vars to set in the Render dashboard** (not in render.yaml):
 
-| Service        | Variable                      | Notes                                                  |
-|----------------|-------------------------------|--------------------------------------------------------|
-| Both           | `DATABASE_URL`                | Postgres connection string                             |
-| Both           | `REDIS_URL`                   | Redis connection string                                |
-| api            | `API_PUBLIC_URL`              | e.g. `https://lumenbazaar-backend.onrender.com`        |
-| api            | `CORS_ALLOWED_ORIGINS`        | Frontend origins                                       |
-| api            | `TESTNET_ASSET`               | `usdc` (default) or `lbt` (custom test-only)           |
-| api            | `STELLAR_TESTNET_USDC_ISSUER` | Official Stellar testnet USDC issuer (with TESTNET_ASSET=usdc) |
-| api            | `STELLAR_TESTNET_USDC_CONTRACT_ID` | Official Stellar testnet USDC contract (with TESTNET_ASSET=usdc) |
-| api            | `TESTNET_LBT_ISSUER`          | LBT custom asset issuer (only with TESTNET_ASSET=lbt)  |
-| api            | `TESTNET_LBT_CONTRACT_ID`     | LBT custom asset contract (only with TESTNET_ASSET=lbt)|
-| api            | `FACILITATOR_ACCOUNT`         |                                                        |
-| api            | `FACILITATOR_SIGNING_KEY`     | Secret; never in repo                                  |
-| api            | `FACILITATOR_SIGNING_KEY_VERSION` |                                                    |
-| api            | `EVENT_STREAM_SIGNING_SECRET` |                                                        |
-| mcp            | `MCP_PUBLIC_URL`              | e.g. `https://lumenbazaar-mcp.onrender.com/mcp`        |
-| mcp            | `MCP_ALLOWED_ORIGINS`         | Comma-separated trusted origins; omit for no CORS      |
-| mcp            | `API_BASE_URL`                | e.g. `https://lumenbazaar-backend.onrender.com`        |
+| Service | Variable                           | Notes                                                            |
+| ------- | ---------------------------------- | ---------------------------------------------------------------- |
+| Both    | `DATABASE_URL`                     | Postgres connection string                                       |
+| Both    | `REDIS_URL`                        | Redis connection string                                          |
+| api     | `API_PUBLIC_URL`                   | e.g. `https://lumenbazaar-backend.onrender.com`                  |
+| api     | `CORS_ALLOWED_ORIGINS`             | Frontend origins                                                 |
+| api     | `TESTNET_ASSET`                    | `usdc` (default) or `lbt` (custom test-only)                     |
+| api     | `STELLAR_TESTNET_USDC_ISSUER`      | Official Stellar testnet USDC issuer (with TESTNET_ASSET=usdc)   |
+| api     | `STELLAR_TESTNET_USDC_CONTRACT_ID` | Official Stellar testnet USDC contract (with TESTNET_ASSET=usdc) |
+| api     | `TESTNET_LBT_ISSUER`               | LBT custom asset issuer (only with TESTNET_ASSET=lbt)            |
+| api     | `TESTNET_LBT_CONTRACT_ID`          | LBT custom asset contract (only with TESTNET_ASSET=lbt)          |
+| api     | `FACILITATOR_ACCOUNT`              |                                                                  |
+| api     | `FACILITATOR_SIGNING_KEY`          | Secret; never in repo                                            |
+| api     | `FACILITATOR_SIGNING_KEY_VERSION`  |                                                                  |
+| api     | `EVENT_STREAM_SIGNING_SECRET`      |                                                                  |
+| mcp     | `MCP_PUBLIC_URL`                   | e.g. `https://lumenbazaar-mcp.onrender.com/mcp`                  |
+| mcp     | `MCP_ALLOWED_ORIGINS`              | Comma-separated trusted origins; omit for no CORS                |
+| mcp     | `API_BASE_URL`                     | e.g. `https://lumenbazaar-backend.onrender.com`                  |
 
 `MCP_TRUST_PROXY=true` is already set in `render.yaml` for the mcp service
 because Render injects `X-Forwarded-For`.
@@ -251,6 +251,7 @@ MCP_SMOKE_URL=http://localhost:3001/mcp pnpm smoke:mcp
 ```
 
 The script performs four steps in order:
+
 1. **initialize** — MCP `initialize` + `notifications/initialized`
 2. **tools/list** — lists available tools and validates their schemas
 3. **tools/call inspect_budget** — calls the always-available read-only local tool
@@ -283,9 +284,9 @@ Machine-readable JSON is printed to stdout:
   "protocolVersion": "2024-11-05",
   "toolCount": 5,
   "steps": [
-    { "step": "initialize",                  "pass": true, "durationMs": 312 },
-    { "step": "tools/list",                  "pass": true, "durationMs": 88,  "detail": "count=5" },
-    { "step": "tools/call inspect_budget",   "pass": true, "durationMs": 54  }
+    { "step": "initialize", "pass": true, "durationMs": 312 },
+    { "step": "tools/list", "pass": true, "durationMs": 88, "detail": "count=5" },
+    { "step": "tools/call inspect_budget", "pass": true, "durationMs": 54 }
   ],
   "pass": true
 }
@@ -303,7 +304,12 @@ When any step fails the script exits with code 1 and marks `pass: false` in the 
   "protocolVersion": null,
   "toolCount": null,
   "steps": [
-    { "step": "initialize", "pass": false, "durationMs": 2001, "detail": "initialize timed out after 2000ms" }
+    {
+      "step": "initialize",
+      "pass": false,
+      "durationMs": 2001,
+      "detail": "initialize timed out after 2000ms"
+    }
   ],
   "pass": false
 }

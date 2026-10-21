@@ -9,6 +9,7 @@ Implemented a complete webhook delivery system that notifies sellers of payment 
 ## Files Created
 
 ### Core Webhook Schema (Shared Package)
+
 - **packages/shared/src/webhooks.ts** (325 lines)
   - `WebhookPayload` type with explicit field mapping (never spreads records)
   - `WEBHOOK_SCHEMA_VERSION = "1.0.0"` with validation
@@ -18,6 +19,7 @@ Implemented a complete webhook delivery system that notifies sellers of payment 
   - Type definitions for `WebhookEndpoint`, `WebhookSecret`, `WebhookEvent`, `WebhookDeliveryAttempt`
 
 ### API Services
+
 - **apps/api/src/services/webhooks.ts** (380 lines)
   - `WebhookService` - manages endpoint lifecycle (CRUD)
   - `validateWebhookUrl()` - SSRF protection (HTTPS only, no credentials, no private IPs)
@@ -39,6 +41,7 @@ Implemented a complete webhook delivery system that notifies sellers of payment 
   - Safe error handling (never throws, preventing blocking settlement operations)
 
 ### API Routes
+
 - **apps/api/src/routes/webhooks.ts** (140 lines)
   - `POST /v1/sellers/:sellerId/webhooks` - create endpoint (returns secret once)
   - `GET /v1/sellers/:sellerId/webhooks` - list endpoints (paginated)
@@ -50,6 +53,7 @@ Implemented a complete webhook delivery system that notifies sellers of payment 
   - `GET /v1/sellers/:sellerId/webhooks/events` - list webhook events (TODO)
 
 ### Worker / Queue Infrastructure
+
 - **apps/worker/src/workers/webhookDelivery.ts** (245 lines)
   - `deliverWebhook()` - main delivery function with signing, timeout, retry logic
   - `computeBackoffDelay()` - exponential backoff with jitter (5s, 10s, 20s, 40s, 80s)
@@ -65,6 +69,7 @@ Implemented a complete webhook delivery system that notifies sellers of payment 
   - Added `enqueueWebhookDelivery()` function with idempotent job IDs
 
 ### Database Schema
+
 - **prisma/schema.prisma** (Modified)
   - Added `WebhookEndpoint` model (seller-owned, track last delivery)
   - Added `WebhookSecret` model (current + previous during rotation)
@@ -77,6 +82,7 @@ Implemented a complete webhook delivery system that notifies sellers of payment 
   - Creates indexes for efficient querying
 
 ### Application Integration
+
 - **apps/api/src/app.ts** (Modified)
   - Added `WebhookService` and `WebhookEventService` imports
   - Added options to `BuildApiAppOptions` type
@@ -84,6 +90,7 @@ Implemented a complete webhook delivery system that notifies sellers of payment 
   - Registered webhook routes via `registerWebhookRoutes()`
 
 ### Tests
+
 - **apps/api/src/services/webhooks.test.ts** (200+ lines)
   - Tests for URL validation (SSRF protection)
   - Secret generation and hashing
@@ -108,6 +115,7 @@ Implemented a complete webhook delivery system that notifies sellers of payment 
   - Max attempts handling
 
 ### Documentation
+
 - **docs/WEBHOOKS.md** (400+ lines)
   - Overview of webhook system
   - Security details (SSRF, secrets, signatures, replay protection)
@@ -127,31 +135,37 @@ Implemented a complete webhook delivery system that notifies sellers of payment 
 ## Architecture Decisions
 
 ### 1. Explicit Field Mapping
+
 **Decision**: Never spread settlement records; use explicit `buildWebhookPayload()` function
 **Rationale**: Prevents accidental leakage of internal fields (signatures, auth entries, secrets)
 **Implementation**: Allowlist of safe fields hardcoded in schema
 
 ### 2. Stable Event IDs
+
 **Decision**: EventId = `correlationId.eventType`
 **Rationale**: Ensures idempotency - same event producing same ID across retries
 **Implementation**: Generated consistently, stored in WebhookEvent table
 
 ### 3. Separate Delivery Queue
+
 **Decision**: Create separate `webhook-delivery` queue distinct from settlement confirmation
 **Rationale**: Webhook delivery is independent; doesn't block payment processing
 **Implementation**: BullMQ job queue with idempotent job IDs
 
 ### 4. Secret Rotation Overlap Window
+
 **Decision**: 1-hour overlap period where both old and new secrets are valid
 **Rationale**: Allows receivers to update secrets gradually without missing webhooks
 **Implementation**: `rotatedOutAt` timestamp tracking, validation during delivery
 
 ### 5. Non-Blocking Event Emission
+
 **Decision**: Webhook event listeners never throw; errors are swallowed
 **Rationale**: Settlement persistence must never be blocked by webhook failures
 **Implementation**: Try/catch in listener loop, console.error logging
 
 ### 6. SSRF Protection at Registration
+
 **Decision**: Validate webhook URLs at endpoint creation, reject private IPs
 **Rationale**: Prevents abuse before it happens
 **Implementation**: URL parsing + regex patterns for IP ranges
@@ -159,16 +173,19 @@ Implemented a complete webhook delivery system that notifies sellers of payment 
 ## Integration Points
 
 ### 1. Settlement Status Transitions
+
 **Location**: `packages/stellar-payments/src/settlement.ts`
 **Integration**: After `recordConfirmed()` and `recordFailed()` transactions complete
 **Implementation**: SettlementEventEmitter adapter called in settlement service (to be implemented)
 
 ### 2. Settlement Reconciliation
+
 **Location**: `apps/worker/src/workers/settlementConfirmation.ts`
 **Integration**: When reconciliation confirms status on Horizon
 **Implementation**: Call `emitReconciledEvent()` after transaction (to be implemented)
 
 ### 3. Seller Context
+
 **Location**: `apps/api/src/services/sellers.ts`
 **Integration**: Webhooks are seller-owned resources
 **Implementation**: All webhook routes check seller ownership
@@ -207,6 +224,7 @@ WebhookEvent (1) ──→ (N) WebhookDeliveryAttempt
 ## Testing Strategy
 
 ### Unit Tests
+
 - Schema validation (URL, payload, signatures)
 - SSRF protection (reject private IPs, credentials, http)
 - Secret generation/hashing
@@ -215,6 +233,7 @@ WebhookEvent (1) ──→ (N) WebhookDeliveryAttempt
 - Header redaction
 
 ### Integration Tests (To Be Implemented)
+
 - End-to-end webhook delivery with mocked HTTP
 - Secret rotation overlap behavior
 - Delivery retry with backoff
@@ -222,6 +241,7 @@ WebhookEvent (1) ──→ (N) WebhookDeliveryAttempt
 - Seller authorization checks
 
 ### E2E Tests (To Be Implemented)
+
 - Create endpoint → emit event → receive delivery
 - Secret rotation → new secret signs new events
 - Endpoint disable → no deliveries
@@ -243,6 +263,7 @@ WebhookEvent (1) ──→ (N) WebhookDeliveryAttempt
 ## Known Limitations & TODOs
 
 ### Incomplete Integration
+
 1. Settlement event emission hook-in not yet connected to `recordConfirmed()`/`recordFailed()`
 2. Delivery history routes have TODO placeholders
 3. OpenAPI spec not yet updated with webhook endpoints
@@ -250,6 +271,7 @@ WebhookEvent (1) ──→ (N) WebhookDeliveryAttempt
 5. No actual HTTP delivery implementation (mock for tests)
 
 ### Future Enhancements
+
 1. Webhook event filtering (subscribe to specific event types)
 2. Webhook retries configuration per endpoint
 3. Webhook templating (custom payloads)

@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "description": "Facilitator, seller catalog, discovery, and conformance APIs for LumenBazaar.",
     "x-release": {
-      "commit": "737e891baa49e202a7f4f4d8424177f0c7b99c43",
+      "commit": "d10153816f8244240e2dc77635dfbcd7c47eccd7",
       "version": "0.1.0",
       "protocol": "stellar-x402",
       "x402Version": 2,

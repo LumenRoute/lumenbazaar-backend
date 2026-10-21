@@ -228,9 +228,7 @@ describe("CORS helpers", () => {
     });
 
     it("parses multiple comma-separated origins and trims whitespace", () => {
-      const s = parseCorsAllowedOrigins(
-        "https://a.example.com , https://b.example.com"
-      );
+      const s = parseCorsAllowedOrigins("https://a.example.com , https://b.example.com");
       expect(s.has("https://a.example.com")).toBe(true);
       expect(s.has("https://b.example.com")).toBe(true);
       expect(s.size).toBe(2);
@@ -253,9 +251,7 @@ describe("CORS helpers", () => {
 
     it("returns the origin when it is in the allowed set", () => {
       const allowed = new Set(["https://app.example.com"]);
-      expect(resolveCorsOrigin("https://app.example.com", allowed)).toBe(
-        "https://app.example.com"
-      );
+      expect(resolveCorsOrigin("https://app.example.com", allowed)).toBe("https://app.example.com");
     });
 
     it("returns null when the origin is not in the allowed set", () => {
@@ -289,19 +285,11 @@ describe("CORS HTTP integration", () => {
       });
 
       expect(response.status).toBe(204);
-      expect(response.headers.get("access-control-allow-origin")).toBe(
-        "https://app.example.com"
-      );
-      expect(response.headers.get("access-control-allow-headers")).toMatch(
-        /Mcp-Session-Id/i
-      );
-      expect(response.headers.get("access-control-allow-headers")).toMatch(
-        /Mcp-Protocol-Version/i
-      );
+      expect(response.headers.get("access-control-allow-origin")).toBe("https://app.example.com");
+      expect(response.headers.get("access-control-allow-headers")).toMatch(/Mcp-Session-Id/i);
+      expect(response.headers.get("access-control-allow-headers")).toMatch(/Mcp-Protocol-Version/i);
       expect(response.headers.get("access-control-allow-headers")).toMatch(/traceparent/i);
-      expect(response.headers.get("access-control-expose-headers")).toMatch(
-        /Mcp-Session-Id/i
-      );
+      expect(response.headers.get("access-control-expose-headers")).toMatch(/Mcp-Session-Id/i);
       expect(response.headers.get("access-control-expose-headers")).toMatch(/traceparent/i);
       expect(response.headers.get("access-control-allow-credentials")).toBe("true");
       expect(response.headers.get("access-control-max-age")).toBeTruthy();
@@ -362,9 +350,7 @@ describe("CORS HTTP integration", () => {
         headers: { origin: "https://app.example.com" }
       });
 
-      expect(response.headers.get("access-control-expose-headers")).toMatch(
-        /Mcp-Session-Id/i
-      );
+      expect(response.headers.get("access-control-expose-headers")).toMatch(/Mcp-Session-Id/i);
     } finally {
       await server.close();
     }
@@ -439,7 +425,13 @@ describe("applyCorsHeaders unit", () => {
       headersSent: false
     } as unknown as ServerResponse;
 
-    return { request, response, capturedHeaders, getStatus: () => statusCode, isEnded: () => ended };
+    return {
+      request,
+      response,
+      capturedHeaders,
+      getStatus: () => statusCode,
+      isEnded: () => ended
+    };
   }
 
   it("returns true and ends the response for OPTIONS preflight with a known origin", () => {

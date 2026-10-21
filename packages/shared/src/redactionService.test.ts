@@ -97,7 +97,8 @@ describe("RedactionService", () => {
 
     it("redacts sensitive text values in strings", () => {
       const metadata = {
-        description: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
+        description:
+          "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
         stellarKey: "SBGCYAXSV52JRYUBJJ3TTVHJ4THVDKUVPVGWYJK4RN3QXU74NI3EVDFX",
         normalField: "value"
       };
@@ -193,7 +194,8 @@ describe("RedactionService", () => {
     });
 
     it("redacts key-value pairs from error messages", () => {
-      const message = "Config validation failed: api_key=sk_live_1234567890 and secret:my-super-secret";
+      const message =
+        "Config validation failed: api_key=sk_live_1234567890 and secret:my-super-secret";
 
       const result = service.redactErrorMessage(message);
 
@@ -207,7 +209,9 @@ describe("RedactionService", () => {
 
       const result = service.redactErrorMessage(longMessage);
 
-      expect(result.length).toBeLessThanOrEqual(DEFAULT_TESTNET_POLICY.redaction.maxErrorMessageLength);
+      expect(result.length).toBeLessThanOrEqual(
+        DEFAULT_TESTNET_POLICY.redaction.maxErrorMessageLength
+      );
       expect(result.endsWith("...")).toBe(true);
     });
   });
@@ -476,9 +480,7 @@ describe("Environment-specific behavior", () => {
     const mainnetService = new RedactionService(DEFAULT_MAINNET_POLICY);
     const mainnetStatus = mainnetService.getRedactionStatus();
 
-    expect(testnStatus.maxErrorMessageLength).toBeGreaterThan(
-      mainnetStatus.maxErrorMessageLength
-    );
+    expect(testnStatus.maxErrorMessageLength).toBeGreaterThan(mainnetStatus.maxErrorMessageLength);
   });
 
   it("mainnet has smaller batch size for cleanup", () => {

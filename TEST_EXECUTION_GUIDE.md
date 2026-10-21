@@ -17,6 +17,7 @@ pnpm check
 ```
 
 This runs:
+
 1. `pnpm prisma:generate` - Generate Prisma client
 2. `pnpm openapi:check` - Validate OpenAPI specs
 3. `pnpm format:check` - Check code formatting
@@ -26,6 +27,7 @@ This runs:
 7. `pnpm prisma:validate` - Validate Prisma schema
 
 **Expected output** (last section):
+
 ```
 ✓ packages/stellar-payments/src/x402AdversarialVerification.integration.test.ts
   ✓ x402 Stellar adversarial verification integration matrix
@@ -82,6 +84,7 @@ pnpm test -- packages/stellar-payments/src/x402AdversarialVerification.integrati
 ```
 
 **Expected output**:
+
 ```
 ✓ packages/stellar-payments/src/x402AdversarialVerification.integration.test.ts
   ✓ x402 Stellar adversarial verification integration matrix (20 tests)
@@ -100,6 +103,7 @@ pnpm test -- --watch packages/stellar-payments/src/x402AdversarialVerification.i
 ```
 
 This will:
+
 - Run tests
 - Watch for file changes
 - Re-run tests automatically
@@ -173,24 +177,26 @@ x402 Stellar adversarial verification integration matrix
 
 ### Test Count Summary
 
-| Category | Count |
-|----------|-------|
-| Control Vector | 1 |
-| Adversarial Vectors | 10 |
-| Replay Tests | 2 |
-| Network Error Tests | 3 |
-| Error Mapping Tests | 12 |
-| **Total** | **20+** |
+| Category            | Count   |
+| ------------------- | ------- |
+| Control Vector      | 1       |
+| Adversarial Vectors | 10      |
+| Replay Tests        | 2       |
+| Network Error Tests | 3       |
+| Error Mapping Tests | 12      |
+| **Total**           | **20+** |
 
 ## Expected Behaviors
 
 ### Control Vector
+
 - ✅ **Status**: PASS
 - ✅ **Result**: `verified`
 - ✅ **Error Code**: None (success)
 - ✅ **Assertion**: `paymentAttemptId` and `paymentHash` defined
 
 ### Each Adversarial Vector
+
 - ✅ **Status**: PASS (assertion succeeds)
 - ✅ **Verification Result**: Rejection
 - ✅ **Error Code**: Specific code (not generic)
@@ -208,12 +214,14 @@ x402 Stellar adversarial verification integration matrix
   - Replay (conflicting) → `REPLAY_DETECTED`
 
 ### Network Error Tests
+
 - ✅ **Status**: PASS (assertion succeeds)
 - ✅ **Network Condition**: Simulated failure
 - ✅ **Result**: Rejection (NOT success)
 - ✅ **Error Code**: `SETTLEMENT_FAILED` (decisive rejection)
 
 ### Error Mapping Tests
+
 - ✅ **Status**: PASS (assertion succeeds)
 - ✅ **Mapping**: `invalidReason` → `ErrorCode`
 - ✅ **Verification**: All 12+ mappings correct
@@ -236,6 +244,7 @@ x402 Stellar adversarial verification integration matrix
    - ✅ PaymentVerificationService contract changed → Update test setup
 
 3. **How to debug**:
+
    ```bash
    # Run with verbose output
    pnpm test -- --reporter=verbose packages/stellar-payments/src/x402AdversarialVerification.integration.test.ts
@@ -282,6 +291,7 @@ Or focused:
 ### For Other CI Systems
 
 Replace `pnpm` with equivalent command for your system:
+
 - **npm**: `npm run check` or `npm test -- packages/stellar-payments/src/x402AdversarialVerification.integration.test.ts`
 - **yarn**: `yarn check` or `yarn test -- packages/stellar-payments/src/x402AdversarialVerification.integration.test.ts`
 
@@ -296,12 +306,14 @@ Replace `pnpm` with equivalent command for your system:
 ### Test Type: Unit vs. Integration
 
 All tests are **SIMULATED (local)**:
+
 - ✅ No network calls
 - ✅ No external dependencies
 - ✅ Deterministic (same result every run)
 - ✅ Fast (completes in seconds)
 
 **Future work** can add live testnet vectors that would:
+
 - Make real RPC calls to Stellar testnet
 - Be slower (~30-60 seconds per test)
 - Require testnet access
@@ -309,6 +321,7 @@ All tests are **SIMULATED (local)**:
 ## Test Isolation
 
 Each test:
+
 - ✅ Creates its own mock adapter
 - ✅ Creates its own service instance
 - ✅ Uses isolated fixtures

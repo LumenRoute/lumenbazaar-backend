@@ -342,9 +342,12 @@ export function verifyReceiptEvidence(
       version: RECEIPT_VERIFICATION_VERSION,
       algorithm: RECEIPT_VERIFICATION_ALGORITHM
     },
-    reason: digest === receipt.evidenceHash ? undefined : "evidence_hash_invalid",
-    reasonMessage:
-      digest === receipt.evidenceHash ? undefined : "Computed digest does not match stored digest"
+    ...(digest === receipt.evidenceHash
+      ? {}
+      : {
+          reason: "evidence_hash_invalid" as const,
+          reasonMessage: "Computed digest does not match stored digest"
+        })
   };
 }
 
@@ -367,7 +370,9 @@ function verifyField(
   results.push({
     field: fieldName,
     status: match ? "match" : "mismatch",
-    reason: match ? "Field matches" : `Field mismatch: expected "${expectedValue}", got "${actualValue}"`
+    reason: match
+      ? "Field matches"
+      : `Field mismatch: expected "${expectedValue}", got "${actualValue}"`
   });
 }
 

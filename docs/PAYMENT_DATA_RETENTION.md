@@ -15,6 +15,7 @@ This document defines the data retention policy for payment records in LumenRout
 **Retention Period**: Indefinite (effectively 1,000 years in practice)
 
 **Business Justification**:
+
 - Core evidence of payment authorization requests
 - Used for replay protection via unique `paymentHash` and `idempotencyKey` constraints
 - Necessary for audit trails and regulatory compliance
@@ -22,6 +23,7 @@ This document defines the data retention policy for payment records in LumenRout
 - Links seller, resource, and payment network activity
 
 **Data Structure**:
+
 ```typescript
 {
   id: string;                    // Unique identifier
@@ -42,10 +44,12 @@ This document defines the data retention policy for payment records in LumenRout
 ```
 
 **Sensitive Fields** (never logged or stored as-is):
+
 - `paymentHash`: Linkable to user activity
 - `idempotencyKey`: User-controlled identifier
 
 **Cleanup Behavior**:
+
 - No deletion ever occurs
 - Records older than 7 days with status `"received"` are marked as `"expired"`
 - Expiration is tracked via `status` update and logged in AuditLog
@@ -57,6 +61,7 @@ This document defines the data retention policy for payment records in LumenRout
 **Retention Period**: Indefinite (effectively 1,000 years in practice)
 
 **Business Justification**:
+
 - Immutable blockchain evidence of transaction settlements
 - Contains `transactionHash` and `ledger` number (cryptographic proof)
 - Required for reconciliation of on-chain vs. off-chain state
@@ -64,6 +69,7 @@ This document defines the data retention policy for payment records in LumenRout
 - One-to-one relationship with PaymentAttempt (cannot be deleted due to FK constraint `ON DELETE RESTRICT`)
 
 **Data Structure**:
+
 ```typescript
 {
   id: string;
@@ -86,9 +92,11 @@ This document defines the data retention policy for payment records in LumenRout
 ```
 
 **Sensitive Fields** (redacted in logs):
+
 - `transactionHash`: Linkable to on-chain activity
 
 **Cleanup Behavior**:
+
 - Never deleted (FK constraint prevents it)
 - `reconciliationState: "needs_review"` settlements are flagged for operator attention
 - Reconciliation jobs retry with exponential backoff (max 8 attempts)
@@ -101,6 +109,7 @@ This document defines the data retention policy for payment records in LumenRout
 **Retention Period**: Indefinite (effectively 1,000 years in practice)
 
 **Business Justification**:
+
 - Customer-facing proof of payment
 - Contains deduplicated evidence hash (`evidenceHash`) for detection of duplicate payments
 - Includes financial details (`amount`, `assetCode`, `assetIssuer`) for customer records
@@ -108,6 +117,7 @@ This document defines the data retention policy for payment records in LumenRout
 - One-to-one relationship with PaymentAttempt (cannot be deleted due to FK constraint)
 
 **Data Structure**:
+
 ```typescript
 {
   id: string;
@@ -132,10 +142,12 @@ This document defines the data retention policy for payment records in LumenRout
 ```
 
 **Sensitive Fields** (redacted in logs):
+
 - `transactionHash`: Linkable activity
 - `evidenceHash`: Payment linkability
 
 **Cleanup Behavior**:
+
 - Never deleted (FK constraint prevents it)
 - Available indefinitely for customer lookup and dispute resolution
 - Indexed by `(network, status)`, `(sellerId, status)`, `(resourceId, status)` for quick lookup
@@ -147,6 +159,7 @@ This document defines the data retention policy for payment records in LumenRout
 **Retention Period**: Indefinite (effectively 1,000 years in practice)
 
 **Business Justification**:
+
 - Streaming payment contracts for Upto scheme
 - Tracks cumulative spending against a cap amount
 - Required for usage-based billing audits
@@ -154,6 +167,7 @@ This document defines the data retention policy for payment records in LumenRout
 - Session history needed for buyer/seller disputes
 
 **Data Structure**:
+
 ```typescript
 {
   id: string;
@@ -182,6 +196,7 @@ This document defines the data retention policy for payment records in LumenRout
 ```
 
 **Sensitive Fields** (redacted in logs):
+
 - `contractId`: Smart contract linkability
 - `contractSessionId`: Session linkability
 - `assetContractId`: Asset contract reference
@@ -189,6 +204,7 @@ This document defines the data retention policy for payment records in LumenRout
 - `transactionHash`: On-chain activity
 
 **Cleanup Behavior**:
+
 - Never deleted
 - Sessions remain available for historical lookups
 - Settled/expired sessions mark status; never removed
@@ -200,21 +216,23 @@ This document defines the data retention policy for payment records in LumenRout
 **Retention Period**: Indefinite (effectively 1,000 years in practice)
 
 **Business Justification**:
+
 - Individual settlement events within a PaymentSession
 - Each settlement represents a transaction on-chain with cryptographic proof
 - One-to-many relationship with PaymentSession (multiple settlements per session)
 - Required for reconciling session balance and usage history
 
 **Data Structure**:
+
 ```typescript
 {
   id: string;
   sessionId: string;
   network: NetworkId;
   amount: string;
-  transactionHash: string;        // Blockchain proof (redacted in logs)
-  ledger: number;                 // Block height
-  usageHash: string;              // Usage metadata hash (redacted in logs)
+  transactionHash: string; // Blockchain proof (redacted in logs)
+  ledger: number; // Block height
+  usageHash: string; // Usage metadata hash (redacted in logs)
   status: SettlementStatus;
   settledAt: string;
   createdAt: string;
@@ -222,10 +240,12 @@ This document defines the data retention policy for payment records in LumenRout
 ```
 
 **Sensitive Fields** (redacted in logs):
+
 - `transactionHash`: On-chain linkability
 - `usageHash`: Usage tracking
 
 **Cleanup Behavior**:
+
 - Never deleted
 - Immutable settlement history
 - Indexed for efficient session settlement lookups
@@ -237,6 +257,7 @@ This document defines the data retention policy for payment records in LumenRout
 **Retention Period**: Indefinite (effectively 1,000 years in practice)
 
 **Business Justification**:
+
 - Immutable compliance trail for all payment operations
 - Records actor, action, target, and timestamp for non-repudiation
 - Enables investigation of payment anomalies and disputes
@@ -244,30 +265,34 @@ This document defines the data retention policy for payment records in LumenRout
 - Sanitized metadata (sensitive fields redacted at storage time)
 
 **Data Structure**:
+
 ```typescript
 {
   id: string;
   correlationId: string | null;
-  action: string;                 // e.g., "payment.attempt.created"
+  action: string; // e.g., "payment.attempt.created"
   actorType: "buyer" | "facilitator" | "seller" | "system";
-  actorId: string | null;         // Who performed the action
-  targetType: string;             // e.g., "payment_attempt"
-  targetId: string | null;        // What was affected
-  metadata: JsonObject;           // Redacted at storage (no secrets)
+  actorId: string | null; // Who performed the action
+  targetType: string; // e.g., "payment_attempt"
+  targetId: string | null; // What was affected
+  metadata: JsonObject; // Redacted at storage (no secrets)
   createdAt: string;
 }
 ```
 
 **Metadata Examples**:
+
 - `payment.attempt.created`: `{ network, amount, assetCode, resourceId, sellerId }`
 - `payment.retention.reviewed`: `{ retained: true, reason: "financial_evidence", status: "failed" }`
 - `payment_archived`: `{ paymentAttemptId, status, settledAt, createdAt }`
 
 **Sensitive Fields** (redacted before storage):
+
 - Any field matching `/(secret|seed|private|token|authorization|password|api[_-]?key|payment[_-]?payload)/i`
 - Redaction is applied at the `AuditLogService` layer
 
 **Cleanup Behavior**:
+
 - Never deleted
 - Available indefinitely for compliance queries
 - Indexed by `(actorType, actorId)`, `(targetType, targetId)`, `(action, createdAt)`
@@ -281,20 +306,24 @@ This document defines the data retention policy for payment records in LumenRout
 **Trigger**: Automatic cleanup job (stalePaymentCleanup worker) runs on schedule
 
 **Condition**: PaymentAttempt records with:
+
 - `status: "received"` (never progressed to verified/settling)
 - `createdAt` older than 7 days (configurable: `stalePaymentAgeMs`)
 
-**Action**: 
+**Action**:
+
 1. Update `status` from `"received"` to `"expired"`
 2. Set `failureCode: "AUTH_EXPIRED"`
 3. Set `failureReason: "Payment authorization expired after inactivity"`
 4. Create AuditLog entry: `action: "payment.attempt.expired"`, `metadata: { reason: "age_based_expiration" }`
 
 **Idempotency**: Running cleanup multiple times is safe
+
 - First run marks as expired; subsequent runs ignore already-expired records
 - Idempotent via status check in worker query
 
-**Auditability**: 
+**Auditability**:
+
 - Every expiration logged in AuditLog
 - `correlationId` links to original PaymentAttempt
 - Timestamp and actor recorded for compliance
@@ -304,18 +333,22 @@ This document defines the data retention policy for payment records in LumenRout
 **Trigger**: Automatic archival job runs on schedule
 
 **Condition**: Settlement records with:
+
 - `status: "settled"` or `status: "confirmed"`
 - `settledAt` older than 90 days for testnet or 180 days for mainnet (configurable: `archivePaymentAgeMs`)
 
 **Action**:
+
 1. Create `CatalogEvent` record: `type: "payment_archived"`, `metadata: { paymentAttemptId, status, settledAt, createdAt }`
 2. No deletion occurs; record remains in database with status intact
 
 **Idempotency**: Archival is idempotent
+
 - Check if CatalogEvent for this payment already exists
 - Skip if already archived
 
 **Auditability**:
+
 - CatalogEvent serves as archival audit trail
 - Original PaymentAttempt/Settlement records remain unchanged
 - Can query `CatalogEvent` table to find archived payments
@@ -325,10 +358,12 @@ This document defines the data retention policy for payment records in LumenRout
 **Trigger**: Background reconciliation job (settlement-confirmation queue)
 
 **Condition**: Settlements with:
+
 - `reconciliationState: "pending"` (awaiting confirmation)
 - Not reached max retry count (8 attempts)
 
 **Action**:
+
 1. Query Stellar Horizon API for transaction status
 2. If confirmed: `reconciliationState: "reconciled"`, `status: "settled"`
 3. If failed: `reconciliationState: "needs_review"` for operator attention
@@ -336,6 +371,7 @@ This document defines the data retention policy for payment records in LumenRout
 5. Remove from queue after completion or max retries
 
 **Auditability**:
+
 - `reconciliationAttempts` tracks retry count
 - `lastReconciledAt` records last attempt timestamp
 - `reconciliationReason` explains why manual review is needed
@@ -347,6 +383,7 @@ This document defines the data retention policy for payment records in LumenRout
 ### Environment-Based Defaults
 
 **Testnet** (`LUMEN_ENV=testnet`):
+
 ```javascript
 {
   stalePaymentAgeMs: 7 * 24 * 60 * 60 * 1000,      // 7 days
@@ -359,6 +396,7 @@ This document defines the data retention policy for payment records in LumenRout
 ```
 
 **Mainnet** (`LUMEN_ENV=mainnet`):
+
 ```javascript
 {
   stalePaymentAgeMs: 7 * 24 * 60 * 60 * 1000,      // 7 days
@@ -382,7 +420,7 @@ const customPolicy = {
   cleanup: {
     ...DEFAULT_TESTNET_POLICY.cleanup,
     expiredPaymentThresholdMs: 3 * 24 * 60 * 60 * 1000, // 3 days instead of 7
-    archiveThresholdMs: 60 * 24 * 60 * 60 * 1000        // 60 days instead of 90
+    archiveThresholdMs: 60 * 24 * 60 * 60 * 1000 // 60 days instead of 90
   }
 };
 
@@ -403,6 +441,7 @@ These patterns are matched against object keys and redacted to `[redacted]`:
 ```
 
 **Examples**:
+
 - `secret` → `[redacted]`
 - `api_key` → `[redacted]`
 - `paymentHash` → `[redacted]`
@@ -421,6 +460,7 @@ These patterns are replaced with `[redacted]` in error messages and logs:
 ```
 
 **Examples**:
+
 - `Bearer eyJhbGciOiJIUzI1NiIs...` → `[redacted]`
 - `SBGCYAXSV52JRYUBJJ3TTVHJ4THVDKUVPVGWYJK4RN3QXU74NI3EVDFX` → `[redacted]`
 - `api_key=sk_live_12345678` → `[redacted]`
@@ -449,6 +489,7 @@ These patterns are replaced with `[redacted]` in error messages and logs:
 ### For Application Code
 
 **Logging Payments**:
+
 ```typescript
 import { getGlobalRedactionService } from "@lumenbazaar/shared";
 
@@ -463,6 +504,7 @@ logger.info("Payment attempt", redacted);
 ```
 
 **Audit Recording**:
+
 ```typescript
 import { AuditLogService } from "./services/audit";
 
@@ -478,7 +520,7 @@ await auditLog.record({
   metadata: {
     network: "stellar:testnet",
     amount: "100.00",
-    assetCode: "USDC",
+    assetCode: "USDC"
     // ❌ Don't include sensitive fields; they'll be redacted anyway
     // paymentHash: "...", // Already redacted by service
   }
@@ -486,6 +528,7 @@ await auditLog.record({
 ```
 
 **Error Handling**:
+
 ```typescript
 import { toPublicError } from "@lumenbazaar/shared";
 
@@ -501,6 +544,7 @@ try {
 ### For Worker Jobs
 
 **Job Error Logging**:
+
 ```typescript
 import { getGlobalRedactionService } from "@lumenbazaar/shared";
 
@@ -521,6 +565,7 @@ try {
 ### Non-Repudiation
 
 Every payment action is recorded with:
+
 - **Actor**: Who initiated (buyer, seller, facilitator, system)
 - **Action**: What was done (created, verified, settled, etc.)
 - **Target**: What was affected (payment attempt, settlement, receipt)
@@ -577,13 +622,14 @@ const payment = await db.paymentAttempt.findUnique({
 
 ```typescript
 const service = getGlobalRedactionService();
-console.log(service.isFieldRedacted("paymentHash"));     // true
-console.log(service.isFieldRedacted("amount"));          // false
+console.log(service.isFieldRedacted("paymentHash")); // true
+console.log(service.isFieldRedacted("amount")); // false
 ```
 
 ### Q: What happens to very old payment records?
 
 **A**: They are never deleted. Records older than the archival threshold (90/180 days) are marked via CatalogEvent but remain in the database. This allows:
+
 - Historical lookups (e.g., "show me all payments from 2 years ago")
 - Compliance queries over long periods
 - Forensic analysis if needed
@@ -597,4 +643,3 @@ console.log(service.isFieldRedacted("amount"));          // false
 - **Audit Service**: `apps/api/src/services/audit.ts`
 - **Cleanup Worker**: `apps/worker/src/workers/stalePaymentCleanup.ts`
 - **Error Mapping**: `packages/shared/src/errorMapping.ts`
-

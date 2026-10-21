@@ -4,15 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPrismaClient } from "@lumenbazaar/shared";
 import type { Job } from "bullmq";
 
-import { handleStalePaymentCleanup, type StalePaymentCleanupJobData } from "./stalePaymentCleanup.js";
+import {
+  handleStalePaymentCleanup,
+  type StalePaymentCleanupJobData
+} from "./workers/stalePaymentCleanup.js";
 import { DEFAULT_TESTNET_POLICY } from "@lumenbazaar/shared";
 
+let jobLogs: string[] = [];
 const databaseUrl = process.env.PAYMENT_PERSISTENCE_TEST_DATABASE_URL;
 const describePostgres = databaseUrl === undefined ? describe.skip : describe;
 
 describePostgres("Stale Payment Cleanup Integration", () => {
   let client: PrismaClient;
-  let jobLogs: string[];
 
   beforeEach(async () => {
     client = createClient();
@@ -395,7 +398,9 @@ describePostgres("Stale Payment Cleanup Integration", () => {
       await handleStalePaymentCleanup(job, client, DEFAULT_TESTNET_POLICY);
 
       // Verify record still exists
-      const updated = await client.paymentAttempt.findUnique({ where: { id: "attempt_settled_2" } });
+      const updated = await client.paymentAttempt.findUnique({
+        where: { id: "attempt_settled_2" }
+      });
 
       expect(updated).toBeDefined();
       expect(updated?.status).toBe("settled");
@@ -511,7 +516,9 @@ describePostgres("Stale Payment Cleanup Integration", () => {
       const job = createMockJob("cleanup_expired", 7 * 24 * 60 * 60 * 1000);
 
       // Job should complete without throwing
-      await expect(handleStalePaymentCleanup(job, client, DEFAULT_TESTNET_POLICY)).resolves.not.toThrow();
+      await expect(
+        handleStalePaymentCleanup(job, client, DEFAULT_TESTNET_POLICY)
+      ).resolves.not.toThrow();
     });
   });
 });

@@ -4,10 +4,10 @@
 
 LumenBazaar exposes two health endpoints with distinct semantics. Understanding the difference is critical for correct orchestrator configuration — misusing them causes unnecessary restarts (liveness as readiness) or invisible degradation (readiness as liveness).
 
-| Endpoint | Probe type | Performs I/O? | Returns 503? | Purpose |
-|---|---|---|---|---|
-| `GET /health` | Liveness | **No** | Never | Is the process alive? |
-| `GET /ready` | Readiness | **Yes** | When degraded | Is the process ready to serve traffic? |
+| Endpoint      | Probe type | Performs I/O? | Returns 503?  | Purpose                                |
+| ------------- | ---------- | ------------- | ------------- | -------------------------------------- |
+| `GET /health` | Liveness   | **No**        | Never         | Is the process alive?                  |
+| `GET /ready`  | Readiness  | **Yes**       | When degraded | Is the process ready to serve traffic? |
 
 ---
 
@@ -53,13 +53,13 @@ The response body always has the same shape regardless of HTTP status:
   "ok": false,
   "environment": "testnet",
   "checks": {
-    "database":   { "status": "unavailable", "latencyMs": 12,   "reason": "dependency_check_failed" },
-    "redis":      { "status": "ready",        "latencyMs": 3 },
-    "stellarRpc": { "status": "timeout",      "latencyMs": 2001, "reason": "probe_timeout" },
-    "horizon":    { "status": "ready",        "latencyMs": 45 },
-    "signer":     { "status": "not_required" },
-    "migrations": { "status": "ready",        "latencyMs": 9 },
-    "assets":     { "status": "unavailable", "reason": "dependency_check_failed" }
+    "database": { "status": "unavailable", "latencyMs": 12, "reason": "dependency_check_failed" },
+    "redis": { "status": "ready", "latencyMs": 3 },
+    "stellarRpc": { "status": "timeout", "latencyMs": 2001, "reason": "probe_timeout" },
+    "horizon": { "status": "ready", "latencyMs": 45 },
+    "signer": { "status": "not_required" },
+    "migrations": { "status": "ready", "latencyMs": 9 },
+    "assets": { "status": "unavailable", "reason": "dependency_check_failed" }
   },
   "capabilities": { "exact": false, "upto": false }
 }
@@ -75,7 +75,7 @@ readinessProbe:
   initialDelaySeconds: 10
   periodSeconds: 15
   failureThreshold: 2
-  timeoutSeconds: 10   # Must exceed READINESS_PROBE_TIMEOUT_MS × number of probe retries
+  timeoutSeconds: 10 # Must exceed READINESS_PROBE_TIMEOUT_MS × number of probe retries
 ```
 
 **Configuration example (AWS ALB):**
@@ -93,13 +93,13 @@ Success codes:       200
 
 ## Status Codes
 
-| Status | Meaning |
-|---|---|
-| `ready` | Dependency responded successfully within the deadline |
-| `unavailable` | Dependency is reachable but returned an error, or the probe threw an exception |
-| `timeout` | Probe did not complete within the configured deadline (`READINESS_PROBE_TIMEOUT_MS`) |
+| Status           | Meaning                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| `ready`          | Dependency responded successfully within the deadline                                                  |
+| `unavailable`    | Dependency is reachable but returned an error, or the probe threw an exception                         |
+| `timeout`        | Probe did not complete within the configured deadline (`READINESS_PROBE_TIMEOUT_MS`)                   |
 | `not_configured` | The dependency is required for the current capabilities but has no probe registered (treat as failure) |
-| `not_required` | The dependency is optional and not enabled for this deployment (not a failure) |
+| `not_required`   | The dependency is optional and not enabled for this deployment (not a failure)                         |
 
 ---
 
@@ -132,15 +132,15 @@ Errors are always mapped to stable reason codes: `dependency_check_failed` or `p
 
 ## Dependency Probes
 
-| Dependency | Probe method | Notes |
-|---|---|---|
-| PostgreSQL | `SELECT 1` + disconnect | Uses a short-lived Prisma client |
-| Redis | `CONNECT` + `PING` + disconnect | ioredis with `maxRetriesPerRequest: 0` |
-| Stellar RPC | `getLatestLedger` JSON-RPC | Checks for a valid `result` field |
-| Horizon | `GET /` | Checks for HTTP 2xx |
-| Signer | `assertReady()` + state check | Only probed when a payment adapter is enabled |
-| Migrations | `_prisma_migrations` query | Checks all required migrations are applied |
-| Assets | Config validation | Checks networks have real (non-placeholder) asset issuers |
+| Dependency  | Probe method                    | Notes                                                     |
+| ----------- | ------------------------------- | --------------------------------------------------------- |
+| PostgreSQL  | `SELECT 1` + disconnect         | Uses a short-lived Prisma client                          |
+| Redis       | `CONNECT` + `PING` + disconnect | ioredis with `maxRetriesPerRequest: 0`                    |
+| Stellar RPC | `getLatestLedger` JSON-RPC      | Checks for a valid `result` field                         |
+| Horizon     | `GET /`                         | Checks for HTTP 2xx                                       |
+| Signer      | `assertReady()` + state check   | Only probed when a payment adapter is enabled             |
+| Migrations  | `_prisma_migrations` query      | Checks all required migrations are applied                |
+| Assets      | Config validation               | Checks networks have real (non-placeholder) asset issuers |
 
 ---
 

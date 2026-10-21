@@ -15,7 +15,11 @@ import { type FastifyInstance } from "fastify";
 import { z } from "zod";
 import { LumenError } from "@lumenbazaar/shared";
 import { verifyReceiptEvidence } from "@lumenbazaar/stellar-payments";
-import type { ReceiptService, PaymentAttemptStore, SettlementStore } from "@lumenbazaar/stellar-payments";
+import type {
+  ReceiptService,
+  PaymentAttemptStore,
+  SettlementStore
+} from "@lumenbazaar/stellar-payments";
 import { parseParams } from "../http/validation.js";
 
 export type ReceiptVerificationRouteOptions = {
@@ -90,7 +94,7 @@ export function registerReceiptVerificationRoutes(
       );
 
       // Verify
-      const result = verifyReceiptEvidence(receipt, attempt, settlement);
+      const result = verifyReceiptEvidence(receipt, attempt, settlement ?? null);
 
       reply.header("x-correlation-id", receipt.correlationId);
       return result;
@@ -101,11 +105,9 @@ export function registerReceiptVerificationRoutes(
 
       // Re-throw as internal error if not already a LumenError
       if (!(error instanceof LumenError)) {
-        throw new LumenError(
-          "INTERNAL_ERROR",
-          "An error occurred during receipt verification.",
-          { cause: error }
-        );
+        throw new LumenError("INTERNAL_ERROR", "An error occurred during receipt verification.", {
+          details: { cause: error instanceof Error ? error.message : String(error) }
+        });
       }
 
       throw error;

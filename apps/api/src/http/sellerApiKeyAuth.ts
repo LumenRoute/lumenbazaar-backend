@@ -64,14 +64,14 @@ export function registerSellerApiKeyAuth(app: FastifyInstance, options: SellerAp
       return;
     }
 
-    if (route === "/v1/resources/:id/versions" && (method === "GET")) {
+    if (route === "/v1/resources/:id/versions" && method === "GET") {
       // Version listing requires read scope and resource ownership
       requireScope(principal, "resources:read");
       await requireResourceOwnership(request, principal, options);
       return;
     }
 
-    if (route === "/v1/resources/:id/versions/:version" && (method === "GET")) {
+    if (route === "/v1/resources/:id/versions/:version" && method === "GET") {
       // Version retrieval requires read scope and resource ownership
       requireScope(principal, "resources:read");
       await requireResourceOwnership(request, principal, options);

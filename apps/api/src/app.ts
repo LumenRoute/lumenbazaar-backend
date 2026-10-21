@@ -20,8 +20,12 @@ import {
   SettlementService,
   createPaymentPersistence,
   createRuntimePaymentReconciliation,
+  createStellarSdkUptoSessionBindings,
   createX402StellarAdapter,
-  type FacilitatorSignerProvider
+  type FacilitatorSignerProvider,
+  type PaymentAttemptStore,
+  type SettlementStore,
+  type UptoSessionContractBindings
 } from "@lumenbazaar/stellar-payments";
 
 import { registerErrorHandling } from "./http/errors.js";
@@ -105,6 +109,7 @@ export type BuildApiAppOptions = {
   paymentCapabilities?: PaymentCapabilities;
   readinessService?: ReadinessService;
   signerProvider?: FacilitatorSignerProvider;
+  uptoBindings?: UptoSessionContractBindings;
   /**
    * Pre-built capability registry.  Injected by tests that need fine-grained
    * control over which schemes are reported as supported without running real
@@ -114,6 +119,8 @@ export type BuildApiAppOptions = {
   streamAccessService?: StreamAccessService;
   receiptStatusStreamService?: ReceiptStatusStreamService;
   eventStreamTuning?: EventStreamTuning;
+  attemptStore?: PaymentAttemptStore;
+  settlementStore?: SettlementStore;
 };
 
 export function buildApiApp(options: BuildApiAppOptions = {}) {
@@ -133,13 +140,26 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     options.signerProvider === undefined
       ? undefined
       : createX402StellarAdapter({ config, signerProvider: options.signerProvider });
+  const liveUptoBindings =
+    options.uptoBindings ??
+    (config.features.uptoScheme && options.signerProvider !== undefined
+      ? createStellarSdkUptoSessionBindings({ config, signerProvider: options.signerProvider })
+      : undefined);
+  const isUptoLive =
+    config.features.uptoScheme &&
+    (liveUptoBindings !== undefined ||
+      (config.lumenEnv === "local" &&
+        (options.paymentSessionService !== undefined ||
+          options.uptoBindings !== undefined ||
+          options.paymentCapabilities?.upto === true))) &&
+    listConfiguredNetworks(config).every((network) => network.uptoSessionContractId !== undefined);
   const paymentCapabilities = options.paymentCapabilities ?? {
     exact:
       runtimeAdapter !== undefined &&
       listConfiguredNetworks(config).every((network) =>
         network.assets.some((asset) => asset.contractId !== undefined)
       ),
-    upto: false
+    upto: Boolean(isUptoLive)
   };
   const readinessService =
     options.readinessService ??
@@ -256,7 +276,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
     options.paymentSessionService ??
     new PaymentSessionService(config, {
       auditLogService,
-      store: options.paymentSessionStore ?? paymentPersistence.paymentSessionStore
+      store: options.paymentSessionStore ?? paymentPersistence.paymentSessionStore,
+      ...(liveUptoBindings !== undefined ? { bindings: liveUptoBindings } : {})
     });
   const catalogValidationService =
     options.catalogValidationService ?? new CatalogValidationService(config, sellerService);
@@ -280,12 +301,15 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   // When no pre-built registry is provided, construct one in onReady.
   if (capRegistry === undefined) {
     app.addHook("onReady", async () => {
+      const activeUptoService =
+        options.paymentSessionService ?? (isUptoLive ? paymentSessionService : undefined);
       capRegistry = await buildCapabilityRegistry({
-        exactAdapter: runtimeAdapter,
-        uptoService:
-          options.paymentSessionService === undefined ? paymentSessionService : undefined,
+        ...(runtimeAdapter !== undefined ? { exactAdapter: runtimeAdapter } : {}),
+        ...(activeUptoService !== undefined ? { uptoService: activeUptoService } : {}),
         networks: listConfiguredNetworks(config).map((n) => n.id),
-        allowedCapabilities: options.paymentCapabilities,
+        ...(options.paymentCapabilities !== undefined
+          ? { allowedCapabilities: options.paymentCapabilities }
+          : {}),
         checkOptions: { timeoutMs: 5_000 },
         logger: {
           info: (msg, data) => app.log.info({ ...data, event: msg }),
@@ -319,13 +343,14 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
         // Capability options are forwarded from the registry once initialized.
         // These are overridden at runtime via getCapabilityRegistry() in the
         // conformance service when a registry is wired in.
-        exactEnabled: options.paymentCapabilities?.exact,
-        uptoEnabled:
-          options.paymentCapabilities?.upto !== undefined
-            ? config.features.uptoScheme && options.paymentCapabilities.upto
-            : undefined,
+        ...(options.paymentCapabilities?.exact !== undefined
+          ? { exactEnabled: options.paymentCapabilities.exact }
+          : {}),
+        ...(options.paymentCapabilities?.upto !== undefined
+          ? { uptoEnabled: config.features.uptoScheme && options.paymentCapabilities.upto }
+          : {}),
         capabilityRegistry: () => getCapabilityRegistry(),
-        isLive: config.lumenEnv !== "local" && config.lumenEnv !== "test",
+        isLive: config.lumenEnv !== "local",
         commit: getReleaseCommit(),
         x402PackageVersion: "2.28.0"
       }
@@ -365,7 +390,9 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   });
   registerPaymentSessionRoutes(app, { paymentSessionService });
   registerSellerRoutes(app, { sellerService, sellerApiKeyService });
-  registerWebhookRoutes(app, { webhookService: options.webhookService });
+  registerWebhookRoutes(app, {
+    ...(options.webhookService !== undefined ? { webhookService: options.webhookService } : {})
+  });
   registerResourceRoutes(app, { resourceService });
   registerDiscoveryRoutes(app, {
     catalogValidationService,
@@ -384,8 +411,8 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   });
   registerReceiptVerificationRoutes(app, {
     receiptService: routeReceiptService,
-    attemptStore: verificationService.getAttemptStore(),
-    settlementStore: paymentPersistence.settlementStore
+    attemptStore: options.attemptStore ?? verificationService.getAttemptStore(),
+    settlementStore: options.settlementStore ?? paymentPersistence.settlementStore
   });
 
   return app;

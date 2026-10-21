@@ -154,16 +154,18 @@ describe("loadConfig", () => {
       loadConfig({
         FACILITATOR_SIGNER_PROVIDER: "cloud-kms",
         FACILITATOR_SIGNER_NETWORK: "stellar:pubnet",
-        FACILITATOR_SIGNER_KMS_KEY_ID: "projects/test/locations/global/keyRings/ring/cryptoKeys/key",
-        FACILITATOR_SIGNER_KMS_PUBLIC_KEY: "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ"
+        FACILITATOR_SIGNER_KMS_KEY_ID:
+          "projects/test/locations/global/keyRings/ring/cryptoKeys/key",
+        FACILITATOR_SIGNER_KMS_PUBLIC_KEY:
+          "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ"
       } as never)
     ).toThrow("FACILITATOR_SIGNER_NETWORK must match the active Stellar network");
   });
 
   it("rejects an unknown signer provider", () => {
-    expect(() =>
-      loadConfig({ FACILITATOR_SIGNER_PROVIDER: "unknown-provider" } as never)
-    ).toThrow(ZodError);
+    expect(() => loadConfig({ FACILITATOR_SIGNER_PROVIDER: "unknown-provider" } as never)).toThrow(
+      ZodError
+    );
   });
 
   it("does not fall back to environment signing when cloud KMS is configured", () => {
@@ -232,7 +234,7 @@ describe("loadConfig", () => {
   it("uses official Circle testnet USDC issuer by default", () => {
     const config = loadConfig({ LUMEN_ENV: "testnet" });
     const officialUsdcIssuer = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
-    expect(config.networks["stellar:testnet"].assets[0].issuer).toBe(officialUsdcIssuer);
+    expect(config.networks["stellar:testnet"].assets[0]!.issuer).toBe(officialUsdcIssuer);
   });
 
   it("allows overriding testnet USDC issuer explicitly", () => {
@@ -265,7 +267,7 @@ describe("loadConfig", () => {
 
   it("flags LBT as test-only in metadata", () => {
     const config = loadConfig({ TESTNET_ASSET: "lbt" });
-    const lbtAsset = config.networks["stellar:testnet"].assets[0];
+    const lbtAsset = config.networks["stellar:testnet"].assets[0]!;
     expect(lbtAsset.kind).toBe("lbt");
     expect(lbtAsset.isTestOnly).toBe(true);
   });
@@ -297,13 +299,13 @@ describe("loadConfig", () => {
     const usdcConfig = loadConfig({ TESTNET_ASSET: "usdc" });
     const lbtConfig = loadConfig({ TESTNET_ASSET: "lbt" });
 
-    expect(usdcConfig.networks["stellar:testnet"].assets[0].code).toBe("USDC");
-    expect(lbtConfig.networks["stellar:testnet"].assets[0].code).toBe("LBT");
+    expect(usdcConfig.networks["stellar:testnet"].assets[0]!.code).toBe("USDC");
+    expect(lbtConfig.networks["stellar:testnet"].assets[0]!.code).toBe("LBT");
   });
 
   it("marks USDC as not test-only", () => {
     const config = loadConfig({ TESTNET_ASSET: "usdc" });
-    const usdcAsset = config.networks["stellar:testnet"].assets[0];
+    const usdcAsset = config.networks["stellar:testnet"].assets[0]!;
     expect(usdcAsset.isTestOnly).toBe(false);
     expect(usdcAsset.kind).toBe("usdc");
   });
@@ -315,7 +317,7 @@ describe("loadConfig", () => {
       STELLAR_PUBNET_USDC_ISSUER: "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ"
     });
 
-    const pubnetAsset = config.networks["stellar:pubnet"].assets[0];
+    const pubnetAsset = config.networks["stellar:pubnet"].assets[0]!;
     expect(pubnetAsset.code).toBe("USDC");
     expect(pubnetAsset.kind).toBe("usdc");
     expect(pubnetAsset.isTestOnly).toBe(false);

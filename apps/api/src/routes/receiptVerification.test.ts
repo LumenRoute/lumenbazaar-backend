@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { Decimal } from "@prisma/client/runtime/library";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApiApp } from "../app.js";
-import type { ReceiptService, PaymentAttemptStore, SettlementStore } from "@lumenbazaar/stellar-payments";
+import type {
+  ReceiptService,
+  PaymentAttemptStore,
+  SettlementStore
+} from "@lumenbazaar/stellar-payments";
 import {
   InMemoryPaymentAttemptStore,
   InMemorySettlementStore,
@@ -27,8 +30,9 @@ describe("Receipt Verification Endpoint", () => {
 
     app = buildApiApp({
       logger: false,
-      verificationService: undefined, // Will use default
       receiptService,
+      attemptStore,
+      settlementStore,
       paymentCapabilities: {
         exact: false,
         upto: false
@@ -43,40 +47,75 @@ describe("Receipt Verification Endpoint", () => {
   });
 
   const createTestPaymentAttempt = async (
-    overrides: Partial<PaymentAttempt> = {}
+    overrides: Partial<{
+      correlationId: string;
+      paymentHash: string;
+      resourceId: string;
+      sellerId: string;
+      network: "stellar:testnet" | "stellar:pubnet";
+      assetCode: string;
+      assetIssuer: string;
+      amount: string;
+      payTo: string;
+      idempotencyKey: string;
+      expiresAtLedger: number;
+      failureCode: any;
+      failureReason: any;
+    }> = {}
   ): Promise<PaymentAttempt> => {
+    const { failureCode, failureReason, ...rest } = overrides;
     return attemptStore.createVerifiedAttempt({
       correlationId: "corr-123",
       paymentHash: "hash-" + Math.random().toString(36),
       resourceId: "resource-123",
       sellerId: "seller-123",
-      network: "testnet",
+      network: "stellar:testnet",
       assetCode: "USDC",
       assetIssuer: "GBRPYHIL2CI3WHZALSZ5XJSWMURMJG7ZFQCW5ENMTL5JNXKF3KKV7RW",
       amount: "100.0000000",
       payTo: "GISSUER123",
-      ...overrides
+      ...rest
     });
   };
 
   const createTestSettlement = async (
     paymentAttemptId: string,
-    overrides: Partial<Parameters<typeof settlementStore.createSettlement>[0]> = {}
+    overrides: {
+      transactionHash?: string | null;
+      ledger?: number | null;
+      amount?: string;
+      assetCode?: string;
+      assetIssuer?: string;
+      network?: "stellar:testnet" | "stellar:pubnet";
+      status?: Settlement["status"];
+      reconciliationState?: Settlement["reconciliationState"];
+    } = {}
   ): Promise<Settlement> => {
-    return settlementStore.createSettlement({
+    const input: Parameters<typeof settlementStore.createSettlement>[0] = {
       paymentAttemptId,
       correlationId: "corr-123",
-      transactionHash: "tx-hash-abc123",
-      ledger: 12345,
-      network: "testnet",
-      amount: "100.0000000",
-      assetCode: "USDC",
-      assetIssuer: "GBRPYHIL2CI3WHZALSZ5XJSWMURMJG7ZFQCW5ENMTL5JNXKF3KKV7RW",
-      status: "confirmed",
-      reconciliationState: "reconciled",
-      settledAt: new Date().toISOString(),
-      ...overrides
-    });
+      network: overrides.network ?? "stellar:testnet",
+      amount: overrides.amount ?? "100.0000000",
+      assetCode: overrides.assetCode ?? "USDC",
+      assetIssuer:
+        overrides.assetIssuer ?? "GBRPYHIL2CI3WHZALSZ5XJSWMURMJG7ZFQCW5ENMTL5JNXKF3KKV7RW",
+      status: overrides.status ?? "confirmed",
+      reconciliationState: overrides.reconciliationState ?? "reconciled",
+      settledAt: new Date().toISOString()
+    };
+    if (
+      overrides.transactionHash !== null &&
+      ("transactionHash" in overrides ? overrides.transactionHash !== undefined : true)
+    ) {
+      input.transactionHash = overrides.transactionHash ?? "tx-hash-abc123";
+    }
+    if (
+      overrides.ledger !== null &&
+      ("ledger" in overrides ? overrides.ledger !== undefined : true)
+    ) {
+      input.ledger = overrides.ledger ?? 12345;
+    }
+    return settlementStore.createSettlement(input);
   };
 
   const createTestReceipt = async (
@@ -202,7 +241,7 @@ describe("Receipt Verification Endpoint", () => {
       // Tamper with receipt's amount
       receipt = {
         ...receipt,
-        amount: new Decimal("50.0000000")
+        amount: "50.0000000"
       };
 
       // Mock the receipt store to return tampered receipt

@@ -110,9 +110,13 @@ describe("API server base", () => {
 
   it("health stays 200 when redis is down", async () => {
     const config = loadConfig({ LUMEN_ENV: "testnet" });
-    const readinessService = createStaticReadinessService(config, { exact: false, upto: false }, {
-      redis: { status: "unavailable", reason: "dependency_check_failed" }
-    });
+    const readinessService = createStaticReadinessService(
+      config,
+      { exact: false, upto: false },
+      {
+        redis: { status: "unavailable", reason: "dependency_check_failed" }
+      }
+    );
     const app = buildApiApp({ config, logger: false, readinessService });
 
     const health = await app.inject({ method: "GET", url: "/health" });
@@ -126,9 +130,13 @@ describe("API server base", () => {
 
   it("health stays 200 when horizon is timed out", async () => {
     const config = loadConfig({ LUMEN_ENV: "testnet" });
-    const readinessService = createStaticReadinessService(config, { exact: false, upto: false }, {
-      horizon: { status: "timeout", latencyMs: 2001, reason: "probe_timeout" }
-    });
+    const readinessService = createStaticReadinessService(
+      config,
+      { exact: false, upto: false },
+      {
+        horizon: { status: "timeout", latencyMs: 2001, reason: "probe_timeout" }
+      }
+    );
     const app = buildApiApp({ config, logger: false, readinessService });
 
     const health = await app.inject({ method: "GET", url: "/health" });
@@ -142,9 +150,13 @@ describe("API server base", () => {
 
   it("health stays 200 when stellarRpc is timed out", async () => {
     const config = loadConfig({ LUMEN_ENV: "testnet" });
-    const readinessService = createStaticReadinessService(config, { exact: false, upto: false }, {
-      stellarRpc: { status: "timeout", latencyMs: 2001, reason: "probe_timeout" }
-    });
+    const readinessService = createStaticReadinessService(
+      config,
+      { exact: false, upto: false },
+      {
+        stellarRpc: { status: "timeout", latencyMs: 2001, reason: "probe_timeout" }
+      }
+    );
     const app = buildApiApp({ config, logger: false, readinessService });
 
     const health = await app.inject({ method: "GET", url: "/health" });
@@ -158,9 +170,13 @@ describe("API server base", () => {
 
   it("health stays 200 when signer is not_configured (required but missing)", async () => {
     const config = loadConfig({ LUMEN_ENV: "testnet" });
-    const readinessService = createStaticReadinessService(config, { exact: true, upto: false }, {
-      signer: { status: "not_configured" }
-    });
+    const readinessService = createStaticReadinessService(
+      config,
+      { exact: true, upto: false },
+      {
+        signer: { status: "not_configured" }
+      }
+    );
     const app = buildApiApp({ config, logger: false, readinessService });
 
     const health = await app.inject({ method: "GET", url: "/health" });
@@ -174,11 +190,15 @@ describe("API server base", () => {
 
   it("health stays 200 when multiple dependencies are down simultaneously", async () => {
     const config = loadConfig({ LUMEN_ENV: "testnet" });
-    const readinessService = createStaticReadinessService(config, { exact: false, upto: false }, {
-      database: { status: "unavailable", reason: "dependency_check_failed" },
-      redis: { status: "timeout", latencyMs: 2001, reason: "probe_timeout" },
-      horizon: { status: "unavailable", reason: "dependency_check_failed" }
-    });
+    const readinessService = createStaticReadinessService(
+      config,
+      { exact: false, upto: false },
+      {
+        database: { status: "unavailable", reason: "dependency_check_failed" },
+        redis: { status: "timeout", latencyMs: 2001, reason: "probe_timeout" },
+        horizon: { status: "unavailable", reason: "dependency_check_failed" }
+      }
+    );
     const app = buildApiApp({ config, logger: false, readinessService });
 
     const health = await app.inject({ method: "GET", url: "/health" });
@@ -194,15 +214,19 @@ describe("API server base", () => {
 
   it("health stays 200 when all dependencies are down", async () => {
     const config = loadConfig({ LUMEN_ENV: "testnet" });
-    const readinessService = createStaticReadinessService(config, { exact: true, upto: false }, {
-      database: { status: "unavailable", reason: "dependency_check_failed" },
-      redis: { status: "unavailable", reason: "dependency_check_failed" },
-      stellarRpc: { status: "timeout", reason: "probe_timeout" },
-      horizon: { status: "timeout", reason: "probe_timeout" },
-      signer: { status: "not_configured" },
-      migrations: { status: "unavailable", reason: "dependency_check_failed" },
-      assets: { status: "unavailable", reason: "dependency_check_failed" }
-    });
+    const readinessService = createStaticReadinessService(
+      config,
+      { exact: true, upto: false },
+      {
+        database: { status: "unavailable", reason: "dependency_check_failed" },
+        redis: { status: "unavailable", reason: "dependency_check_failed" },
+        stellarRpc: { status: "timeout", reason: "probe_timeout" },
+        horizon: { status: "timeout", reason: "probe_timeout" },
+        signer: { status: "not_configured" },
+        migrations: { status: "unavailable", reason: "dependency_check_failed" },
+        assets: { status: "unavailable", reason: "dependency_check_failed" }
+      }
+    );
     const app = buildApiApp({ config, logger: false, readinessService });
 
     const health = await app.inject({ method: "GET", url: "/health" });
@@ -231,9 +255,13 @@ describe("API server base", () => {
 
   it("readiness response never contains raw error messages or credentials", async () => {
     const config = loadConfig({ LUMEN_ENV: "testnet" });
-    const readinessService = createStaticReadinessService(config, { exact: false, upto: false }, {
-      database: { status: "unavailable", reason: "dependency_check_failed" }
-    });
+    const readinessService = createStaticReadinessService(
+      config,
+      { exact: false, upto: false },
+      {
+        database: { status: "unavailable", reason: "dependency_check_failed" }
+      }
+    );
     const app = buildApiApp({ config, logger: false, readinessService });
 
     const ready = await app.inject({ method: "GET", url: "/ready" });

@@ -36,9 +36,7 @@ export function detectCIEnvironment(): CIEnvironment {
   const eventRepository = process.env.GITHUB_EVENT_PATH ? "fork" : "main";
   const isForkPullRequest =
     isPullRequest &&
-    (eventRepository === "fork" ||
-      process.env.GITHUB_EVENT_REPOSITORY?.includes("fork") ||
-      false);
+    (eventRepository === "fork" || process.env.GITHUB_EVENT_REPOSITORY?.includes("fork") || false);
 
   return {
     isCI: isGitHub || process.env.CI === "true",
@@ -190,9 +188,7 @@ export type EnvironmentValidation = {
   trustLevel: "untrusted" | "internal" | "trusted";
 };
 
-export function validateTestnetE2EEnvironment(
-  mode: "smoke" | "full"
-): EnvironmentValidation {
+export function validateTestnetE2EEnvironment(mode: "smoke" | "full"): EnvironmentValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
   let credentialsPresent = false;
@@ -213,7 +209,8 @@ export function validateTestnetE2EEnvironment(
   }
 
   // Check manifest
-  const manifestPath = process.env.TESTNET_MANIFEST_PATH || "docs/deployment/testnet-endpoints.json";
+  const manifestPath =
+    process.env.TESTNET_MANIFEST_PATH || "docs/deployment/testnet-endpoints.json";
   if (!manifestPath) {
     warnings.push("TESTNET_MANIFEST_PATH not set - using default");
   }
@@ -274,9 +271,7 @@ export type SecurityAuditLog = {
   fundedOperationsAllowed: boolean;
 };
 
-export function generateSecurityAuditLog(
-  mode: "smoke" | "full"
-): SecurityAuditLog {
+export function generateSecurityAuditLog(mode: "smoke" | "full"): SecurityAuditLog {
   return {
     timestamp: new Date().toISOString(),
     ciEnvironment: detectCIEnvironment(),

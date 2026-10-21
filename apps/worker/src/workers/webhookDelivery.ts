@@ -1,6 +1,5 @@
 import { URL } from "node:url";
 import crypto from "node:crypto";
-import fetch from "node-fetch";
 
 import {
   type AppConfig,
@@ -12,7 +11,7 @@ import {
   WEBHOOK_DELIVERY_REQUEST_TIMEOUT_MS,
   WEBHOOK_MAX_DELIVERY_ATTEMPTS,
   WEBHOOK_DELIVERY_INITIAL_BACKOFF_MS,
-  LumenError,
+  LumenError
 } from "@lumenbazaar/shared";
 
 /**
@@ -67,7 +66,9 @@ export function computeBackoffDelay(
  * @param input - Webhook delivery job input
  * @returns Delivery result with retry instructions
  */
-export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<WebhookDeliveryResult> {
+export async function deliverWebhook(
+  input: WebhookDeliveryJobInput
+): Promise<WebhookDeliveryResult> {
   const startTime = Date.now();
   const rawBody = JSON.stringify(input.payload);
   const timestamp = new Date().toISOString();
@@ -86,9 +87,9 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
       ? {
           "x-lumenbazaar-signature-previous": input.previousSecrets
             .map((secret) => computeWebhookSignature(secret, timestamp, rawBody))
-            .join(","),
+            .join(",")
         }
-      : {}),
+      : {})
   };
 
   try {
@@ -96,9 +97,9 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
       method: "POST",
       headers,
       body: rawBody,
-      timeout: WEBHOOK_DELIVERY_REQUEST_TIMEOUT_MS,
+      signal: AbortSignal.timeout(WEBHOOK_DELIVERY_REQUEST_TIMEOUT_MS),
       // Explicitly disable redirects to prevent SSRF/bounce attacks
-      redirect: "error",
+      redirect: "error"
     });
 
     const latencyMs = Date.now() - startTime;
@@ -106,9 +107,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
 
     // Truncate and redact response body (max 500 chars)
     const responseBodyTruncated =
-      responseText.length > 500
-        ? responseText.substring(0, 500) + "..."
-        : responseText;
+      responseText.length > 500 ? responseText.substring(0, 500) + "..." : responseText;
 
     const success = response.ok; // 2xx status
 
@@ -117,7 +116,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
         success: true,
         statusCode: response.status,
         latencyMs,
-        shouldRetry: false,
+        shouldRetry: false
       };
     }
 
@@ -137,9 +136,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
       latencyMs,
       responseBodyTruncated,
       shouldRetry,
-      nextAttemptDelayMs: shouldRetry
-        ? computeBackoffDelay(input.attemptNumber)
-        : undefined,
+      ...(shouldRetry ? { nextAttemptDelayMs: computeBackoffDelay(input.attemptNumber) } : {})
     };
   } catch (error) {
     const latencyMs = Date.now() - startTime;
@@ -157,7 +154,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
         "invalid url",
         "malformed",
         "invalid_argument",
-        "unsupported protocol",
+        "unsupported protocol"
       ];
 
       shouldRetry =
@@ -174,7 +171,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
       latencyMs,
       errorClass,
       shouldRetry,
-      nextAttemptDelayMs,
+      ...(nextAttemptDelayMs !== undefined ? { nextAttemptDelayMs } : {})
     };
   }
 }
@@ -211,7 +208,7 @@ export function redactSensitiveHeaders(headers: Record<string, string>): Record<
     /^cookie$/i,
     /^set-cookie$/i,
     /^x-api-key$/i,
-    /^x-auth-token$/i,
+    /^x-auth-token$/i
   ];
 
   for (const [key, value] of Object.entries(headers)) {
@@ -245,9 +242,14 @@ export function createWebhookDeliveryAttemptRecord(
     requestUrl: url,
     requestHeaders: redactSensitiveHeaders(headers),
     statusCode: result.statusCode ?? null,
-    responseBodyTruncated: result.responseBodyTruncated ?? null,
+    responseBodyTruncated:
+      result.responseBodyTruncated !== undefined && result.responseBodyTruncated !== null
+        ? result.responseBodyTruncated.length > 500
+          ? result.responseBodyTruncated.substring(0, 500) + "..."
+          : result.responseBodyTruncated
+        : null,
     latencyMs: result.latencyMs,
     errorClass: result.errorClass ?? null,
-    createdAt: new Date().toISOString(),
+    createdAt: new Date().toISOString()
   };
 }

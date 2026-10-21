@@ -21,8 +21,7 @@ const execAsync = promisify(exec);
 
 const SCHEMA_PATH = "prisma/schema.prisma";
 const MAINTENANCE_DB_URL =
-  process.env.MAINTENANCE_DB_URL ||
-  "postgresql://postgres:postgres@localhost:5432/postgres";
+  process.env.MAINTENANCE_DB_URL || "postgresql://postgres:postgres@localhost:5432/postgres";
 
 /**
  * Parse PostgreSQL connection URL components
@@ -43,9 +42,9 @@ function parsePostgresUrl(url) {
  */
 function buildPsqlCommand(url, query) {
   const params = parsePostgresUrl(url);
-  const pgpassFile = [
-    `${params.host}:${params.port}:*:${params.user}:${params.password}`
-  ].join(":");
+  const pgpassFile = [`${params.host}:${params.port}:*:${params.user}:${params.password}`].join(
+    ":"
+  );
 
   // Use PGPASSWORD environment variable to avoid password prompt
   return `PGPASSWORD="${params.password}" psql -h ${params.host} -p ${params.port} -U ${params.user} -d ${params.database} -c "${query}"`;
@@ -61,10 +60,7 @@ async function createTestDatabase(name = null) {
 
   console.log(`Creating disposable test database: ${dbName}`);
 
-  const createCommand = buildPsqlCommand(
-    MAINTENANCE_DB_URL,
-    `CREATE DATABASE ${dbName};`
-  );
+  const createCommand = buildPsqlCommand(MAINTENANCE_DB_URL, `CREATE DATABASE ${dbName};`);
 
   try {
     const { stdout, stderr } = await execAsync(createCommand);

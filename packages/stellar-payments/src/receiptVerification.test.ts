@@ -212,17 +212,17 @@ describe("Receipt Verification", () => {
     idempotencyKey: "idem-000",
     resourceId: "resource-111",
     sellerId: "seller-222",
-    network: "testnet",
+    network: "stellar:testnet",
     assetCode: "USDC",
     assetIssuer: "GBRPYHIL2CI3WHZALSZ5XJSWMURMJG7ZFQCW5ENMTL5JNXKF3KKV7RW",
-    amount: new Decimal("100.0000000"),
+    amount: "100.0000000",
     payTo: "GISSUER123",
     status: "received",
     failureCode: null,
     failureReason: null,
     expiresAtLedger: null,
-    createdAt: new Date("2024-10-17T10:00:00Z"),
-    updatedAt: new Date("2024-10-17T10:00:00Z"),
+    createdAt: "2024-10-17T10:00:00Z",
+    updatedAt: "2024-10-17T10:00:00Z",
     ...overrides
   });
 
@@ -232,17 +232,17 @@ describe("Receipt Verification", () => {
     paymentAttemptId: "attempt-123",
     transactionHash: "tx-hash-abc123",
     ledger: 12345,
-    network: "testnet",
-    amount: new Decimal("100.0000000"),
+    network: "stellar:testnet",
+    amount: "100.0000000",
     assetCode: "USDC",
     assetIssuer: "GBRPYHIL2CI3WHZALSZ5XJSWMURMJG7ZFQCW5ENMTL5JNXKF3KKV7RW",
     status: "confirmed",
     reconciliationState: "reconciled",
     reconciliationReason: null,
     reconciliationAttempts: 1,
-    lastReconciledAt: new Date("2024-10-17T10:05:00Z"),
-    settledAt: new Date("2024-10-17T10:05:00Z"),
-    createdAt: new Date("2024-10-17T10:00:00Z"),
+    lastReconciledAt: "2024-10-17T10:05:00Z",
+    settledAt: "2024-10-17T10:05:00Z",
+    createdAt: "2024-10-17T10:00:00Z",
     ...overrides
   });
 
@@ -279,8 +279,8 @@ describe("Receipt Verification", () => {
       failureCode: attempt.failureCode,
       failureReason: attempt.failureReason,
       evidenceHash: digest,
-      createdAt: new Date("2024-10-17T10:05:00Z"),
-      updatedAt: new Date("2024-10-17T10:05:00Z"),
+      createdAt: "2024-10-17T10:05:00Z",
+      updatedAt: "2024-10-17T10:05:00Z",
       ...overrides
     };
   };
@@ -371,7 +371,7 @@ describe("Receipt Verification", () => {
       const attempt = createMockAttempt();
       const settlement = createMockSettlement();
       const receipt = createMockReceipt(attempt, settlement, {
-        amount: new Decimal("50.0000000")
+        amount: "50.0000000"
       });
 
       const result = verifyReceiptEvidence(receipt, attempt, settlement);

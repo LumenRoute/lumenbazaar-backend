@@ -69,8 +69,8 @@ export class ReceiptVerificationService {
     // Re-derive evidence and perform verification
     const verificationResult = verifyReceiptEvidence(
       receiptId as any, // We'll pass receipt-like object
-      paymentAttempt,
-      settlement
+      paymentAttempt as any,
+      settlement as any
     );
 
     return verificationResult;
@@ -102,9 +102,9 @@ export class ReceiptVerificationService {
     const results = receipts.map((receipt) => {
       const settlement = receipt.paymentAttempt?.settlement || null;
       const verificationResult = verifyReceiptEvidence(
-        receipt,
-        receipt.paymentAttempt,
-        settlement
+        receipt as any,
+        receipt.paymentAttempt as any,
+        settlement as any
       );
 
       return {
