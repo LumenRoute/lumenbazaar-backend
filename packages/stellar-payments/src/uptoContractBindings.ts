@@ -57,6 +57,17 @@ export type UptoSessionContractBindings = {
   settleSession: (
     input: UptoContractSettleSessionInput
   ) => Promise<UptoContractSettleSessionResult>;
+  getSessionState?: (
+    contractId: string,
+    contractSessionId: string
+  ) => Promise<
+    | {
+        status: "open" | "settled" | "expired";
+        ledger?: number;
+        transactionHash?: string;
+      }
+    | undefined
+  >;
 };
 
 export type GeneratedUptoSessionClient = {
@@ -597,6 +608,8 @@ export function createGeneratedUptoSessionBindings(
 }
 
 export function createLocalUptoSessionContractBindings(): UptoSessionContractBindings {
+  const settledSessions = new Map<string, { ledger: number; transactionHash: string }>();
+
   return {
     async createSession(input) {
       assertStellarPublicKey(input.buyer, "buyer");
@@ -623,10 +636,23 @@ export function createLocalUptoSessionContractBindings(): UptoSessionContractBin
       if (input.seller) {
         assertStellarPublicKey(input.seller, "seller");
       }
+      const txHash = contractTransactionHash(input.contractSessionId, input.usageHash);
+      settledSessions.set(input.contractSessionId, { ledger: 1, transactionHash: txHash });
       return {
         ledger: 1,
-        transactionHash: contractTransactionHash(input.contractSessionId, input.usageHash)
+        transactionHash: txHash
       };
+    },
+    async getSessionState(_contractId, contractSessionId) {
+      const settled = settledSessions.get(contractSessionId);
+      if (settled) {
+        return {
+          status: "settled",
+          ledger: settled.ledger,
+          transactionHash: settled.transactionHash
+        };
+      }
+      return { status: "open" };
     }
   };
 }

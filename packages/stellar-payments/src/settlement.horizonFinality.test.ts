@@ -34,7 +34,7 @@ describe("Settlement with Horizon Finality Verification", () => {
         inclusionFeeStroops: 1000
       },
       redisUrl: "redis://localhost:6379"
-    } as unknown as AppConfig;
+    } as AppConfig;
 
     attemptStore = new InMemoryPaymentAttemptStore();
     settlementStore = new InMemorySettlementStore();
@@ -67,7 +67,7 @@ describe("Settlement with Horizon Finality Verification", () => {
     // Create a verified payment attempt
     await attemptStore.createVerifiedAttempt({
       paymentHash: "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
-      network: "stellar:testnet",
+      network: "testnet",
       assetCode: "USDC",
       assetIssuer: "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
       amount: "100.0000000",
@@ -80,12 +80,12 @@ describe("Settlement with Horizon Finality Verification", () => {
     const settlementRequest = {
       x402Version: 2,
       paymentPayload: {
-        network: "stellar:testnet",
+        network: "testnet",
         payer: "GBMFJBSX4UYXB3DQRHLKK6K5SNOKNW7TIZ2LJ7SLGKWHP46JBNVPPQH7",
         payerSignature: "test_signature"
       },
       paymentRequirements: {
-        network: "stellar:testnet",
+        network: "testnet",
         payTo: "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
         amount: "100.0000000",
         assetCode: "USDC",
@@ -104,7 +104,10 @@ describe("Settlement with Horizon Finality Verification", () => {
     expect(result.ledger).toBe(12345678);
 
     // Verify settlement record exists in store
-    const settlement = await settlementStore.getSettlementByTransactionHash(result.transactionHash);
+    const settlement = await settlementStore.getSettlementByTransactionHash(
+      result.transactionHash,
+      result.network
+    );
     expect(settlement).toBeDefined();
     expect(settlement?.status).toBe("confirmed");
     expect(settlement?.ledger).toBe(12345678);
@@ -114,7 +117,7 @@ describe("Settlement with Horizon Finality Verification", () => {
     // Create a verified payment attempt
     await attemptStore.createVerifiedAttempt({
       paymentHash: "xyz789uvw123xyz789uvw123xyz789uvw123xyz789uvw123xyz789uvw123xyz7",
-      network: "stellar:testnet",
+      network: "testnet",
       assetCode: "USDC",
       assetIssuer: "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
       amount: "50.0000000",
@@ -149,12 +152,12 @@ describe("Settlement with Horizon Finality Verification", () => {
     const settlementRequest = {
       x402Version: 2,
       paymentPayload: {
-        network: "stellar:testnet",
+        network: "testnet",
         payer: "GBMFJBSX4UYXB3DQRHLKK6K5SNOKNW7TIZ2LJ7SLGKWHP46JBNVPPQH7",
         payerSignature: "test_signature"
       },
       paymentRequirements: {
-        network: "stellar:testnet",
+        network: "testnet",
         payTo: "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
         amount: "50.0000000",
         assetCode: "USDC",
@@ -167,7 +170,10 @@ describe("Settlement with Horizon Finality Verification", () => {
     await expect(timeoutService.settle(settlementRequest)).rejects.toThrow("SETTLEMENT_FAILED");
 
     // Verify settlement was recorded with timed_out status
-    const settlement = await settlementStore.getSettlementByTransactionHash("timeout_tx_hash");
+    const settlement = await settlementStore.getSettlementByTransactionHash(
+      "timeout_tx_hash",
+      "stellar:testnet"
+    );
     expect(settlement?.status).toBe("timed_out");
   });
 
@@ -177,7 +183,7 @@ describe("Settlement with Horizon Finality Verification", () => {
     // Create first verified attempt
     await attemptStore.createVerifiedAttempt({
       paymentHash,
-      network: "stellar:testnet",
+      network: "testnet",
       assetCode: "USDC",
       assetIssuer: "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
       amount: "75.0000000",
@@ -189,12 +195,12 @@ describe("Settlement with Horizon Finality Verification", () => {
     const settlementRequest = {
       x402Version: 2,
       paymentPayload: {
-        network: "stellar:testnet",
+        network: "testnet",
         payer: "GBMFJBSX4UYXB3DQRHLKK6K5SNOKNW7TIZ2LJ7SLGKWHP46JBNVPPQH7",
         payerSignature: "test_signature"
       },
       paymentRequirements: {
-        network: "stellar:testnet",
+        network: "testnet",
         payTo: "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
         amount: "75.0000000",
         assetCode: "USDC",
@@ -218,7 +224,7 @@ describe("Settlement with Horizon Finality Verification", () => {
   it("should mark settlement as requiring review if on-chain verification fails", async () => {
     await attemptStore.createVerifiedAttempt({
       paymentHash: "failed_verification_123failed_verification_123failed_verification_1",
-      network: "stellar:testnet",
+      network: "testnet",
       assetCode: "USDC",
       assetIssuer: "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
       amount: "25.0000000",
@@ -252,12 +258,12 @@ describe("Settlement with Horizon Finality Verification", () => {
     const settlementRequest = {
       x402Version: 2,
       paymentPayload: {
-        network: "stellar:testnet",
+        network: "testnet",
         payer: "GBMFJBSX4UYXB3DQRHLKK6K5SNOKNW7TIZ2LJ7SLGKWHP46JBNVPPQH7",
         payerSignature: "test_signature"
       },
       paymentRequirements: {
-        network: "stellar:testnet",
+        network: "testnet",
         payTo: "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
         amount: "25.0000000",
         assetCode: "USDC",
@@ -268,8 +274,10 @@ describe("Settlement with Horizon Finality Verification", () => {
 
     await expect(failedService.settle(settlementRequest)).rejects.toThrow("SETTLEMENT_FAILED");
 
-    const settlement =
-      await settlementStore.getSettlementByTransactionHash("failed_verification_tx");
+    const settlement = await settlementStore.getSettlementByTransactionHash(
+      "failed_verification_tx",
+      "stellar:testnet"
+    );
     expect(settlement?.status).toBe("failed");
   });
 });

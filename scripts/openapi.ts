@@ -28,6 +28,10 @@ export function resolveTargetCommit(checkOnly: boolean, existingCommit?: string)
     return existingCommit;
   }
 
+  if (checkOnly && existingCommit && existingCommit !== "unspecified") {
+    return existingCommit;
+  }
+
   const envCommit =
     process.env.RELEASE_COMMIT ??
     process.env.GIT_COMMIT ??

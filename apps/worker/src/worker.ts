@@ -5,11 +5,12 @@ import {
   getPrismaClient,
   type AppConfig,
   loadConfig,
-  redactSensitiveText
+  redactSensitiveText,
+  runWithTraceparent,
+  safeIdentifierHash,
+  startTraceSpan
 } from "@lumenbazaar/shared";
 import { settlementReconciliationJobId } from "@lumenbazaar/stellar-payments";
-
-import { enqueueSettlementConfirmation } from "./jobQueue.js";
 import { createBullMqConnection, createBullMqQueue, queueNames, type QueueName } from "./queues.js";
 import { handleNetworkHealth, type NetworkHealthJobData } from "./workers/networkHealth.js";
 import { handleOutboxRelay, type OutboxRelayJobData } from "./workers/outboxRelay.js";
@@ -26,12 +27,39 @@ import { handleSearchSync, type SearchSyncJobData } from "./workers/searchSync.j
 import {
   handleSettlementConfirmation,
   markReconciliationDeadLetter,
+  resumePendingSettlements,
   type SettlementConfirmationJobData
 } from "./workers/settlementConfirmation.js";
 import {
   handleStalePaymentCleanup,
   type StalePaymentCleanupJobData
 } from "./workers/stalePaymentCleanup.js";
+
+async function traceWorkerJob(
+  job: Job<Record<string, unknown>>,
+  queueName: QueueName,
+  callback: () => Promise<void>
+) {
+  const parent = typeof job.data.traceparent === "string" ? job.data.traceparent : undefined;
+  return runWithTraceparent(parent, async () => {
+    const settlementHash = safeIdentifierHash(job.data.settlementId);
+    const receiptHash = safeIdentifierHash(job.data.receiptId);
+    const span = startTraceSpan("worker.job", {
+      "messaging.destination.name": queueName,
+      "messaging.operation": "process",
+      "app.job.name": job.name,
+      ...(settlementHash === undefined ? {} : { "app.settlement.id_hash": settlementHash }),
+      ...(receiptHash === undefined ? {} : { "app.receipt.id_hash": receiptHash })
+    }, 4);
+    return span.run(async () => {
+      try {
+        await callback();
+      } finally {
+        span.end();
+      }
+    });
+  });
+}
 
 export type WorkerJob = {
   id: string;
@@ -102,10 +130,11 @@ export class BullMqWorkerBackend implements WorkerBackend {
     this.workers.push(
       new Worker(
         queueNames.resourceIndexing,
-        async (job: Job<Record<string, unknown>>) => {
-          await handleResourceIndexing(job as Job<ResourceIndexingJobData>);
-          this.recordProcessedJob(job, queueNames.resourceIndexing);
-        },
+        async (job: Job<Record<string, unknown>>) =>
+          traceWorkerJob(job, queueNames.resourceIndexing, async () => {
+            await handleResourceIndexing(job as Job<ResourceIndexingJobData>);
+            this.recordProcessedJob(job, queueNames.resourceIndexing);
+          }),
         {
           connection: this.connection
         }
@@ -115,10 +144,14 @@ export class BullMqWorkerBackend implements WorkerBackend {
     // Add settlement confirmation worker
     const settlementWorker = new Worker(
       queueNames.settlementConfirmation,
-      async (job: Job<Record<string, unknown>>) => {
-        await handleSettlementConfirmation(job as Job<SettlementConfirmationJobData>, this.config);
-        this.recordProcessedJob(job, queueNames.settlementConfirmation);
-      },
+      async (job: Job<Record<string, unknown>>) =>
+        traceWorkerJob(job, queueNames.settlementConfirmation, async () => {
+          await handleSettlementConfirmation(
+            job as Job<SettlementConfirmationJobData>,
+            this.config
+          );
+          this.recordProcessedJob(job, queueNames.settlementConfirmation);
+        }),
       {
         connection: this.connection
       }
@@ -134,10 +167,11 @@ export class BullMqWorkerBackend implements WorkerBackend {
     this.workers.push(
       new Worker(
         queueNames.searchSync,
-        async (job: Job<Record<string, unknown>>) => {
-          await handleSearchSync(job as Job<SearchSyncJobData>);
-          this.recordProcessedJob(job, queueNames.searchSync);
-        },
+        async (job: Job<Record<string, unknown>>) =>
+          traceWorkerJob(job, queueNames.searchSync, async () => {
+            await handleSearchSync(job as Job<SearchSyncJobData>);
+            this.recordProcessedJob(job, queueNames.searchSync);
+          }),
         {
           connection: this.connection
         }
@@ -148,10 +182,11 @@ export class BullMqWorkerBackend implements WorkerBackend {
     this.workers.push(
       new Worker(
         queueNames.networkHealth,
-        async (job: Job<Record<string, unknown>>) => {
-          await handleNetworkHealth(job as Job<NetworkHealthJobData>);
-          this.recordProcessedJob(job, queueNames.networkHealth);
-        },
+        async (job: Job<Record<string, unknown>>) =>
+          traceWorkerJob(job, queueNames.networkHealth, async () => {
+            await handleNetworkHealth(job as Job<NetworkHealthJobData>);
+            this.recordProcessedJob(job, queueNames.networkHealth);
+          }),
         {
           connection: this.connection
         }
@@ -162,10 +197,11 @@ export class BullMqWorkerBackend implements WorkerBackend {
     this.workers.push(
       new Worker(
         queueNames.outboxRelay,
-        async (job: Job<Record<string, unknown>>) => {
-          await handleOutboxRelay(job as Job<OutboxRelayJobData>, this.config);
-          this.recordProcessedJob(job, queueNames.outboxRelay);
-        },
+        async (job: Job<Record<string, unknown>>) =>
+          traceWorkerJob(job, queueNames.outboxRelay, async () => {
+            await handleOutboxRelay(job as Job<OutboxRelayJobData>, this.config);
+            this.recordProcessedJob(job, queueNames.outboxRelay);
+          }),
         {
           connection: this.connection
         }
@@ -176,10 +212,11 @@ export class BullMqWorkerBackend implements WorkerBackend {
     this.workers.push(
       new Worker(
         queueNames.receiptFinalizer,
-        async (job: Job<Record<string, unknown>>) => {
-          await handleReceiptFinalizer(job as Job<ReceiptFinalizerJobData>);
-          this.recordProcessedJob(job, queueNames.receiptFinalizer);
-        },
+        async (job: Job<Record<string, unknown>>) =>
+          traceWorkerJob(job, queueNames.receiptFinalizer, async () => {
+            await handleReceiptFinalizer(job as Job<ReceiptFinalizerJobData>);
+            this.recordProcessedJob(job, queueNames.receiptFinalizer);
+          }),
         {
           connection: this.connection
         }
@@ -190,10 +227,11 @@ export class BullMqWorkerBackend implements WorkerBackend {
     this.workers.push(
       new Worker(
         queueNames.stalePaymentCleanup,
-        async (job: Job<Record<string, unknown>>) => {
-          await handleStalePaymentCleanup(job as Job<StalePaymentCleanupJobData>);
-          this.recordProcessedJob(job, queueNames.stalePaymentCleanup);
-        },
+        async (job: Job<Record<string, unknown>>) =>
+          traceWorkerJob(job, queueNames.stalePaymentCleanup, async () => {
+            await handleStalePaymentCleanup(job as Job<StalePaymentCleanupJobData>);
+            this.recordProcessedJob(job, queueNames.stalePaymentCleanup);
+          }),
         {
           connection: this.connection
         }
@@ -204,10 +242,11 @@ export class BullMqWorkerBackend implements WorkerBackend {
     this.workers.push(
       new Worker(
         queueNames.outboxCleanup,
-        async (job: Job<Record<string, unknown>>) => {
-          await handleOutboxCleanup(job as Job<OutboxCleanupJobData>, this.config);
-          this.recordProcessedJob(job, queueNames.outboxCleanup);
-        },
+        async (job: Job<Record<string, unknown>>) =>
+          traceWorkerJob(job, queueNames.outboxCleanup, async () => {
+            await handleOutboxCleanup(job as Job<OutboxCleanupJobData>, this.config);
+            this.recordProcessedJob(job, queueNames.outboxCleanup);
+          }),
         {
           connection: this.connection
         }
@@ -243,42 +282,7 @@ export class BullMqWorkerBackend implements WorkerBackend {
   }
 
   private async resumePendingSettlements() {
-    const db = getPrismaClient();
-    const attempts = await db.paymentAttempt.findMany({
-      where: {
-        OR: [
-          { status: "settling", settlement: null },
-          {
-            settlement: {
-              is: {
-                transactionHash: { not: null },
-                OR: [
-                  { reconciliationState: "pending" },
-                  { status: { in: ["pending", "submitted", "timed_out"] } }
-                ]
-              }
-            }
-          }
-        ]
-      },
-      include: { settlement: true },
-      take: 1000
-    });
-    for (const attempt of attempts) {
-      await enqueueSettlementConfirmation(this.settlementQueue, {
-        correlationId: attempt.correlationId,
-        paymentAttemptId: attempt.id,
-        network: attempt.network,
-        ...(attempt.settlement === null
-          ? {}
-          : {
-              settlementId: attempt.settlement.id,
-              ...(attempt.settlement.transactionHash === null
-                ? {}
-                : { transactionHash: attempt.settlement.transactionHash })
-            })
-      });
-    }
+    await resumePendingSettlements(getPrismaClient(), this.settlementQueue);
   }
 
   private async deadLetterSettlement(job: Job<SettlementConfirmationJobData>, error: Error) {
@@ -292,6 +296,7 @@ export class BullMqWorkerBackend implements WorkerBackend {
         sourceJobId: String(job.id),
         sourceQueue: queueNames.settlementConfirmation,
         correlationId: job.data.correlationId,
+        traceparent: (job.data as SettlementConfirmationJobData & { traceparent?: string }).traceparent,
         paymentAttemptId: job.data.paymentAttemptId,
         settlementId: job.data.settlementId,
         reason
