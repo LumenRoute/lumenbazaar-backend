@@ -1,4 +1,5 @@
 import { type Job } from "bullmq";
+import { type PrismaClient } from "@prisma/client";
 
 import { getPrismaClient, redactSensitiveText } from "@lumenbazaar/shared";
 
@@ -8,15 +9,22 @@ export type SearchSyncJobData = {
   network?: string;
 };
 
+export type SearchSyncDependencies = {
+  db?: PrismaClient;
+};
+
 /**
  * Search Sync Worker
  * Manages search document synchronization and rebuilding of search indexes
  */
-export async function handleSearchSync(job: Job<SearchSyncJobData>) {
+export async function handleSearchSync(
+  job: Job<SearchSyncJobData>,
+  dependencies: SearchSyncDependencies = {}
+) {
   const { action, resourceId, network } = job.data;
 
   try {
-    const db = getPrismaClient();
+    const db = dependencies.db ?? getPrismaClient();
 
     if (action === "rebuild") {
       job.log("Starting search index rebuild");
@@ -33,8 +41,19 @@ export async function handleSearchSync(job: Job<SearchSyncJobData>) {
       });
 
       let indexedCount = 0;
+      let excludedCount = 0;
       for (const resource of resources) {
         try {
+          // Re-read moderation state immediately before writing so a quarantine
+          // that lands while this rebuild is running cannot be overwritten by a
+          // stale in-memory view of the resource.
+          const current = await db.resource.findUnique({
+            where: { id: resource.id },
+            select: { moderationState: true }
+          });
+          const moderationState = current?.moderationState ?? resource.moderationState ?? "visible";
+          const visible = moderationState === "visible";
+
           // Build search document
           const body = buildSearchBody(resource);
           const ranking = buildRankingFields(resource);
@@ -48,24 +67,32 @@ export async function handleSearchSync(job: Job<SearchSyncJobData>) {
               body,
               ranking: ranking as never,
               indexedAt: new Date(),
-              stale: false
+              stale: !visible,
+              moderationState
             },
             update: {
               body,
               ranking: ranking as never,
               indexedAt: new Date(),
-              stale: false
+              stale: !visible,
+              moderationState
             }
           });
 
-          indexedCount++;
+          if (visible) {
+            indexedCount++;
+          } else {
+            excludedCount++;
+          }
         } catch (err) {
           const errorMsg = redactSensitiveText(err instanceof Error ? err.message : String(err));
           job.log(`Failed to index resource ${resource.id}: ${errorMsg}`);
         }
       }
 
-      job.log(`Search index rebuild complete: ${indexedCount} resources indexed`);
+      job.log(
+        `Search index rebuild complete: ${indexedCount} resources indexed, ${excludedCount} excluded from discovery`
+      );
 
       // Record the sync event
       await db.catalogEvent.create({
@@ -76,6 +103,7 @@ export async function handleSearchSync(job: Job<SearchSyncJobData>) {
           metadata: {
             action: "rebuild",
             indexedCount,
+            excludedCount,
             network: network ?? "all"
           }
         }
@@ -131,7 +159,7 @@ export async function handleSearchSync(job: Job<SearchSyncJobData>) {
 
     // Record failure
     try {
-      const db = getPrismaClient();
+      const db = dependencies.db ?? getPrismaClient();
       const failureData: {
         resourceId?: string;
         type: string;

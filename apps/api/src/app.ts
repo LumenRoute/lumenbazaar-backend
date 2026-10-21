@@ -49,6 +49,7 @@ import { CatalogValidationService } from "./services/catalogValidation.js";
 import { ConformanceRunService, createServiceConformanceRunner } from "./services/conformance.js";
 import { DiscoveryService } from "./services/discovery.js";
 import { createMetricsService, type MetricsService } from "./services/metrics.js";
+import { ModerationService } from "./services/moderation.js";
 import { createOperationalMetricsRefresher } from "./services/operationalMetrics.js";
 import { createRuntimeRateLimitService, type RateLimitService } from "./services/rateLimit.js";
 import {
@@ -86,6 +87,7 @@ export type BuildApiAppOptions = {
   catalogService?: CatalogService;
   discoveryService?: DiscoveryService;
   searchService?: SearchService;
+  moderationService?: ModerationService;
   conformanceService?: ConformanceRunService;
   auditLogService?: AuditLogService;
   rateLimitService?: RateLimitService;
@@ -269,6 +271,9 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
       metrics: metricsService
     });
   const discoveryService = options.discoveryService ?? new DiscoveryService(resourceService);
+  const moderationService =
+    options.moderationService ??
+    new ModerationService(resourceService, catalogPersistence.moderationStore, auditLogService);
   const searchService =
     options.searchService ??
     new SearchService(resourceService, metricsService, catalogPersistence.searchDocumentStore);
@@ -366,7 +371,7 @@ export function buildApiApp(options: BuildApiAppOptions = {}) {
   registerPaymentSessionRoutes(app, { paymentSessionService });
   registerSellerRoutes(app, { sellerService, sellerApiKeyService });
   registerWebhookRoutes(app, { webhookService: options.webhookService });
-  registerResourceRoutes(app, { resourceService });
+  registerResourceRoutes(app, { resourceService, moderationService });
   registerDiscoveryRoutes(app, {
     catalogValidationService,
     catalogService,

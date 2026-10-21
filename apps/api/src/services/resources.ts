@@ -7,6 +7,8 @@ import {
   LumenError,
   type AppConfig,
   type JsonObject,
+  type ModerationReasonCode,
+  type ModerationState,
   type PaymentRequirement,
   type Resource,
   type ResourceSchema,
@@ -51,6 +53,7 @@ export const updateResourceSchema = createResourceSchema.partial().omit({ seller
 export const listResourcesSchema = z.object({
   sellerId: z.string().optional(),
   status: z.enum(["draft", "active", "inactive"]).optional(),
+  moderationState: z.enum(["visible", "quarantined", "under_appeal"]).optional(),
   network: z.enum(["stellar:testnet", "stellar:pubnet"]).optional(),
   asset: z.string().optional(),
   type: z.enum(["http", "mcp"]).optional(),
@@ -80,6 +83,15 @@ export type ResourceStore = {
     resourceId: string,
     patch: UpdateResourceInput,
     metadata: JsonObject
+  ) => Promise<{ resource: Resource; version: ResourceVersion }>;
+  updateVersionModeration: (
+    resourceId: string,
+    version: number,
+    update: {
+      moderationState: ModerationState;
+      quarantineReasonCode?: ModerationReasonCode | null;
+      quarantinedAt: string | null;
+    }
   ) => Promise<{ resource: Resource; version: ResourceVersion }>;
   createSchema: (resource: Resource) => Promise<ResourceSchema>;
   createPaymentRequirement: (resource: Resource) => Promise<PaymentRequirement>;
@@ -118,6 +130,7 @@ export class InMemoryResourceStore implements ResourceStore {
       outputSchema: input.outputSchema as JsonObject,
       extensions: input.extensions as JsonObject,
       status: input.status,
+      moderationState: "visible",
       createdAt: now,
       updatedAt: now
     };
@@ -157,6 +170,7 @@ export class InMemoryResourceStore implements ResourceStore {
       outputSchema: (input.outputSchema ?? existing.outputSchema) as JsonObject,
       extensions: (input.extensions ?? existing.extensions) as JsonObject,
       status: input.status ?? existing.status,
+      moderationState: existing.moderationState,
       updatedAt: new Date().toISOString()
     };
 
@@ -196,6 +210,9 @@ export class InMemoryResourceStore implements ResourceStore {
       resourceId: resource.id,
       version: existing.length + 1,
       metadata,
+      moderationState: resource.moderationState,
+      quarantineReasonCode: null,
+      quarantinedAt: null,
       createdAt: new Date().toISOString()
     };
 
@@ -212,7 +229,9 @@ export class InMemoryResourceStore implements ResourceStore {
   }
 
   async listVersions(resourceId: string) {
-    return [...(this.versions.get(resourceId) ?? [])].sort((left, right) => left.version - right.version);
+    return [...(this.versions.get(resourceId) ?? [])].sort(
+      (left, right) => left.version - right.version
+    );
   }
 
   async rollbackResource(resourceId: string, patch: UpdateResourceInput, metadata: JsonObject) {
@@ -221,13 +240,54 @@ export class InMemoryResourceStore implements ResourceStore {
       throw new LumenError("RESOURCE_NOT_FOUND", "Resource was not found.");
     }
     const updated: Resource = {
-      ...existing,
-      ...patch,
+      ...mergeResourcePatch(existing, patch),
       updatedAt: new Date().toISOString()
     };
     this.resources.set(resourceId, updated);
     const version = await this.createVersion(updated, metadata);
     return { resource: updated, version };
+  }
+
+  async updateVersionModeration(
+    resourceId: string,
+    version: number,
+    update: {
+      moderationState: ModerationState;
+      quarantineReasonCode?: ModerationReasonCode | null;
+      quarantinedAt: string | null;
+    }
+  ) {
+    const versions = this.versions.get(resourceId) ?? [];
+    const versionIndex = versions.findIndex((record) => record.version === version);
+    const existingVersion = versions[versionIndex];
+
+    if (existingVersion === undefined) {
+      throw new LumenError("RESOURCE_VERSION_NOT_FOUND", "Resource version was not found.");
+    }
+
+    const updatedVersion: ResourceVersion = {
+      ...existingVersion,
+      ...update,
+      quarantineReasonCode:
+        update.quarantineReasonCode === undefined
+          ? existingVersion.quarantineReasonCode
+          : update.quarantineReasonCode
+    };
+    versions[versionIndex] = updatedVersion;
+    this.versions.set(resourceId, versions);
+
+    const existingResource = this.resources.get(resourceId);
+    if (existingResource === undefined) {
+      throw new LumenError("RESOURCE_NOT_FOUND", "Resource was not found.");
+    }
+
+    const isLatestVersion = versions.at(-1)?.version === version;
+    const updatedResource: Resource = isLatestVersion
+      ? { ...existingResource, moderationState: update.moderationState }
+      : existingResource;
+    this.resources.set(resourceId, updatedResource);
+
+    return { resource: updatedResource, version: updatedVersion };
   }
 
   async createSchema(resource: Resource) {
@@ -274,7 +334,7 @@ export class ResourceService {
 
   async createResource(input: unknown, sellerContext?: { sellerId: string; auditable: boolean }) {
     const resource = normalizeResourceInput(createResourceSchema.parse(input), this.config);
-    
+
     // Enforce seller ownership when seller context is provided (authenticated request)
     if (sellerContext?.auditable && resource.sellerId !== sellerContext.sellerId) {
       await this.auditLogService?.record({
@@ -282,19 +342,16 @@ export class ResourceService {
         actorType: "seller",
         actorId: sellerContext.sellerId,
         targetType: "resource",
-        targetId: undefined,
+        targetId: null,
         metadata: {
           reason: "Attempted to create resource for different seller",
           attemptedSellerId: resource.sellerId,
           actualSellerId: sellerContext.sellerId
         }
       });
-      throw new LumenError(
-        "FORBIDDEN",
-        "API key cannot create resources for another seller."
-      );
+      throw new LumenError("FORBIDDEN", "API key cannot create resources for another seller.");
     }
-    
+
     const seller = await this.sellerService.getSeller(resource.sellerId);
     assertSafeResourceTarget(resource.url, resource.type, resource.routeTemplate, seller.domain);
     const created = await this.store.createResource(resource);
@@ -317,9 +374,13 @@ export class ResourceService {
     return resource;
   }
 
-  async updateResource(resourceId: string, input: unknown, sellerContext?: { sellerId: string; auditable: boolean }) {
+  async updateResource(
+    resourceId: string,
+    input: unknown,
+    sellerContext?: { sellerId: string; auditable: boolean }
+  ) {
     const existing = await this.getResource(resourceId);
-    
+
     // Enforce seller ownership when seller context is provided (authenticated request)
     if (sellerContext?.auditable && existing.sellerId !== sellerContext.sellerId) {
       await this.auditLogService?.record({
@@ -336,7 +397,7 @@ export class ResourceService {
       });
       throw new LumenError("FORBIDDEN", "API key does not own this resource.");
     }
-    
+
     const patch = updateResourceSchema.parse(input);
     const normalized = normalizeResourceInput(mergeResourcePatch(existing, patch), this.config);
 
@@ -352,7 +413,10 @@ export class ResourceService {
     return updated;
   }
 
-  async deleteResource(resourceId: string, sellerContext?: { sellerId: string; auditable: boolean }) {
+  async deleteResource(
+    resourceId: string,
+    sellerContext?: { sellerId: string; auditable: boolean }
+  ) {
     return this.updateResource(resourceId, { status: "inactive" }, sellerContext);
   }
 
@@ -375,9 +439,13 @@ export class ResourceService {
    * never modified; rollback creates a new immutable version containing the
    * restored data and queues it for reindexing.
    */
-  async rollbackResource(resourceId: string, targetVersion: number, sellerContext?: { sellerId: string; auditable: boolean }) {
+  async rollbackResource(
+    resourceId: string,
+    targetVersion: number,
+    sellerContext?: { sellerId: string; auditable: boolean }
+  ) {
     const existing = await this.getResource(resourceId);
-    
+
     // Enforce seller ownership when seller context is provided (authenticated request)
     if (sellerContext?.auditable && existing.sellerId !== sellerContext.sellerId) {
       await this.auditLogService?.record({
@@ -395,7 +463,7 @@ export class ResourceService {
       });
       throw new LumenError("FORBIDDEN", "API key does not own this resource.");
     }
-    
+
     const target = await this.store.getVersion(resourceId, targetVersion);
     if (target === undefined) {
       throw new LumenError("RESOURCE_VERSION_NOT_FOUND", "Resource version was not found.");
@@ -403,10 +471,7 @@ export class ResourceService {
 
     const latest = await this.store.getLatestVersion(resourceId);
     if (latest === undefined || target.version >= latest.version) {
-      throw new LumenError(
-        "CONFLICT",
-        "Can only roll back to an older historical version."
-      );
+      throw new LumenError("CONFLICT", "Can only roll back to an older historical version.");
     }
 
     const metadata: JsonObject = {
@@ -468,6 +533,8 @@ export function resourceMatchesFilters(resource: Resource, filters: ListResource
   return (
     (filters.sellerId === undefined || resource.sellerId === filters.sellerId) &&
     (filters.status === undefined || resource.status === filters.status) &&
+    (filters.moderationState === undefined ||
+      resource.moderationState === filters.moderationState) &&
     (filters.network === undefined || resource.network === filters.network) &&
     (filters.asset === undefined || resource.assetCode === filters.asset.toUpperCase()) &&
     (filters.type === undefined || resource.type === filters.type) &&
