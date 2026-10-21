@@ -88,6 +88,7 @@ export class SearchService {
       ranking: rankingFields(resource),
       indexedAt: now,
       stale: false,
+      moderationState: resource.moderationState,
       createdAt: now,
       updatedAt: now
     };
@@ -104,6 +105,7 @@ export class SearchService {
       const page = await this.resourceService.listResources({
         limit: 100,
         status: "active",
+        moderationState: "visible",
         ...(filters.network === undefined ? {} : { network: filters.network }),
         ...(filters.asset === undefined ? {} : { asset: filters.asset }),
         ...(filters.type === undefined ? {} : { type: filters.type }),
@@ -117,6 +119,7 @@ export class SearchService {
       );
       const documents = new Map(documentEntries);
       const ranked = page.resources
+        .filter((resource) => resource.moderationState === "visible")
         .map((resource) => {
           const document = documents.get(resource.id);
           const body = document?.body ?? buildSearchBody(resource);

@@ -15,6 +15,8 @@ import {
   type AppConfig,
   type CatalogEvent,
   type JsonObject,
+  type ModerationReasonCode,
+  type ModerationState,
   type PaymentRequirement,
   type Resource,
   type ResourceSchema,
@@ -43,9 +45,11 @@ import {
   type UpdateResourceInput
 } from "./resources.js";
 import {
-  InMemorySearchDocumentStore,
-  type SearchDocumentStore
-} from "./search.js";
+  InMemoryModerationStore,
+  PrismaModerationStore,
+  type ModerationStore
+} from "./moderation.js";
+import { InMemorySearchDocumentStore, type SearchDocumentStore } from "./search.js";
 import {
   InMemorySellerApiKeyStore,
   type SellerApiKeyRecord,
@@ -119,7 +123,12 @@ export class PrismaResourceStore implements ResourceStore {
     return this.db.$transaction(async (tx) => {
       const resource = mapResource(await tx.resource.create({ data: resourceCreateData(input) }));
       await tx.resourceVersion.create({
-        data: { resourceId: resource.id, version: 1, metadata: json(resourceToMetadata(resource)) }
+        data: {
+          resourceId: resource.id,
+          version: 1,
+          metadata: json(resourceToMetadata(resource)),
+          moderationState: resource.moderationState
+        }
       });
       await tx.resourceSchema.create({ data: resourceSchemaData(resource) });
       await tx.paymentRequirement.create({ data: paymentRequirementData(resource) });
@@ -148,7 +157,8 @@ export class PrismaResourceStore implements ResourceStore {
         data: {
           resourceId,
           version: (latest._max.version ?? 0) + 1,
-          metadata: json(resourceToMetadata(resource))
+          metadata: json(resourceToMetadata(resource)),
+          moderationState: resource.moderationState
         }
       });
       await tx.resourceSchema.create({ data: resourceSchemaData(resource) });
@@ -238,7 +248,8 @@ export class PrismaResourceStore implements ResourceStore {
           data: {
             resourceId,
             version: (latest._max.version ?? 0) + 1,
-            metadata: json(metadata)
+            metadata: json(metadata),
+            moderationState: resource.moderationState
           }
         })
       );
@@ -249,6 +260,59 @@ export class PrismaResourceStore implements ResourceStore {
         data: { stale: true }
       });
       return { resource, version };
+    });
+  }
+
+  async updateVersionModeration(
+    resourceId: string,
+    version: number,
+    update: {
+      moderationState: ModerationState;
+      quarantineReasonCode?: ModerationReasonCode | null;
+      quarantinedAt: string | null;
+    }
+  ) {
+    return this.db.$transaction(async (tx) => {
+      const existingVersion = await tx.resourceVersion.findFirst({
+        where: { resourceId, version }
+      });
+      if (existingVersion === null) {
+        throw new LumenError("RESOURCE_VERSION_NOT_FOUND", "Resource version was not found.");
+      }
+
+      const versionRow = await tx.resourceVersion.update({
+        where: { id: existingVersion.id },
+        data: {
+          moderationState: update.moderationState,
+          ...(update.quarantineReasonCode === undefined
+            ? {}
+            : { quarantineReasonCode: update.quarantineReasonCode }),
+          quarantinedAt: update.quarantinedAt === null ? null : new Date(update.quarantinedAt)
+        }
+      });
+      const latest = await tx.resourceVersion.findFirst({
+        where: { resourceId },
+        orderBy: { version: "desc" }
+      });
+      const isLatestVersion = latest?.version === version;
+      const resourceRow = isLatestVersion
+        ? await tx.resource.update({
+            where: { id: resourceId },
+            data: { moderationState: update.moderationState }
+          })
+        : await tx.resource.findUniqueOrThrow({ where: { id: resourceId } });
+
+      if (isLatestVersion) {
+        await tx.searchDocument.updateMany({
+          where: { resourceId },
+          data: { moderationState: update.moderationState, stale: true }
+        });
+      }
+
+      return {
+        resource: mapResource(resourceRow),
+        version: mapResourceVersion(versionRow)
+      };
     });
   }
 
@@ -337,7 +401,10 @@ export class PrismaSellerApiKeyStore implements SellerApiKeyStore {
 export class PrismaCatalogEventStore implements CatalogEventStore {
   constructor(private readonly db: PrismaClient) {}
 
-  async createCatalogEvent(input: Omit<CatalogEvent, "id" | "createdAt">, tx?: Prisma.TransactionClient) {
+  async createCatalogEvent(
+    input: Omit<CatalogEvent, "id" | "createdAt">,
+    tx?: Prisma.TransactionClient
+  ) {
     // Use provided transaction client if available, otherwise use root client
     const client = tx ?? this.db;
     return mapCatalogEvent(
@@ -367,14 +434,16 @@ export class PrismaSearchDocumentStore implements SearchDocumentStore {
           body: document.body,
           ranking: json(document.ranking),
           indexedAt: new Date(document.indexedAt ?? document.updatedAt),
-          stale: document.stale
+          stale: document.stale,
+          moderationState: document.moderationState
         },
         update: {
           sellerId: document.sellerId,
           body: document.body,
           ranking: json(document.ranking),
           indexedAt: new Date(document.indexedAt ?? document.updatedAt),
-          stale: document.stale
+          stale: document.stale,
+          moderationState: document.moderationState
         }
       })
     );
@@ -404,13 +473,15 @@ export function createCatalogPersistence(config: AppConfig) {
     config.nodeEnv !== "production" ||
     config.lumenEnv === "local"
   ) {
-  return {
-    sellerStore: new InMemorySellerStore() as SellerStore,
-    sellerApiKeyStore: new InMemorySellerApiKeyStore() as SellerApiKeyStore,
-    resourceStore: new InMemoryResourceStore() as ResourceStore,
+    const resourceStore = new InMemoryResourceStore();
+    return {
+      sellerStore: new InMemorySellerStore() as SellerStore,
+      sellerApiKeyStore: new InMemorySellerApiKeyStore() as SellerApiKeyStore,
+      resourceStore: resourceStore as ResourceStore,
       eventStore: new InMemoryCatalogEventStore() as CatalogEventStore,
       searchDocumentStore: new InMemorySearchDocumentStore() as SearchDocumentStore,
       indexingQueue: new InMemoryResourceIndexingQueue() as ResourceIndexingQueue,
+      moderationStore: new InMemoryModerationStore(resourceStore) as ModerationStore,
       close: async () => undefined
     };
   }
@@ -418,13 +489,15 @@ export function createCatalogPersistence(config: AppConfig) {
   const db = new PrismaClient({ datasources: { db: { url: config.databaseUrl } } });
   const redis = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
   const queue = new Queue<ResourceIndexingJob>("resource-indexing", { connection: redis });
+  const resourceStore = new PrismaResourceStore(db);
   return {
     sellerStore: new PrismaSellerStore(db) as SellerStore,
     sellerApiKeyStore: new PrismaSellerApiKeyStore(db) as SellerApiKeyStore,
-    resourceStore: new PrismaResourceStore(db) as ResourceStore,
+    resourceStore: resourceStore as ResourceStore,
     eventStore: new PrismaCatalogEventStore(db) as CatalogEventStore,
     searchDocumentStore: new PrismaSearchDocumentStore(db) as SearchDocumentStore,
     indexingQueue: new BullMqResourceIndexingQueue(queue) as ResourceIndexingQueue,
+    moderationStore: new PrismaModerationStore(db, resourceStore) as ModerationStore,
     close: async () => {
       await queue.close();
       await redis.quit();
@@ -518,13 +591,21 @@ function mapResource(row: Prisma.ResourceGetPayload<object>): Resource {
     outputSchema: row.outputSchema as JsonObject,
     extensions: row.extensions as JsonObject,
     status: row.status as Resource["status"],
+    moderationState: row.moderationState as ModerationState,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   };
 }
 
 function mapResourceVersion(row: Prisma.ResourceVersionGetPayload<object>): ResourceVersion {
-  return { ...row, metadata: row.metadata as JsonObject, createdAt: row.createdAt.toISOString() };
+  return {
+    ...row,
+    metadata: row.metadata as JsonObject,
+    moderationState: row.moderationState as ModerationState,
+    quarantineReasonCode: row.quarantineReasonCode as ModerationReasonCode | null,
+    quarantinedAt: row.quarantinedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString()
+  };
 }
 
 function mapResourceSchema(row: Prisma.ResourceSchemaGetPayload<object>): ResourceSchema {
@@ -565,6 +646,7 @@ function mapSearchDocument(row: Prisma.SearchDocumentGetPayload<object>): Search
     ...row,
     ranking: row.ranking as JsonObject,
     indexedAt: row.indexedAt?.toISOString() ?? null,
+    moderationState: row.moderationState as ModerationState,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   };

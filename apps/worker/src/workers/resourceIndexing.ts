@@ -26,6 +26,11 @@ export async function handleResourceIndexing(job: Job<ResourceIndexingJobData>) 
       throw new Error(`Resource not found: ${resourceId}`);
     }
 
+    // Moderation state is read from the database immediately before indexing.
+    // A job that was queued before a quarantine must not restore visibility.
+    const moderationState = resource.moderationState ?? "visible";
+    const visible = moderationState === "visible";
+
     // Build search document
     const body = buildSearchBody(resource);
     const ranking = buildRankingFields(resource);
@@ -39,13 +44,15 @@ export async function handleResourceIndexing(job: Job<ResourceIndexingJobData>) 
         body,
         ranking: ranking as never,
         indexedAt: new Date(),
-        stale: false
+        stale: !visible,
+        moderationState
       },
       update: {
         body,
         ranking: ranking as never,
         indexedAt: new Date(),
-        stale: false
+        stale: !visible,
+        moderationState
       }
     });
 
@@ -65,6 +72,7 @@ export async function handleResourceIndexing(job: Job<ResourceIndexingJobData>) 
       reason: null,
       metadata: {
         versionId,
+        moderationState,
         indexedAt: new Date().toISOString()
       }
     };

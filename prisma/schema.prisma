@@ -26,6 +26,7 @@ model Seller {
   webhookEndpoints WebhookEndpoint[]
   webhookEvents    WebhookEvent[]
   apiKeys          SellerApiKey[]
+  moderationNotifications ModerationNotification[]
 
   @@index([domain])
 }
@@ -82,6 +83,7 @@ model Resource {
   outputSchema        Json
   extensions          Json
   status              String               @default("active")
+  moderationState     String               @default("visible")
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   seller              Seller               @relation(fields: [sellerId], references: [id], onDelete: Restrict)
@@ -94,21 +96,29 @@ model Resource {
   catalogEvents       CatalogEvent[]
   mcpTools            McpTool[]
   searchDocument      SearchDocument?
+  moderationActions   ResourceModerationAction[]
+  moderationNotifications ModerationNotification[]
 
   @@index([sellerId])
   @@index([network, assetCode])
   @@index([type, status])
+  @@index([moderationState, status])
 }
 
 model ResourceVersion {
-  id         String   @id @default(cuid())
-  resourceId String
-  version    Int
-  metadata   Json
-  createdAt  DateTime @default(now())
-  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(cuid())
+  resourceId           String
+  version              Int
+  metadata             Json
+  moderationState      String   @default("visible")
+  quarantineReasonCode String?
+  quarantinedAt        DateTime?
+  createdAt            DateTime @default(now())
+  resource             Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  moderationActions    ResourceModerationAction[]
 
   @@unique([resourceId, version])
+  @@index([resourceId, moderationState])
 }
 
 model ResourceSchema {
@@ -329,15 +339,60 @@ model SearchDocument {
   sellerId   String
   body       String
   ranking    Json
-  indexedAt  DateTime?
-  stale      Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  resource   Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  seller     Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  indexedAt       DateTime?
+  stale           Boolean   @default(true)
+  moderationState String    @default("visible")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  resource        Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  seller          Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
 
   @@index([sellerId])
   @@index([stale])
+  @@index([moderationState])
+}
+
+model ResourceModerationAction {
+  id             String                @id @default(cuid())
+  resourceId     String
+  versionId      String
+  version        Int
+  action         String
+  resultingState String
+  reasonCode     String
+  evidenceRefs   Json
+  reviewerId     String
+  reviewerType   String                @default("operator")
+  notes          String?
+  metadata       Json
+  createdAt      DateTime              @default(now())
+  resource       Resource              @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  versionRecord  ResourceVersion       @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  notification   ModerationNotification?
+
+  @@index([resourceId, createdAt])
+  @@index([resourceId, version, createdAt])
+  @@index([action, createdAt])
+  @@index([reviewerId, createdAt])
+}
+
+model ModerationNotification {
+  id            String                  @id @default(cuid())
+  actionId      String                  @unique
+  sellerId      String
+  resourceId    String
+  status        String                  @default("pending")
+  channel       String                  @default("in_app")
+  notifiedAt    DateTime?
+  failureReason String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  action        ResourceModerationAction @relation(fields: [actionId], references: [id], onDelete: Restrict)
+  seller        Seller                  @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  resource      Resource                @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+
+  @@index([sellerId, status])
+  @@index([resourceId, createdAt])
 }
 
 model ConformanceRun {

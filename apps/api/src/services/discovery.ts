@@ -28,7 +28,8 @@ export class DiscoveryService {
   async browse(input: unknown): Promise<DiscoveryBrowseResult> {
     const page = await this.resourceService.listResources({
       ...browseDiscoverySchema.parse(input),
-      status: "active"
+      status: "active",
+      moderationState: "visible"
     });
 
     return {

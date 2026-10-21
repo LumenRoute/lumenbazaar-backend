@@ -241,6 +241,279 @@ const rollbackResourceResponse: SchemaObject = {
   }
 };
 
+const moderationEvidenceReference: SchemaObject = {
+  type: "object",
+  required: ["type", "ref"],
+  additionalProperties: false,
+  properties: {
+    type: {
+      type: "string",
+      enum: ["url", "report", "transaction", "screenshot", "other"]
+    },
+    ref: {
+      type: "string",
+      description: "Reference to synthetic or explicitly public testnet evidence only."
+    },
+    description: { type: "string" }
+  }
+};
+
+const moderationAction: SchemaObject = {
+  type: "object",
+  required: [
+    "id",
+    "resourceId",
+    "versionId",
+    "version",
+    "action",
+    "resultingState",
+    "reasonCode",
+    "evidenceRefs",
+    "reviewerId",
+    "reviewerType",
+    "createdAt"
+  ],
+  properties: {
+    id: { type: "string" },
+    resourceId: { type: "string" },
+    versionId: { type: "string" },
+    version: { type: "integer", minimum: 1 },
+    action: {
+      type: "string",
+      enum: ["quarantine", "appeal", "restore", "reject_appeal"]
+    },
+    resultingState: {
+      type: "string",
+      enum: ["visible", "quarantined", "under_appeal"]
+    },
+    reasonCode: {
+      type: "string",
+      enum: [
+        "abuse",
+        "deceptive",
+        "compromised",
+        "unsafe",
+        "unsuitable",
+        "copyright",
+        "policy_violation",
+        "other",
+        "appeal_upheld",
+        "false_positive",
+        "manual_restore"
+      ]
+    },
+    evidenceRefs: {
+      type: "array",
+      items: moderationEvidenceReference
+    },
+    reviewerId: {
+      type: "string",
+      description: "Immutable reviewer identity recorded on the action."
+    },
+    reviewerType: { type: "string", enum: ["operator", "seller", "system"] },
+    notes: { type: ["string", "null"] },
+    metadata: jsonObject,
+    createdAt: { type: "string", format: "date-time" }
+  }
+};
+
+const moderationNotification: SchemaObject = {
+  type: "object",
+  required: [
+    "id",
+    "actionId",
+    "sellerId",
+    "resourceId",
+    "status",
+    "channel",
+    "createdAt",
+    "updatedAt"
+  ],
+  properties: {
+    id: { type: "string" },
+    actionId: { type: "string" },
+    sellerId: { type: "string" },
+    resourceId: { type: "string" },
+    status: {
+      type: "string",
+      enum: ["pending", "notified", "failed", "not_required"]
+    },
+    channel: { type: "string" },
+    notifiedAt: { type: ["string", "null"], format: "date-time" },
+    failureReason: { type: ["string", "null"] },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", format: "date-time" }
+  }
+};
+
+const moderationView: SchemaObject = {
+  type: "object",
+  required: [
+    "resourceId",
+    "sellerId",
+    "resourceStatus",
+    "moderationState",
+    "discoveryState",
+    "latestVersion",
+    "quarantine",
+    "notificationStatus",
+    "appealable",
+    "actions",
+    "notifications"
+  ],
+  properties: {
+    resourceId: { type: "string" },
+    sellerId: { type: "string" },
+    resourceStatus: { type: "string", enum: ["draft", "active", "inactive"] },
+    moderationState: {
+      type: "string",
+      enum: ["visible", "quarantined", "under_appeal"]
+    },
+    discoveryState: {
+      type: "string",
+      enum: ["discoverable", "quarantined", "outage", "draft"],
+      description:
+        "Distinguishes moderation quarantine from a seller-declared outage or draft resource."
+    },
+    latestVersion: { type: ["integer", "null"] },
+    quarantine: {
+      type: ["object", "null"],
+      required: ["version", "reasonCode", "quarantinedAt"],
+      properties: {
+        version: { type: "integer" },
+        reasonCode: {
+          type: ["string", "null"],
+          enum: [
+            "abuse",
+            "deceptive",
+            "compromised",
+            "unsafe",
+            "unsuitable",
+            "copyright",
+            "policy_violation",
+            "other",
+            null
+          ]
+        },
+        quarantinedAt: { type: ["string", "null"], format: "date-time" }
+      }
+    },
+    notificationStatus: {
+      type: ["string", "null"],
+      enum: ["pending", "notified", "failed", "not_required", null]
+    },
+    appealable: { type: "boolean" },
+    actions: { type: "array", items: moderationAction },
+    notifications: { type: "array", items: moderationNotification }
+  }
+};
+
+const quarantineResourceVersionRequest: SchemaObject = {
+  type: "object",
+  required: ["reasonCode", "evidenceRefs", "reviewerId"],
+  additionalProperties: false,
+  properties: {
+    reasonCode: {
+      type: "string",
+      enum: [
+        "abuse",
+        "deceptive",
+        "compromised",
+        "unsafe",
+        "unsuitable",
+        "copyright",
+        "policy_violation",
+        "other"
+      ]
+    },
+    evidenceRefs: {
+      type: "array",
+      minItems: 1,
+      maxItems: 20,
+      items: moderationEvidenceReference
+    },
+    notes: { type: "string", maxLength: 2000 },
+    reviewerId: { type: "string" },
+    notifySeller: { type: "boolean", default: true }
+  }
+};
+
+const restoreResourceVersionRequest: SchemaObject = {
+  type: "object",
+  required: ["reviewerId"],
+  additionalProperties: false,
+  properties: {
+    reasonCode: {
+      type: "string",
+      enum: ["appeal_upheld", "false_positive", "manual_restore"],
+      default: "manual_restore"
+    },
+    evidenceRefs: {
+      type: "array",
+      maxItems: 20,
+      items: moderationEvidenceReference
+    },
+    notes: { type: "string", maxLength: 2000 },
+    reviewerId: { type: "string" },
+    notifySeller: { type: "boolean", default: true }
+  }
+};
+
+const appealResourceVersionRequest: SchemaObject = {
+  type: "object",
+  required: ["message"],
+  additionalProperties: false,
+  properties: {
+    message: { type: "string", minLength: 1, maxLength: 4000 },
+    evidenceRefs: {
+      type: "array",
+      maxItems: 20,
+      items: moderationEvidenceReference
+    }
+  }
+};
+
+const rejectAppealRequest: SchemaObject = {
+  type: "object",
+  required: ["reviewerId"],
+  additionalProperties: false,
+  properties: {
+    reasonCode: {
+      type: "string",
+      enum: [
+        "abuse",
+        "deceptive",
+        "compromised",
+        "unsafe",
+        "unsuitable",
+        "copyright",
+        "policy_violation",
+        "other"
+      ],
+      default: "other"
+    },
+    evidenceRefs: {
+      type: "array",
+      maxItems: 20,
+      items: moderationEvidenceReference
+    },
+    notes: { type: "string", maxLength: 2000 },
+    reviewerId: { type: "string" },
+    notifySeller: { type: "boolean", default: true }
+  }
+};
+
+const moderationNotificationStatusRequest: SchemaObject = {
+  type: "object",
+  required: ["status", "reviewerId"],
+  additionalProperties: false,
+  properties: {
+    status: { type: "string", enum: ["notified", "failed"] },
+    reviewerId: { type: "string" },
+    failureReason: { type: "string", maxLength: 500 }
+  }
+};
+
 const paymentRequirements: SchemaObject = {
   type: "object",
   additionalProperties: false,
@@ -929,6 +1202,71 @@ export const apiRouteContracts: RouteContract[] = [
     tags: ["resources"],
     requestBody: rollbackResourceRequest,
     response: rollbackResourceResponse
+  },
+  {
+    method: "get",
+    path: "/v1/operator/resources/{id}/moderation",
+    operationId: "getResourceModerationForOperator",
+    summary:
+      "Operator view of moderation history, quarantine state, evidence, reviewer attribution, and seller notification status.",
+    tags: ["moderation"],
+    response: moderationView
+  },
+  {
+    method: "post",
+    path: "/v1/operator/resources/{id}/versions/{version}/quarantine",
+    operationId: "quarantineResourceVersion",
+    summary:
+      "Quarantine a resource version. The action is immutable, attributed to the reviewer, and excluded from public discovery.",
+    tags: ["moderation"],
+    requestBody: quarantineResourceVersionRequest,
+    response: moderationView
+  },
+  {
+    method: "post",
+    path: "/v1/operator/resources/{id}/versions/{version}/restore",
+    operationId: "restoreResourceVersion",
+    summary:
+      "Restore a quarantined or under-appeal resource version to public discovery without rewriting seller metadata.",
+    tags: ["moderation"],
+    requestBody: restoreResourceVersionRequest,
+    response: moderationView
+  },
+  {
+    method: "post",
+    path: "/v1/operator/resources/{id}/versions/{version}/reject-appeal",
+    operationId: "rejectResourceVersionAppeal",
+    summary: "Reject a seller appeal and keep the resource version quarantined.",
+    tags: ["moderation"],
+    requestBody: rejectAppealRequest,
+    response: moderationView
+  },
+  {
+    method: "post",
+    path: "/v1/operator/moderation/notifications/{notificationId}",
+    operationId: "updateModerationNotificationStatus",
+    summary: "Record the delivery outcome of a seller moderation notification.",
+    tags: ["moderation"],
+    requestBody: moderationNotificationStatusRequest,
+    response: moderationNotification
+  },
+  {
+    method: "get",
+    path: "/v1/sellers/{sellerId}/resources/{id}/moderation",
+    operationId: "getResourceModerationForSeller",
+    summary:
+      "Seller view of quarantine state, reason, evidence, actions, and notification status. Distinguishes quarantine from outage.",
+    tags: ["moderation", "sellers"],
+    response: moderationView
+  },
+  {
+    method: "post",
+    path: "/v1/sellers/{sellerId}/resources/{id}/versions/{version}/appeal",
+    operationId: "appealResourceVersionQuarantine",
+    summary: "Submit a seller appeal for a quarantined resource version.",
+    tags: ["moderation", "sellers"],
+    requestBody: appealResourceVersionRequest,
+    response: moderationView
   },
   {
     method: "get",

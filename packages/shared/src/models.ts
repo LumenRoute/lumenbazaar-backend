@@ -16,6 +16,21 @@ export type JsonObject = {
 
 export type ResourceType = "http" | "mcp";
 export type ResourceStatus = "draft" | "active" | "inactive";
+export type ModerationState = "visible" | "quarantined" | "under_appeal";
+export type ModerationActionType = "quarantine" | "appeal" | "restore" | "reject_appeal";
+export type ModerationReasonCode =
+  | "abuse"
+  | "deceptive"
+  | "compromised"
+  | "unsafe"
+  | "unsuitable"
+  | "copyright"
+  | "policy_violation"
+  | "other";
+export type ModerationResolutionCode = "appeal_upheld" | "false_positive" | "manual_restore";
+export type ModerationNotificationStatus = "pending" | "notified" | "failed" | "not_required";
+export type ModerationEvidenceType = "url" | "report" | "transaction" | "screenshot" | "other";
+export type ResourceDiscoveryState = "discoverable" | "quarantined" | "outage" | "draft";
 export type PaymentScheme = "exact" | "upto";
 export type PaymentStatus =
   | "received"
@@ -36,7 +51,15 @@ export type SettlementStatus =
   | "failed";
 export type ReceiptStatus = "pending" | "finalized" | "failed";
 export type PaymentSessionStatus = "open" | "settled" | "cancelled" | "expired";
-export type CatalogEventType = "validated" | "cataloged" | "updated" | "deleted";
+export type CatalogEventType =
+  | "validated"
+  | "cataloged"
+  | "updated"
+  | "deleted"
+  | "quarantined"
+  | "restored"
+  | "appealed"
+  | "appeal_rejected";
 
 export type Seller = {
   id: string;
@@ -96,6 +119,7 @@ export type Resource = {
   outputSchema: JsonObject;
   extensions: JsonObject;
   status: ResourceStatus;
+  moderationState: ModerationState;
   createdAt: string;
   updatedAt: string;
 };
@@ -105,6 +129,9 @@ export type ResourceVersion = {
   resourceId: string;
   version: number;
   metadata: JsonObject;
+  moderationState: ModerationState;
+  quarantineReasonCode: ModerationReasonCode | null;
+  quarantinedAt: string | null;
   createdAt: string;
 };
 
@@ -127,8 +154,62 @@ export type SearchDocument = {
   ranking: JsonObject;
   indexedAt: string | null;
   stale: boolean;
+  moderationState: ModerationState;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ModerationEvidenceReference = {
+  type: ModerationEvidenceType;
+  ref: string;
+  description?: string | undefined;
+};
+
+export type ResourceModerationAction = {
+  id: string;
+  resourceId: string;
+  versionId: string;
+  version: number;
+  action: ModerationActionType;
+  resultingState: ModerationState;
+  reasonCode: ModerationReasonCode | ModerationResolutionCode;
+  evidenceRefs: ModerationEvidenceReference[];
+  reviewerId: string;
+  reviewerType: "operator" | "seller" | "system";
+  notes: string | null;
+  metadata: JsonObject;
+  createdAt: string;
+};
+
+export type ModerationNotification = {
+  id: string;
+  actionId: string;
+  sellerId: string;
+  resourceId: string;
+  status: ModerationNotificationStatus;
+  channel: string;
+  notifiedAt: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ResourceModerationView = {
+  resourceId: string;
+  sellerId: string;
+  resourceStatus: ResourceStatus;
+  moderationState: ModerationState;
+  discoveryState: ResourceDiscoveryState;
+  latestVersion: number | null;
+  quarantine: {
+    version: number;
+    reasonCode: ModerationReasonCode | null;
+    quarantinedAt: string | null;
+  } | null;
+  notificationStatus: ModerationNotificationStatus | null;
+  appealable: boolean;
+  actions: ResourceModerationAction[];
+  notifications: ModerationNotification[];
 };
 
 export type PaymentAttempt = {
