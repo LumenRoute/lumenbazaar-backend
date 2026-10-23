@@ -27,9 +27,17 @@ import { type PaymentPayload, type PaymentRequirements } from "@x402/core/types"
 import { createEd25519Signer } from "@x402/stellar";
 import { ExactStellarScheme } from "@x402/stellar/exact/facilitator";
 
-import { type FacilitatorSignerProvider } from "./facilitatorSigner.js";
+import {
+  type FacilitatorSignerProvider,
+  type FacilitatorStellarSigner
+} from "./facilitatorSigner.js";
 import { parseVerifyPaymentRequest } from "./paymentPayload.js";
-import { createX402StellarAdapter, type X402VerificationInput } from "./x402Adapter.js";
+import {
+  createX402StellarAdapter,
+  transactionHashFromXdr,
+  wrapSignerForSubmissionIntent,
+  type X402VerificationInput
+} from "./x402Adapter.js";
 
 const config = loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId });
 const normalizedRequest = parseVerifyPaymentRequest(testPaymentRequest, config);
@@ -67,6 +75,65 @@ describe("default x402 Stellar adapter", () => {
       valid: false
     });
     expect(adapter.settleExact).toBeUndefined();
+  });
+});
+
+describe("transactionHashFromXdr", () => {
+  it("derives the network transaction hash from a signed transaction envelope", () => {
+    const payer = Keypair.random();
+    const account = new Account(payer.publicKey(), "0");
+    const transaction = new TransactionBuilder(account, {
+      fee: BASE_FEE,
+      networkPassphrase: Networks.TESTNET
+    })
+      .addOperation(
+        Operation.invokeContractFunction({
+          contract: testAssetContractId,
+          function: "transfer",
+          args: [nativeToScVal(payer.publicKey(), { type: "address" })]
+        })
+      )
+      .setTimeout(60)
+      .build();
+
+    expect(transactionHashFromXdr(transaction.toXDR(), Networks.TESTNET)).toBe(
+      transaction.hash().toString("hex")
+    );
+    expect(transactionHashFromXdr(transaction.toXDR(), Networks.PUBLIC)).not.toBe(
+      transaction.hash().toString("hex")
+    );
+  });
+
+  it("does not return the signed transaction until submission intent is persisted", async () => {
+    const payer = Keypair.random();
+    const transaction = new TransactionBuilder(new Account(payer.publicKey(), "0"), {
+      fee: BASE_FEE,
+      networkPassphrase: Networks.TESTNET
+    })
+      .addOperation(
+        Operation.invokeContractFunction({
+          contract: testAssetContractId,
+          function: "transfer",
+          args: [nativeToScVal(payer.publicKey(), { type: "address" })]
+        })
+      )
+      .setTimeout(60)
+      .build();
+    transaction.sign(payer);
+    const persistIntent = vi.fn(async () => {
+      throw new Error("intent persistence failed");
+    });
+    const signer = {
+      address: payer.publicKey(),
+      signAuthEntry: vi.fn(),
+      signTransaction: vi.fn().mockResolvedValue({ signedTxXdr: transaction.toXDR() })
+    } as unknown as FacilitatorStellarSigner;
+    const wrapped = wrapSignerForSubmissionIntent(signer, Networks.TESTNET, persistIntent);
+
+    await expect(
+      wrapped.signTransaction(transaction.toXDR(), { networkPassphrase: Networks.TESTNET })
+    ).rejects.toThrow("intent persistence failed");
+    expect(persistIntent).toHaveBeenCalledWith(transaction.hash().toString("hex"));
   });
 });
 

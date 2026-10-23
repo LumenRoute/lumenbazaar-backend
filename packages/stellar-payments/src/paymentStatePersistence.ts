@@ -17,6 +17,17 @@ export type ConfirmedPaymentStateInput = {
   };
 };
 
+export type SubmittedPaymentStateInput = {
+  attempt: PaymentAttempt;
+  settlement: CreateSettlementInput & {
+    idempotencyKey: string;
+    requestHash: string;
+    transactionHash: string;
+    status: "submitted";
+    reconciliationState: "pending";
+  };
+};
+
 export type FailedPaymentStateInput = {
   attempt: PaymentAttempt;
   settlement: CreateSettlementInput & {
@@ -42,6 +53,11 @@ export function receiptStatusChange(receipt: Receipt): ReceiptStreamChange {
 }
 
 export type PaymentStatePersistence = {
+  recordSubmission(input: SubmittedPaymentStateInput): Promise<{
+    attempt: PaymentAttempt;
+    settlement: Settlement;
+    receipt: Receipt;
+  }>;
   recordConfirmed(input: ConfirmedPaymentStateInput): Promise<{
     attempt: PaymentAttempt;
     settlement: Settlement;

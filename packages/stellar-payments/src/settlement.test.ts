@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { loadConfig } from "@lumenbazaar/shared";
 import { testAssetContractId, testPaymentPayload, testPaymentRequest } from "@lumenbazaar/testkit";
+import { type SubmittedPaymentStateInput } from "./paymentStatePersistence.js";
 
 import {
   InMemoryPaymentAttemptStore,
@@ -30,6 +31,26 @@ const adapter: X402StellarAdapter = {
 };
 
 describe("SettlementService", () => {
+  it("reclaims only a stale pre-submit settlement claim", async () => {
+    const attemptStore = new InMemoryPaymentAttemptStore();
+    const attempt = await attemptStore.createVerifiedAttempt({
+      paymentHash: "payment_hash_stale_claim",
+      network: "stellar:testnet",
+      assetCode: "USDC",
+      assetIssuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      amount: "500000",
+      payTo: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+    });
+
+    await expect(attemptStore.claimSettlement(attempt.id)).resolves.toMatchObject({
+      status: "settling"
+    });
+    await expect(attemptStore.claimSettlement(attempt.id)).resolves.toBeUndefined();
+    await expect(
+      attemptStore.claimSettlement(attempt.id, new Date(Date.now() + 1000).toISOString())
+    ).resolves.toMatchObject({ status: "settling" });
+  });
+
   it("settles a verified exact payment and stores transaction evidence", async () => {
     const attemptStore = new InMemoryPaymentAttemptStore();
     const settlementStore = new InMemorySettlementStore();
@@ -101,6 +122,105 @@ describe("SettlementService", () => {
     expect(concurrent).toEqual(first);
     expect(retry).toEqual(first);
     expect(settleExact).toHaveBeenCalledTimes(1);
+  });
+
+  it("resumes confirmation after a crash following submission intent without resubmitting", async () => {
+    const attemptStore = new InMemoryPaymentAttemptStore();
+    const settlementStore = new InMemorySettlementStore();
+    const receiptService = new ReceiptService();
+    let submittedToNetwork = 0;
+    const settleExact = vi.fn(async (input: Parameters<NonNullable<X402StellarAdapter["settleExact"]>>[0]) => {
+      await input.onTransactionPrepared?.("tx_crash_window");
+      submittedToNetwork += 1;
+      throw new Error("simulated crash after network submission");
+    });
+    const crashAdapter: X402StellarAdapter = {
+      async verifyExact() {
+        return { valid: true, adapter: "@x402/stellar" };
+      },
+      settleExact
+    };
+    const config = loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId });
+    const verification = new PaymentVerificationService(config, {
+      adapter: crashAdapter,
+      attemptStore
+    });
+    const verified = await verification.verify(testPaymentRequest);
+    const enqueue = vi.fn(async () => undefined);
+    const statePersistence = {
+      async recordSubmission({ attempt, settlement: intent }: SubmittedPaymentStateInput) {
+        const submittedAttempt = await attemptStore.updatePaymentAttempt(attempt.id, {
+          status: "submitted"
+        });
+        const settlement = await settlementStore.createSettlement(intent);
+        const receipt = await receiptService.finalizeSettlementReceipt(submittedAttempt, settlement);
+        return { attempt: submittedAttempt, settlement, receipt };
+      }
+    } as never;
+    const settlement = new SettlementService(config, {
+      adapter: crashAdapter,
+      attemptStore,
+      settlementStore,
+      receiptService,
+      statePersistence,
+      reconciliationScheduler: { enqueue }
+    });
+
+    await expect(settlement.settle(testPaymentRequest)).rejects.toThrow(
+      "simulated crash after network submission"
+    );
+    await expect(settlement.settle(testPaymentRequest)).rejects.toMatchObject({
+      code: "SETTLEMENT_FAILED",
+      statusCode: 409,
+      details: { status: "submitted", transactionHash: "tx_crash_window" }
+    });
+
+    expect(settleExact).toHaveBeenCalledTimes(1);
+    expect(submittedToNetwork).toBe(1);
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentAttemptId: verified.paymentAttemptId,
+        transactionHash: "tx_crash_window"
+      })
+    );
+    await expect(attemptStore.getPaymentAttempt(verified.paymentAttemptId)).resolves.toMatchObject({
+      status: "submitted"
+    });
+  });
+
+  it("rejects a conflicting request fingerprint under the settlement idempotency key", async () => {
+    const attemptStore = new InMemoryPaymentAttemptStore();
+    const settlementStore = new InMemorySettlementStore();
+    const settleExact = vi.fn(adapter.settleExact);
+    const config = loadConfig({ STELLAR_TESTNET_USDC_CONTRACT_ID: testAssetContractId });
+    const verification = new PaymentVerificationService(config, { adapter, attemptStore });
+    const settlement = new SettlementService(config, {
+      adapter: { ...adapter, settleExact },
+      attemptStore,
+      settlementStore
+    });
+    const verified = await verification.verify(testPaymentRequest);
+    const attempt = await attemptStore.getPaymentAttempt(verified.paymentAttemptId);
+    if (attempt === undefined) {
+      throw new Error("verified attempt missing");
+    }
+    await settlementStore.createSettlement({
+      paymentAttemptId: attempt.id,
+      idempotencyKey: `settle:${attempt.id}`,
+      requestHash: "conflicting-payload-hash",
+      transactionHash: "tx_existing_intent",
+      network: attempt.network,
+      amount: attempt.amount,
+      assetCode: attempt.assetCode,
+      assetIssuer: attempt.assetIssuer,
+      status: "submitted",
+      reconciliationState: "pending"
+    });
+
+    await expect(settlement.settle(testPaymentRequest)).rejects.toMatchObject({
+      code: "REPLAY_DETECTED"
+    });
+    expect(settleExact).not.toHaveBeenCalled();
   });
 
   it("independently re-verifies immediately before official settlement", async () => {

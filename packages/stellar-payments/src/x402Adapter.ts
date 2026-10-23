@@ -1,8 +1,12 @@
 import { type AppConfig, type ErrorCode } from "@lumenbazaar/shared";
 import { type SettleResponse, type VerifyResponse } from "@x402/core/types";
 import { ExactStellarScheme } from "@x402/stellar/exact/facilitator";
+import * as StellarSdk from "@stellar/stellar-sdk";
 
-import { type FacilitatorSignerProvider } from "./facilitatorSigner.js";
+import {
+  type FacilitatorSignerProvider,
+  type FacilitatorStellarSigner
+} from "./facilitatorSigner.js";
 import {
   type ExactStellarPaymentPayload,
   type ExactStellarPaymentRequirements,
@@ -13,6 +17,7 @@ export type X402VerificationInput = {
   paymentPayload: ExactStellarPaymentPayload;
   paymentRequirements: ExactStellarPaymentRequirements;
   normalizedRequest: NormalizedVerifyPaymentRequest;
+  onTransactionPrepared?: (transactionHash: string) => Promise<void>;
 };
 
 export type X402VerificationResult = {
@@ -62,6 +67,8 @@ export type X402StellarAdapterOptions = {
     rpcUrl: string;
     maxTransactionFeeStroops: number;
     inclusionFeeStroops: number;
+    onTransactionPrepared?: (transactionHash: string) => Promise<void>;
+    networkPassphrase?: string;
   }) => Promise<OfficialExactVerifier>;
   resolveFinality?: (input: {
     network: ExactStellarPaymentRequirements["network"];
@@ -69,6 +76,28 @@ export type X402StellarAdapterOptions = {
     transactionHash: string;
   }) => Promise<SettlementFinality>;
 };
+
+export function transactionHashFromXdr(transactionXdr: string, networkPassphrase: string) {
+  const transaction = StellarSdk.TransactionBuilder.fromXDR(transactionXdr, networkPassphrase);
+  return transaction.hash().toString("hex");
+}
+
+export function wrapSignerForSubmissionIntent(
+  signer: FacilitatorStellarSigner,
+  networkPassphrase: string,
+  onTransactionPrepared: (transactionHash: string) => Promise<void>
+): FacilitatorStellarSigner {
+  return {
+    ...signer,
+    async signTransaction(transactionXdr, options) {
+      const signed = await signer.signTransaction(transactionXdr, options);
+      if (signed.error === undefined) {
+        await onTransactionPrepared(transactionHashFromXdr(signed.signedTxXdr, networkPassphrase));
+      }
+      return signed;
+    }
+  };
+}
 
 export function createX402StellarAdapter(options?: X402StellarAdapterOptions): X402StellarAdapter {
   if (options !== undefined) {
@@ -88,9 +117,19 @@ export function createX402StellarAdapter(options?: X402StellarAdapterOptions): X
 function createOfficialAdapter(options: X402StellarAdapterOptions): X402StellarAdapter {
   const createVerifier =
     options.createVerifier ??
-    (async ({ rpcUrl, maxTransactionFeeStroops, inclusionFeeStroops }) => {
+    (async ({
+      rpcUrl,
+      maxTransactionFeeStroops,
+      inclusionFeeStroops,
+      onTransactionPrepared,
+      networkPassphrase
+    }) => {
       const signer = await options.signerProvider.getSigner();
-      return new ExactStellarScheme([signer], {
+      const settlementSigner =
+        onTransactionPrepared === undefined || networkPassphrase === undefined
+          ? signer
+          : wrapSignerForSubmissionIntent(signer, networkPassphrase, onTransactionPrepared);
+      return new ExactStellarScheme([settlementSigner], {
         rpcConfig: { url: rpcUrl },
         maxTransactionFeeStroops,
         inclusionFeeStroops
@@ -98,7 +137,10 @@ function createOfficialAdapter(options: X402StellarAdapterOptions): X402StellarA
     });
   const resolveFinality = options.resolveFinality ?? resolveRpcFinality;
 
-  async function getVerifier(input: X402VerificationInput) {
+  async function getVerifier(
+    input: X402VerificationInput,
+    onTransactionPrepared?: (transactionHash: string) => Promise<void>
+  ) {
     const network = options.config.networks[input.normalizedRequest.network];
     if (network === undefined) {
       return undefined;
@@ -109,7 +151,10 @@ function createOfficialAdapter(options: X402StellarAdapterOptions): X402StellarA
         network: input.normalizedRequest.network,
         rpcUrl: network.rpcUrl,
         maxTransactionFeeStroops: options.config.settlement.maxTransactionFeeStroops,
-        inclusionFeeStroops: options.config.settlement.inclusionFeeStroops
+        inclusionFeeStroops: options.config.settlement.inclusionFeeStroops,
+        ...(onTransactionPrepared === undefined
+          ? {}
+          : { onTransactionPrepared, networkPassphrase: network.passphrase })
       })
     };
   }
@@ -135,7 +180,7 @@ function createOfficialAdapter(options: X402StellarAdapterOptions): X402StellarA
     },
     async settleExact(input) {
       try {
-        const resolved = await getVerifier(input);
+        const resolved = await getVerifier(input, input.onTransactionPrepared);
         if (resolved === undefined) {
           return rejectedSettlement("failed", "Payment network is not configured.", {
             stage: "simulation",

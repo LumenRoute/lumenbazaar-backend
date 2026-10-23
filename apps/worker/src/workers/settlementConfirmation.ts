@@ -73,6 +73,18 @@ export async function handleSettlementConfirmation(
     return;
   }
 
+  if (
+    settlement?.transactionHash !== null &&
+    settlement?.transactionHash !== undefined &&
+    job.data.transactionHash !== undefined &&
+    settlement.transactionHash !== job.data.transactionHash
+  ) {
+    const reason = "Reconciliation job transaction hash conflicts with persisted settlement evidence.";
+    await recordNeedsReview(db, attempt.id, settlement.id, reason);
+    await job.log(`Settlement ${settlement.id} requires manual review: ${reason}`);
+    return;
+  }
+
   const transactionHash = settlement?.transactionHash ?? job.data.transactionHash;
   if (settlement === null || transactionHash === null || transactionHash === undefined) {
     const reason = "No submitted transaction evidence is available; manual review is required.";
@@ -97,6 +109,17 @@ export async function handleSettlementConfirmation(
       })
     ]);
     await job.log(reason);
+    return;
+  }
+
+  if (
+    attempt.receipt?.transactionHash !== null &&
+    attempt.receipt?.transactionHash !== undefined &&
+    attempt.receipt.transactionHash !== transactionHash
+  ) {
+    const reason = "Receipt transaction hash conflicts with persisted settlement evidence.";
+    await recordNeedsReview(db, attempt.id, settlement.id, reason);
+    await job.log(`Settlement ${settlement.id} requires manual review: ${reason}`);
     return;
   }
 
@@ -303,21 +326,16 @@ export async function resumePendingSettlements(
 ): Promise<number> {
   const attempts = await db.paymentAttempt.findMany({
     where: {
-      OR: [
-        { status: "settling", settlement: null },
-        {
-          settlement: {
-            is: {
-              transactionHash: { not: null },
-              reconciliationState: { notIn: ["reconciled", "needs_review"] },
-              OR: [
-                { reconciliationState: "pending" },
-                { status: { in: ["pending", "submitted", "timed_out"] } }
-              ]
-            }
-          }
+      settlement: {
+        is: {
+          transactionHash: { not: null },
+          reconciliationState: { notIn: ["reconciled", "needs_review"] },
+          OR: [
+            { reconciliationState: "pending" },
+            { status: { in: ["pending", "submitted", "timed_out"] } }
+          ]
         }
-      ]
+      }
     },
     include: { settlement: true },
     take: options.take ?? 1000

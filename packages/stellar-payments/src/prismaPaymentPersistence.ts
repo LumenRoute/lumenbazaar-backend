@@ -23,6 +23,7 @@ import {
   type ConfirmedPaymentStateInput,
   type FailedPaymentStateInput,
   type PaymentStatePersistence,
+  type SubmittedPaymentStateInput,
   receiptStatusChange,
   type ReceiptStatusChangeListener
 } from "./paymentStatePersistence.js";
@@ -77,9 +78,17 @@ export class PrismaPaymentAttemptStore implements PaymentAttemptStore {
     return row === null ? undefined : mapPaymentAttempt(row);
   }
 
-  async claimSettlement(paymentAttemptId: string) {
+  async claimSettlement(paymentAttemptId: string, staleBefore?: string) {
     const claimed = await this.db.paymentAttempt.updateMany({
-      where: { id: paymentAttemptId, status: "verified" },
+      where: {
+        id: paymentAttemptId,
+        OR: [
+          { status: "verified" },
+          ...(staleBefore === undefined
+            ? []
+            : [{ status: "settling", updatedAt: { lt: new Date(staleBefore) } }])
+        ]
+      },
       data: { status: "settling", failureCode: null, failureReason: null }
     });
     if (claimed.count === 0) {
@@ -202,9 +211,17 @@ export class PrismaPaymentStatePersistence implements PaymentStatePersistence {
     }
   }
 
-  async recordConfirmed(input: ConfirmedPaymentStateInput) {
+  async recordSubmission(input: SubmittedPaymentStateInput) {
     try {
-      const result = await this.client.$transaction(async (tx) => {
+      return await this.client.$transaction(async (tx) => {
+        const transition = await tx.paymentAttempt.updateMany({
+          where: { id: input.attempt.id, status: "settling" },
+          data: { status: "submitted", failureCode: null, failureReason: null }
+        });
+        if (transition.count !== 1) {
+          throw new LumenError("REPLAY_DETECTED", "Payment submission was already claimed.");
+        }
+
         const settlement = mapSettlement(
           await tx.settlement.create({
             data: settlementData({
@@ -213,13 +230,6 @@ export class PrismaPaymentStatePersistence implements PaymentStatePersistence {
             })
           })
         );
-        const transition = await tx.paymentAttempt.updateMany({
-          where: { id: input.attempt.id, status: "settling" },
-          data: { status: "confirmed", failureCode: null, failureReason: null }
-        });
-        if (transition.count !== 1) {
-          throw new LumenError("REPLAY_DETECTED", "Payment state transition was already claimed.");
-        }
         const attempt = mapPaymentAttempt(
           await tx.paymentAttempt.findUniqueOrThrow({ where: { id: input.attempt.id } })
         );
@@ -231,18 +241,162 @@ export class PrismaPaymentStatePersistence implements PaymentStatePersistence {
               resourceId: attempt.resourceId,
               sellerId: attempt.sellerId,
               transactionHash: settlement.transactionHash,
-              ledger: settlement.ledger,
+              ledger: null,
               network: attempt.network,
               amount: attempt.amount,
               assetCode: attempt.assetCode,
               assetIssuer: attempt.assetIssuer,
-              status: "finalized",
-              settledAt: settlement.settledAt,
+              status: "pending",
+              settledAt: null,
               failureCode: null,
               failureReason: null,
               evidenceHash: receiptEvidenceHash(attempt, settlement)
             })
           })
+        );
+
+        await writeOutboxEvent(tx, {
+          aggregateType: "settlement",
+          aggregateId: settlement.id,
+          eventType: "settlement.reconciliation_enqueued",
+          payload: {
+            settlementId: settlement.id,
+            paymentAttemptId: attempt.id,
+            transactionHash: settlement.transactionHash,
+            network: settlement.network,
+            correlationId: settlement.correlationId
+          }
+        });
+
+        return { attempt, settlement, receipt };
+      });
+    } catch (error) {
+      throwReplayOr(error);
+    }
+  }
+
+  async recordConfirmed(input: ConfirmedPaymentStateInput) {
+    try {
+      const result = await this.client.$transaction(async (tx) => {
+        const existingSettlement = await tx.settlement.findUnique({
+          where: { paymentAttemptId: input.attempt.id }
+        });
+        const currentAttemptRow = await tx.paymentAttempt.findUnique({
+          where: { id: input.attempt.id }
+        });
+        const existingReceiptRow = await tx.receipt.findUnique({
+          where: { paymentAttemptId: input.attempt.id }
+        });
+        if (
+          currentAttemptRow?.status === "confirmed" &&
+          existingSettlement?.status === "confirmed" &&
+          existingSettlement.transactionHash === input.settlement.transactionHash &&
+          existingSettlement.ledger === input.settlement.ledger &&
+          existingReceiptRow?.status === "finalized" &&
+          existingReceiptRow.transactionHash === input.settlement.transactionHash &&
+          existingReceiptRow.ledger === input.settlement.ledger
+        ) {
+          const currentAttempt = mapPaymentAttempt(currentAttemptRow);
+          const settlement = mapSettlement(existingSettlement);
+          const receipt = mapReceipt(existingReceiptRow);
+          if (receipt.evidenceHash !== receiptEvidenceHash(currentAttempt, settlement)) {
+            throw new LumenError("REPLAY_DETECTED", "Finalized receipt evidence conflicts with settlement.");
+          }
+          return { attempt: currentAttempt, settlement, receipt };
+        }
+        if (
+          existingSettlement !== null &&
+          existingSettlement.transactionHash !== input.settlement.transactionHash
+        ) {
+          throw new LumenError("REPLAY_DETECTED", "Settlement transaction hash conflicts with intent.");
+        }
+        const settlement = mapSettlement(
+          existingSettlement === null
+            ? await tx.settlement.create({
+                data: settlementData({
+                  ...input.settlement,
+                  correlationId: input.attempt.correlationId
+                })
+              })
+            : await tx.settlement.update({
+                where: { id: existingSettlement.id },
+                data: {
+                  status: "confirmed",
+                  ledger: input.settlement.ledger,
+                  settledAt: new Date(input.settlement.settledAt),
+                  reconciliationState:
+                    existingSettlement.reconciliationState === "reconciled"
+                      ? "reconciled"
+                      : (input.settlement.reconciliationState ?? "not_required"),
+                  reconciliationReason: null
+                }
+              })
+        );
+        const transition = await tx.paymentAttempt.updateMany({
+          where: { id: input.attempt.id, status: { in: ["settling", "submitted"] } },
+          data: { status: "confirmed", failureCode: null, failureReason: null }
+        });
+        if (transition.count !== 1) {
+          throw new LumenError("REPLAY_DETECTED", "Payment state transition was already claimed.");
+        }
+        const attempt = mapPaymentAttempt(
+          await tx.paymentAttempt.findUniqueOrThrow({ where: { id: input.attempt.id } })
+        );
+        const existingReceipt = await tx.receipt.findUnique({
+          where: { paymentAttemptId: attempt.id }
+        });
+        if (
+          existingReceipt !== null &&
+          existingReceipt.transactionHash !== null &&
+          existingReceipt.transactionHash !== settlement.transactionHash
+        ) {
+          throw new LumenError("REPLAY_DETECTED", "Receipt transaction hash conflicts with settlement.");
+        }
+        if (existingReceipt !== null && existingReceipt.status === "finalized") {
+          const expectedEvidenceHash = receiptEvidenceHash(attempt, settlement);
+          if (
+            existingReceipt.transactionHash !== settlement.transactionHash ||
+            existingReceipt.ledger !== settlement.ledger ||
+            existingReceipt.evidenceHash !== expectedEvidenceHash
+          ) {
+            throw new LumenError("REPLAY_DETECTED", "Finalized receipt evidence conflicts with settlement.");
+          }
+        }
+        const receipt = mapReceipt(
+          existingReceipt === null
+            ? await tx.receipt.create({
+                data: receiptData({
+                  correlationId: attempt.correlationId,
+                  paymentAttemptId: attempt.id,
+                  resourceId: attempt.resourceId,
+                  sellerId: attempt.sellerId,
+                  transactionHash: settlement.transactionHash,
+                  ledger: settlement.ledger,
+                  network: attempt.network,
+                  amount: attempt.amount,
+                  assetCode: attempt.assetCode,
+                  assetIssuer: attempt.assetIssuer,
+                  status: "finalized",
+                  settledAt: settlement.settledAt,
+                  failureCode: null,
+                  failureReason: null,
+                  evidenceHash: receiptEvidenceHash(attempt, settlement)
+                })
+              })
+            : existingReceipt.status === "pending"
+              ? await tx.receipt.update({
+                  where: { id: existingReceipt.id, status: "pending" },
+                  data: {
+                    transactionHash: settlement.transactionHash,
+                    ledger: settlement.ledger,
+                    status: "finalized",
+                    settledAt: settlement.settledAt,
+                    failureCode: null,
+                    failureReason: null,
+                    evidenceHash: receiptEvidenceHash(attempt, settlement)
+                  }
+                })
+              : existingReceipt
         );
 
         // Write outbox event for receipt finalization (transactional)
@@ -278,16 +432,38 @@ export class PrismaPaymentStatePersistence implements PaymentStatePersistence {
   async recordFailed(input: FailedPaymentStateInput) {
     try {
       return await this.client.$transaction(async (tx) => {
+        const existingSettlement = await tx.settlement.findUnique({
+          where: { paymentAttemptId: input.attempt.id }
+        });
+        if (
+          existingSettlement !== null &&
+          input.settlement.transactionHash !== undefined &&
+          existingSettlement.transactionHash !== input.settlement.transactionHash
+        ) {
+          throw new LumenError("REPLAY_DETECTED", "Settlement transaction hash conflicts with intent.");
+        }
         const settlement = mapSettlement(
-          await tx.settlement.create({
-            data: settlementData({
-              ...input.settlement,
-              correlationId: input.attempt.correlationId
-            })
-          })
+          existingSettlement === null
+            ? await tx.settlement.create({
+                data: settlementData({
+                  ...input.settlement,
+                  correlationId: input.attempt.correlationId
+                })
+              })
+            : await tx.settlement.update({
+                where: { id: existingSettlement.id },
+                data: {
+                  status: input.settlement.status,
+                  reconciliationState:
+                    existingSettlement.transactionHash !== null
+                      ? existingSettlement.reconciliationState
+                      : (input.settlement.reconciliationState ?? "not_required"),
+                  reconciliationReason: input.failureReason
+                }
+              })
         );
         const transition = await tx.paymentAttempt.updateMany({
-          where: { id: input.attempt.id, status: "settling" },
+          where: { id: input.attempt.id, status: { in: ["settling", "submitted"] } },
           data: {
             status: input.settlement.status,
             failureCode: input.failureCode,
@@ -329,6 +505,8 @@ function settlementData(input: CreateSettlementInput): Prisma.SettlementUnchecke
   return {
     correlationId: input.correlationId ?? getCorrelationId() ?? createCorrelationId(),
     paymentAttemptId: input.paymentAttemptId,
+    idempotencyKey: input.idempotencyKey ?? null,
+    requestHash: input.requestHash ?? null,
     network: input.network,
     amount: input.amount,
     assetCode: input.assetCode,

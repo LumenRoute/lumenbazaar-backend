@@ -31,6 +31,71 @@ describePostgres("Prisma payment persistence", () => {
     await client.$disconnect();
   });
 
+  it("resumes a committed submission intent after restart and finalizes the same receipt", async () => {
+    const attemptStore = new PrismaPaymentAttemptStore(client);
+    const persistence = new PrismaPaymentStatePersistence(client);
+    const attempt = await attemptStore.createVerifiedAttempt({
+      paymentHash: "payment_hash_crash_recovery",
+      idempotencyKey: "verify:payment_hash_crash_recovery",
+      network,
+      assetCode: "USDC",
+      assetIssuer: issuer,
+      amount: "0.0500000",
+      payTo: issuer
+    });
+    await attemptStore.claimSettlement(attempt.id);
+    const intent = await persistence.recordSubmission({
+      attempt,
+      settlement: {
+        paymentAttemptId: attempt.id,
+        idempotencyKey: `settle:${attempt.id}`,
+        requestHash: attempt.paymentHash,
+        transactionHash: "transaction_hash_crash_recovery",
+        network,
+        amount: attempt.amount,
+        assetCode: attempt.assetCode,
+        assetIssuer: attempt.assetIssuer,
+        status: "submitted",
+        reconciliationState: "pending"
+      }
+    });
+    expect(intent).toMatchObject({
+      attempt: { status: "submitted" },
+      settlement: {
+        idempotencyKey: `settle:${attempt.id}`,
+        requestHash: attempt.paymentHash,
+        status: "submitted"
+      },
+      receipt: { status: "pending", transactionHash: "transaction_hash_crash_recovery" }
+    });
+
+    await client.$disconnect();
+    client = createClient();
+    const restartedPersistence = new PrismaPaymentStatePersistence(client);
+    const confirmed = await restartedPersistence.recordConfirmed({
+      attempt,
+      settlement: confirmedSettlement(attempt.id, "transaction_hash_crash_recovery")
+    });
+
+    expect(confirmed).toMatchObject({
+      attempt: { status: "confirmed" },
+      settlement: {
+        id: intent.settlement.id,
+        idempotencyKey: `settle:${attempt.id}`,
+        requestHash: attempt.paymentHash,
+        status: "confirmed",
+        ledger: 123456
+      },
+      receipt: {
+        id: intent.receipt.id,
+        status: "finalized",
+        transactionHash: "transaction_hash_crash_recovery",
+        ledger: 123456
+      }
+    });
+    await expect(client.receipt.count({ where: { paymentAttemptId: attempt.id } })).resolves.toBe(1);
+  });
+
   it("survives a client restart and returns the immutable receipt evidence", async () => {
     const attemptStore = new PrismaPaymentAttemptStore(client);
     const persistence = new PrismaPaymentStatePersistence(client);

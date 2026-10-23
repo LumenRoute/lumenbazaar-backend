@@ -169,6 +169,8 @@ model Settlement {
   id                     String         @id @default(cuid())
   correlationId          String         @db.VarChar(64)
   paymentAttemptId       String         @unique
+  idempotencyKey         String?        @unique
+  requestHash            String?
   transactionHash        String?
   ledger                 Int?
   network                String

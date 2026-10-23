@@ -54,6 +54,8 @@ export type LumenSettleResponse = SettleResponse & {
   };
 };
 
+const SETTLEMENT_CLAIM_STALE_AFTER_MS = 60_000;
+
 export function toLumenSettleResponse(result: SettlementServiceResult): LumenSettleResponse {
   const { amount, network, ...projectResult } = result;
   return {
@@ -123,7 +125,47 @@ export class SettlementService {
     if (existingResult !== undefined) {
       return existingResult;
     }
-    const claimedAttempt = await this.attemptStore.claimSettlement(attempt.id);
+    const idempotencyKey = `settle:${attempt.id}`;
+    const existingSettlement = await this.settlementStore.getSettlementByAttempt(attempt.id);
+    if (existingSettlement !== undefined) {
+      if (
+        existingSettlement.idempotencyKey !== null &&
+        existingSettlement.idempotencyKey !== idempotencyKey ||
+        existingSettlement.requestHash !== null &&
+        existingSettlement.requestHash !== paymentHash
+      ) {
+        throw new LumenError("REPLAY_DETECTED", "Settlement idempotency key conflicts with request.");
+      }
+      if (
+        existingSettlement.status === "submitted" ||
+        ((existingSettlement.status === "timed_out" || existingSettlement.status === "failed") &&
+          existingSettlement.reconciliationState === "pending")
+      ) {
+        if (
+          existingSettlement.transactionHash === null ||
+          existingSettlement.transactionHash === undefined
+        ) {
+          throw new LumenError("SETTLEMENT_FAILED", "Submitted settlement is missing transaction evidence.");
+        }
+        await this.reconciliationScheduler?.enqueue({
+          correlationId: attempt.correlationId,
+          paymentAttemptId: attempt.id,
+          settlementId: existingSettlement.id,
+          transactionHash: existingSettlement.transactionHash,
+          network: existingSettlement.network
+        });
+        throw new LumenError("SETTLEMENT_FAILED", "Settlement is awaiting confirmation.", {
+          statusCode: 409,
+          details: {
+            status: "submitted",
+            settlementId: existingSettlement.id,
+            transactionHash: existingSettlement.transactionHash
+          }
+        });
+      }
+    }
+    const staleBefore = new Date(Date.now() - SETTLEMENT_CLAIM_STALE_AFTER_MS).toISOString();
+    const claimedAttempt = await this.attemptStore.claimSettlement(attempt.id, staleBefore);
     if (claimedAttempt === undefined) {
       return this.waitForDurableResult(attempt.id);
     }
@@ -152,7 +194,54 @@ export class SettlementService {
       );
     }
 
-    const adapterResult = await this.settleWithAdapter(normalized);
+    let preparedTransactionHash: string | undefined;
+    const adapterResult = await this.settleWithAdapter(normalized, async (transactionHash) => {
+      if (this.statePersistence === undefined) {
+        return;
+      }
+      const intent = await this.statePersistence.recordSubmission({
+        attempt,
+        settlement: {
+          correlationId: attempt.correlationId,
+          paymentAttemptId: attempt.id,
+          idempotencyKey,
+          requestHash: paymentHash,
+          transactionHash,
+          network: normalized.network,
+          amount: normalized.amount,
+          assetCode: normalized.asset.code,
+          assetIssuer: normalized.asset.issuer,
+          status: "submitted",
+          reconciliationState: "pending"
+        }
+      });
+      try {
+        await this.reconciliationScheduler?.enqueue({
+          correlationId: attempt.correlationId,
+          paymentAttemptId: attempt.id,
+          settlementId: intent.settlement.id,
+          transactionHash,
+          network: normalized.network
+        });
+      } catch {
+        try {
+          await this.auditLogService?.record({
+            action: "payment.settlement.reconciliation_enqueue_failed",
+            actorType: "system",
+            targetId: intent.settlement.id,
+            targetType: "settlement",
+            metadata: { paymentAttemptId: attempt.id }
+          });
+        } catch {
+          // Durable intent and startup scanning remain the recovery path.
+        }
+      }
+      preparedTransactionHash = transactionHash;
+    }).then((result) =>
+      result.transactionHash === undefined && preparedTransactionHash !== undefined
+        ? { ...result, transactionHash: preparedTransactionHash }
+        : result
+    );
     if (
       adapterResult.status !== "confirmed" ||
       adapterResult.transactionHash === undefined ||
@@ -165,6 +254,8 @@ export class SettlementService {
     const settlementInput = {
       correlationId: attempt.correlationId,
       paymentAttemptId: attempt.id,
+      idempotencyKey,
+      requestHash: paymentHash,
       transactionHash: adapterResult.transactionHash,
       ledger: adapterResult.ledger,
       network: normalized.network,
@@ -234,7 +325,7 @@ export class SettlementService {
     if (settlement?.status === "confirmed") {
       const receipt = await this.receiptService.getReceiptByAttempt(attempt.id);
       if (
-        receipt !== undefined &&
+        receipt?.status === "finalized" &&
         settlement.transactionHash !== null &&
         settlement.ledger !== null
       ) {
@@ -250,7 +341,10 @@ export class SettlementService {
         };
       }
     }
-    if (settlement?.status === "failed" || settlement?.status === "timed_out") {
+    if (
+      (settlement?.status === "failed" || settlement?.status === "timed_out") &&
+      !(settlement.transactionHash !== null && settlement.reconciliationState === "pending")
+    ) {
       throw new LumenError(
         settlementFailureCode(attempt.failureCode),
         attempt.failureReason ?? "Stellar settlement failed.",
@@ -292,7 +386,8 @@ export class SettlementService {
   }
 
   private async settleWithAdapter(
-    normalized: NormalizedVerifyPaymentRequest
+    normalized: NormalizedVerifyPaymentRequest,
+    onTransactionPrepared: (transactionHash: string) => Promise<void>
   ): Promise<X402SettlementResult> {
     if (this.adapter.settleExact === undefined) {
       throw new LumenError(
@@ -304,7 +399,8 @@ export class SettlementService {
     return this.adapter.settleExact({
       paymentPayload: normalized.paymentPayload,
       paymentRequirements: normalized.paymentRequirements,
-      normalizedRequest: normalized
+      normalizedRequest: normalized,
+      onTransactionPrepared
     });
   }
 
@@ -319,6 +415,8 @@ export class SettlementService {
     const settlementInput = {
       correlationId: attempt.correlationId,
       paymentAttemptId: attempt.id,
+      idempotencyKey: `settle:${attempt.id}`,
+      requestHash: attempt.paymentHash,
       ...(result.transactionHash === undefined ? {} : { transactionHash: result.transactionHash }),
       network: normalized.network,
       amount: normalized.amount,
@@ -348,6 +446,15 @@ export class SettlementService {
         status,
         failureCode,
         failureReason
+      });
+    }
+    if (result.transactionHash !== undefined) {
+      await this.reconciliationScheduler?.enqueue({
+        correlationId: attempt.correlationId,
+        paymentAttemptId: attempt.id,
+        settlementId: settlement.id,
+        transactionHash: result.transactionHash,
+        network: normalized.network
       });
     }
     throw new LumenError(failureCode, failureReason, {

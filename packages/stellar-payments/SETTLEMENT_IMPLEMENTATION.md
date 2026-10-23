@@ -23,24 +23,40 @@ This document describes the exact settlement payment implementation that ensures
 
 ### 2. Transaction Submission (Single Attempt Guarantee)
 
-The settlement flow prevents duplicate submissions through idempotent settlement request handling:
+Verification and settlement use separate idempotency identities. Verification stores
+`verify:<paymentHash>` as the unique key, where `paymentHash` is the canonical hash of the payment
+payload. Reusing that key with conflicting requirements is rejected. Settlement stores
+`settle:<paymentAttemptId>` and the request's `paymentHash` as its immutable request fingerprint.
+The signed transaction hash is not available from the buyer payload: the facilitator simulates,
+rebuilds, and signs the transaction. The adapter derives the network-specific hash from that final
+signed envelope and persists it before submitting the envelope to Stellar.
 
 ```
-1. Verify payment payload against requirements
-2. Compute deterministic paymentHash from payload
-3. Check if hash already submitted (idempotency check)
-4. Atomically transition from "verified" → "settling" (claimSettlement)
-5. Submit to Stellar via RPC/adapter
-6. Resolve finality (RPC polling with retry)
-7. Record settlement with transaction hash
-8. On concurrent request: wait up to 5 seconds for result, return cached
+verified
+  └─ atomic claimSettlement → settling
+       ├─ fresh exact verification fails → failed (no network submission)
+       ├─ 60-second pre-submit claim lease expires → identical retry may reclaim settling
+       └─ facilitator signs rebuilt transaction
+            └─ atomic recordSubmission → submitted + pending settlement + pending receipt
+                 ├─ schedule confirmation job, then submit signed envelope
+                 ├─ confirmed → atomically confirm attempt/settlement and finalize receipt
+                 └─ retry/restart → query the stored transaction hash; never resubmit
 ```
 
 **Idempotency Mechanisms**:
 
-- `PaymentAttemptStore.hashes`: Map<paymentHash, attemptId> prevents replay
-- `SettlementStore.byTransactionHash`: Map<txHash, settlementId> prevents duplicate recordings
-- `claimSettlement()`: Atomic "verified" → "settling" transition blocks concurrent settlement
+- `PaymentAttempt.idempotencyKey`: unique `verify:<paymentHash>` key
+- `Settlement.idempotencyKey`: unique `settle:<paymentAttemptId>` key
+- `Settlement.requestHash`: immutable payment payload fingerprint; conflicts are rejected
+- `claimSettlement()`: atomic `verified` → `settling`; a stale `settling` claim can be reclaimed
+  after 60 seconds because no transaction has reached the submission boundary yet
+- `recordSubmission()`: one DB transaction stores the signed transaction hash and request identity,
+  transitions the attempt to `submitted`, creates its pending receipt, and writes the reconciliation
+  outbox event
+- The signer callback awaits `recordSubmission()` before returning signed XDR to the upstream
+  adapter, which submits it to RPC only after that callback resolves
+- `SettlementStore.byTransactionHash`: unique `(transactionHash, network)` prevents duplicate
+  transaction evidence
 
 ### 3. Horizon Finality Verification (Exact Ledger & Hash Matching)
 
@@ -59,33 +75,26 @@ The settlement flow prevents duplicate submissions through idempotent settlement
 - BullMQ job with 8 retry attempts
 - Exponential backoff: 5s → 5s\*2^7 (640s max)
 - Uses Stellar SDK `Horizon.Server.transactions()`
-- Verifies:
-  - `transaction.successful === true`
-  - `transaction.ledger_attr` matches recorded ledger
-  - Transaction hash matches settlement record
+- Confirms a transaction is successful and has a positive ledger number
+- Rejects queue or receipt transaction hashes that conflict with the persisted settlement hash
+- The adapter's RPC finality result is a separate pre-confirmation check; the worker itself uses
+  Horizon and does not compare two providers
 
 ### 4. Receipt Finalization (Deferred Until Horizon Confirms)
 
-**Receipt Status Lifecycle**:
+**Attempt, settlement, and receipt transitions**:
 
 ```
-Creation (settlement.ts):
-  settlement.status = "confirmed"
-  settlement.reconciliationState = "not_required" (or "pending")
-  receipt.status = "pending"
-  ↓
-Reconciliation (settlementConfirmation.ts, if "pending"):
-  settlement.reconciliationState = "reconciled"
-  receipt.status = "finalized"
-  receipt.evidenceHash = SHA256(attemptId:paymentHash:txHash:ledger:network:amount:assetIssuer)
-  ↓
-Final State:
-  receipt.status = "finalized"
-  receipt.evidenceHash matches computation
-  Payment is confirmed and cannot be reversed
+verified → settling → submitted → confirmed
+                         │            └─ settlement confirmed, receipt finalized in one transaction
+                         ├─ receipt pending with signed transaction hash
+                         └─ pending transaction visibility → retry confirmation only
 ```
 
-**Important**: Receipts are created in "pending" status when settlement is submitted. They are NOT finalized until the reconciliation worker confirms the transaction on Horizon.
+The receipt evidence hash is finalized as
+`SHA256(attemptId:paymentHash:txHash:ledger:network:amount:assetIssuer)`. The transaction hash,
+ledger, settlement, attempt status, receipt evidence, and receipt outbox event are committed
+together. A pending receipt is never returned as finalized evidence.
 
 ### 5. Idempotent Retries (No Double Submission)
 
@@ -105,11 +114,12 @@ assert(result1.settlementId === result2.settlementId);
 
 **Implementation**:
 
-1. `findPaymentAttemptByHash()` returns existing attempt if already verified
-2. `claimSettlement()` atomically transitions to "settling" status
-3. Second request gets `undefined` from `claimSettlement()` and waits
-4. `waitForDurableResult()` polls every 20ms up to 5 seconds for completion
-5. Both requests eventually return same result
+1. `findPaymentAttemptByHash()` identifies the verified attempt and checks the same payload
+2. `claimSettlement()` allows only one fresh or stale pre-submit owner
+3. Once `recordSubmission()` commits, retries use the stored hash to schedule/continue confirmation
+4. The retry path does not call `settleExact()` for a submitted intent
+5. Confirmation updates the existing settlement and pending receipt; it does not create a second
+  settlement or receipt
 
 ### 6. Error Handling & Manual Review
 
@@ -138,13 +148,15 @@ assert(result1.settlementId === result2.settlementId);
   id: string;                                    // Unique settlement ID
   correlationId: string;                         // Tracking ID
   paymentAttemptId: string;                      // Links to payment attempt
+  idempotencyKey: string | null;                  // settle:<paymentAttemptId>
+  requestHash: string | null;                    // Canonical payment payload fingerprint
   transactionHash: string | null;                // Stellar transaction hash
   ledger: number | null;                         // Ledger sequence number
   network: NetworkId;                            // testnet | public
   amount: Decimal;                               // Amount in stroops
   assetCode: string;                             // e.g., "USDC"
   assetIssuer: string;                           // Issuer account public key
-  status: "confirmed" | "failed" | "timed_out";  // Final outcome
+  status: "pending" | "submitted" | "confirmed" | "failed" | "timed_out";
   reconciliationState:                           // Finality stage
     | "not_required"  // Legacy: settled by adapter
     | "pending"       // Awaiting Horizon confirmation

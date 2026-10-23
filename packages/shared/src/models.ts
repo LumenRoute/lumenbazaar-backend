@@ -155,6 +155,8 @@ export type Settlement = {
   id: string;
   correlationId: string;
   paymentAttemptId: string;
+  idempotencyKey: string | null;
+  requestHash: string | null;
   transactionHash: string | null;
   ledger: number | null;
   network: NetworkId;

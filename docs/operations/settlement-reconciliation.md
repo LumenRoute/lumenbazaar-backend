@@ -5,56 +5,42 @@ Hosted workers use BullMQ and Redis. Settlement confirmation jobs use
 with eight bounded exponential-backoff attempts, and move to the dead-letter queue after attempts
 are exhausted.
 
-At startup the worker scans for `settling` attempts without a settlement and non-final settlements
-with transaction evidence. It enqueues one reconciliation job per payment attempt. The API does not
-resubmit these payments. The API also enqueues the same deterministic job immediately after it
-durably records a non-final submission; an enqueue outage is audit-logged and the startup scan is
-the recovery path.
+At startup the worker scans non-final settlements that have a persisted transaction hash and
+enqueues one reconciliation job per payment attempt. It does not enqueue `settling` attempts without
+a settlement: these are pre-submit claims and have no network transaction to confirm. An identical
+API retry may reclaim that claim after its 60-second lease expires. Once signed transaction evidence
+is stored, the attempt is `submitted`; the API enqueues the deterministic confirmation job before
+the adapter submits the signed envelope. Retries of `submitted` attempts only query the stored hash
+and never invoke submission again. If enqueueing fails, the startup scan recovers the committed
+intent.
 
-## Observation sources
+Verification keys are `verify:<paymentHash>`. Settlement keys are
+`settle:<paymentAttemptId>`, with `requestHash` storing the canonical payment payload fingerprint.
+The same key with a conflicting fingerprint or transaction hash is rejected.
 
-The worker compares two independent observation sources before finalizing a
-settlement:
+## Horizon result handling
 
-- **Horizon** - the canonical transaction lookup used for transaction visibility and
-ledger attribution.
-- **RPC finality adapter** - an optional secondary observation source that can confirm,
-fail, or remain pending for the same transaction hash. When the adapter is not wired in, the
-worker falls back to Horizon-only behavior for backward compatibility.
+The confirmation worker queries Horizon by the persisted transaction hash. It accepts only a
+successful transaction response with a positive integer ledger. A not-found response or timeout is
+pending and is retried within the bounded BullMQ policy. A failed transaction or malformed response
+is sent to operator review. The adapter performs its own RPC finality check before returning an
+immediate success response; the worker does not compare Horizon and RPC results.
 
-Each observation is one of the following shapes:
-
-- `confirmed` with a ledger number
-- `failed` with a reason
-- `pending` with a reason (transaction not yet visible)
-- `unavailable` with a reason (transport error or timeout)
-
-## Agreement and disagreement states
-
-The comparison is classified explicitly by `classifyReconciliationAgreement` in
-`packages/stellar-payments/src/reconciliation.ts`:
-
-| State | Meaning | Worker action |
-| --- | --- | --- |
-| `agreed_confirmed` | Horizon and RPC agree on the same confirmed ledger. | Finalize settlement and receipt atomically. |
-| `agreed_failed` | Horizon and RPC agree the transaction failed. | Mark for operator review; never resubmit. |
-| `agreed_pending` | Neither source has observed a final result yet. | Preserve pending outcome and retry within the bounded policy. |
-| `disagree_only_horizon` | Horizon confirmed but RPC has not yet observed. | Preserve pending; retry until convergence or dead-letter. |
-| `disagree_only_rpc` | RPC confirmed but Horizon has not yet observed. | Preserve pending; retry until convergence or dead-letter. |
-| `disagree_ledger_mismatch` | Both confirmed but at different ledgers. | Mark for operator review. |
-| `disagree_confirmed_conflict` | One source confirmed and the other reported failure. | Mark for operator review. |
-| `insufficient_evidence` | At least one source was unavailable or the combination is inconclusive. | Preserve pending; retry within the bounded policy. |
-
-Only `agreed_confirmed` allows finalization. A timeout, missing observation, or a single
-source confirmation is never treated as a confirmed payment.
+Before writing confirmation, the worker also checks that the queued hash and any existing receipt
+hash match the stored settlement hash. A conflict is marked `needs_review`; it never overwrites
+evidence or causes another network submission.
 
 ## States
 
-- `pendig`: no final agreed result yet; retry within the bounded policy.
-- `reconciled`: chain confirmation agreed by both sources, payment state, and finalized receipt
-were committed atomically.
+- `pending` / `submitted`: no final agreed result yet; retry confirmation within the bounded policy.
+- `reconciled`: Horizon confirmed the transaction; payment state and finalized receipt were
+committed atomically.
 - `needs_review`: conflicting evidence, chain failure, exhausted retries, or missing
 transaction evidence requires an operator decision.
+
+The pre-submit `settling` state is different from `submitted`: if no transaction hash was committed,
+an identical API request may reclaim it only after the 60-second lease. Worker retries never submit
+transactions.
 
 Each check increments `reconciliationAttempts` and records `lastReconciledAt`. Terminal reasons are
 stored in `reconciliationReason` and a public-safe audit record. Dead-letter reasons must not include

@@ -11,6 +11,8 @@ import {
 export type CreateSettlementInput = {
   correlationId?: string;
   paymentAttemptId: string;
+  idempotencyKey?: string;
+  requestHash?: string;
   transactionHash?: string;
   ledger?: number;
   network: NetworkId;
@@ -46,6 +48,8 @@ export class InMemorySettlementStore implements SettlementStore {
       id: `set_${randomUUID().replaceAll("-", "").slice(0, 24)}`,
       correlationId: input.correlationId ?? getCorrelationId() ?? createCorrelationId(),
       paymentAttemptId: input.paymentAttemptId,
+      idempotencyKey: input.idempotencyKey ?? null,
+      requestHash: input.requestHash ?? null,
       transactionHash: input.transactionHash ?? null,
       ledger: input.ledger ?? null,
       network: input.network,
