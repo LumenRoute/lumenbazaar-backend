@@ -3,11 +3,30 @@ name: CI
 on:
   push:
     branches:
+      - develop
       - main
   pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
 
 jobs:
+  malware-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout submitted commit without credentials
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Scan for known malware indicators
+        run: node scripts/security/scan-malware.mjs
+
   checks:
+    needs: malware-scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -40,6 +59,7 @@ jobs:
         run: pnpm deploy:testnet:check
 
   payment-persistence:
+    needs: malware-scan
     runs-on: ubuntu-latest
     services:
       postgres:
