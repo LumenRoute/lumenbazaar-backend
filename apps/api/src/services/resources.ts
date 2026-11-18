@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   LumenError,
+  canonicalResourceUrl,
   type AppConfig,
   type JsonObject,
   type PaymentRequirement,
@@ -34,6 +35,7 @@ export const createResourceSchema = z.object({
   name: z.string().trim().min(1).max(160),
   description: z.string().trim().min(1).max(2000),
   url: z.string().url(),
+  displayUrl: z.string().optional(),
   routeTemplate: z.string().min(1),
   network: z.enum(["stellar:testnet", "stellar:pubnet"]),
   payTo: z.string().min(1),
@@ -107,7 +109,8 @@ export class InMemoryResourceStore implements ResourceStore {
       type: input.type,
       name: input.name,
       description: input.description,
-      url: input.url,
+      url: canonicalResourceUrl(input.url),
+      displayUrl: input.displayUrl ?? input.url,
       routeTemplate: input.routeTemplate,
       network: input.network,
       payTo: input.payTo,
@@ -146,7 +149,8 @@ export class InMemoryResourceStore implements ResourceStore {
       type: input.type ?? existing.type,
       name: input.name ?? existing.name,
       description: input.description ?? existing.description,
-      url: input.url ?? existing.url,
+      url: input.url === undefined ? existing.url : canonicalResourceUrl(input.url),
+      displayUrl: input.displayUrl ?? input.url ?? existing.displayUrl,
       routeTemplate: input.routeTemplate ?? existing.routeTemplate,
       network: input.network ?? existing.network,
       payTo: input.payTo ?? existing.payTo,
@@ -212,7 +216,9 @@ export class InMemoryResourceStore implements ResourceStore {
   }
 
   async listVersions(resourceId: string) {
-    return [...(this.versions.get(resourceId) ?? [])].sort((left, right) => left.version - right.version);
+    return [...(this.versions.get(resourceId) ?? [])].sort(
+      (left, right) => left.version - right.version
+    );
   }
 
   async rollbackResource(resourceId: string, patch: UpdateResourceInput, metadata: JsonObject) {
@@ -274,7 +280,7 @@ export class ResourceService {
 
   async createResource(input: unknown, sellerContext?: { sellerId: string; auditable: boolean }) {
     const resource = normalizeResourceInput(createResourceSchema.parse(input), this.config);
-    
+
     // Enforce seller ownership when seller context is provided (authenticated request)
     if (sellerContext?.auditable && resource.sellerId !== sellerContext.sellerId) {
       await this.auditLogService?.record({
@@ -289,12 +295,9 @@ export class ResourceService {
           actualSellerId: sellerContext.sellerId
         }
       });
-      throw new LumenError(
-        "FORBIDDEN",
-        "API key cannot create resources for another seller."
-      );
+      throw new LumenError("FORBIDDEN", "API key cannot create resources for another seller.");
     }
-    
+
     const seller = await this.sellerService.getSeller(resource.sellerId);
     assertSafeResourceTarget(resource.url, resource.type, resource.routeTemplate, seller.domain);
     const created = await this.store.createResource(resource);
@@ -317,9 +320,13 @@ export class ResourceService {
     return resource;
   }
 
-  async updateResource(resourceId: string, input: unknown, sellerContext?: { sellerId: string; auditable: boolean }) {
+  async updateResource(
+    resourceId: string,
+    input: unknown,
+    sellerContext?: { sellerId: string; auditable: boolean }
+  ) {
     const existing = await this.getResource(resourceId);
-    
+
     // Enforce seller ownership when seller context is provided (authenticated request)
     if (sellerContext?.auditable && existing.sellerId !== sellerContext.sellerId) {
       await this.auditLogService?.record({
@@ -336,7 +343,7 @@ export class ResourceService {
       });
       throw new LumenError("FORBIDDEN", "API key does not own this resource.");
     }
-    
+
     const patch = updateResourceSchema.parse(input);
     const normalized = normalizeResourceInput(mergeResourcePatch(existing, patch), this.config);
 
@@ -352,7 +359,10 @@ export class ResourceService {
     return updated;
   }
 
-  async deleteResource(resourceId: string, sellerContext?: { sellerId: string; auditable: boolean }) {
+  async deleteResource(
+    resourceId: string,
+    sellerContext?: { sellerId: string; auditable: boolean }
+  ) {
     return this.updateResource(resourceId, { status: "inactive" }, sellerContext);
   }
 
@@ -375,9 +385,13 @@ export class ResourceService {
    * never modified; rollback creates a new immutable version containing the
    * restored data and queues it for reindexing.
    */
-  async rollbackResource(resourceId: string, targetVersion: number, sellerContext?: { sellerId: string; auditable: boolean }) {
+  async rollbackResource(
+    resourceId: string,
+    targetVersion: number,
+    sellerContext?: { sellerId: string; auditable: boolean }
+  ) {
     const existing = await this.getResource(resourceId);
-    
+
     // Enforce seller ownership when seller context is provided (authenticated request)
     if (sellerContext?.auditable && existing.sellerId !== sellerContext.sellerId) {
       await this.auditLogService?.record({
@@ -395,7 +409,7 @@ export class ResourceService {
       });
       throw new LumenError("FORBIDDEN", "API key does not own this resource.");
     }
-    
+
     const target = await this.store.getVersion(resourceId, targetVersion);
     if (target === undefined) {
       throw new LumenError("RESOURCE_VERSION_NOT_FOUND", "Resource version was not found.");
@@ -403,10 +417,7 @@ export class ResourceService {
 
     const latest = await this.store.getLatestVersion(resourceId);
     if (latest === undefined || target.version >= latest.version) {
-      throw new LumenError(
-        "CONFLICT",
-        "Can only roll back to an older historical version."
-      );
+      throw new LumenError("CONFLICT", "Can only roll back to an older historical version.");
     }
 
     const metadata: JsonObject = {
@@ -459,6 +470,8 @@ function normalizeResourceInput<T extends CreateResourceInput | (Resource & Upda
 
   return {
     ...input,
+    url: canonicalResourceUrl(input.url),
+    displayUrl: input.displayUrl ?? input.url,
     amount,
     assetCode
   };
@@ -583,6 +596,7 @@ function mergeResourcePatch(existing: Resource, patch: UpdateResourceInput): Res
     name: patch.name ?? existing.name,
     description: patch.description ?? existing.description,
     url: patch.url ?? existing.url,
+    displayUrl: patch.url ?? existing.displayUrl ?? existing.url,
     routeTemplate: patch.routeTemplate ?? existing.routeTemplate,
     network: patch.network ?? existing.network,
     payTo: patch.payTo ?? existing.payTo,

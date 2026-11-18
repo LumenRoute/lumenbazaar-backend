@@ -72,6 +72,7 @@ model Resource {
   name                String
   description         String
   url                 String
+  displayUrl          String?
   routeTemplate       String
   network             String
   payTo               String

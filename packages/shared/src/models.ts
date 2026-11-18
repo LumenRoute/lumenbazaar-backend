@@ -80,6 +80,7 @@ export type ResourceSchema = {
 };
 
 export type Resource = {
+  displayUrl?: string | null;
   id: string;
   sellerId: string;
   type: ResourceType;

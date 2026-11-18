@@ -5,6 +5,7 @@ import { Queue } from "bullmq";
 import { Redis } from "ioredis";
 
 import {
+  canonicalResourceUrl,
   decodeCursor,
   encodeCursor,
   getTraceparent,
@@ -42,10 +43,7 @@ import {
   type ResourceStore,
   type UpdateResourceInput
 } from "./resources.js";
-import {
-  InMemorySearchDocumentStore,
-  type SearchDocumentStore
-} from "./search.js";
+import { InMemorySearchDocumentStore, type SearchDocumentStore } from "./search.js";
 import {
   InMemorySellerApiKeyStore,
   type SellerApiKeyRecord,
@@ -337,7 +335,10 @@ export class PrismaSellerApiKeyStore implements SellerApiKeyStore {
 export class PrismaCatalogEventStore implements CatalogEventStore {
   constructor(private readonly db: PrismaClient) {}
 
-  async createCatalogEvent(input: Omit<CatalogEvent, "id" | "createdAt">, tx?: Prisma.TransactionClient) {
+  async createCatalogEvent(
+    input: Omit<CatalogEvent, "id" | "createdAt">,
+    tx?: Prisma.TransactionClient
+  ) {
     // Use provided transaction client if available, otherwise use root client
     const client = tx ?? this.db;
     return mapCatalogEvent(
@@ -404,10 +405,10 @@ export function createCatalogPersistence(config: AppConfig) {
     config.nodeEnv !== "production" ||
     config.lumenEnv === "local"
   ) {
-  return {
-    sellerStore: new InMemorySellerStore() as SellerStore,
-    sellerApiKeyStore: new InMemorySellerApiKeyStore() as SellerApiKeyStore,
-    resourceStore: new InMemoryResourceStore() as ResourceStore,
+    return {
+      sellerStore: new InMemorySellerStore() as SellerStore,
+      sellerApiKeyStore: new InMemorySellerApiKeyStore() as SellerApiKeyStore,
+      resourceStore: new InMemoryResourceStore() as ResourceStore,
       eventStore: new InMemoryCatalogEventStore() as CatalogEventStore,
       searchDocumentStore: new InMemorySearchDocumentStore() as SearchDocumentStore,
       indexingQueue: new InMemoryResourceIndexingQueue() as ResourceIndexingQueue,
@@ -436,6 +437,8 @@ export function createCatalogPersistence(config: AppConfig) {
 function resourceCreateData(input: CreateResourceInput): Prisma.ResourceUncheckedCreateInput {
   return {
     ...input,
+    url: canonicalResourceUrl(input.url),
+    displayUrl: input.displayUrl ?? input.url,
     amount: input.amount,
     inputSchema: json(input.inputSchema as JsonObject),
     outputSchema: json(input.outputSchema as JsonObject),
@@ -448,7 +451,9 @@ function resourceUpdateData(input: UpdateResourceInput): Prisma.ResourceUnchecke
     ...(input.type === undefined ? {} : { type: input.type }),
     ...(input.name === undefined ? {} : { name: input.name }),
     ...(input.description === undefined ? {} : { description: input.description }),
-    ...(input.url === undefined ? {} : { url: input.url }),
+    ...(input.url === undefined
+      ? {}
+      : { url: canonicalResourceUrl(input.url), displayUrl: input.displayUrl ?? input.url }),
     ...(input.routeTemplate === undefined ? {} : { routeTemplate: input.routeTemplate }),
     ...(input.network === undefined ? {} : { network: input.network }),
     ...(input.payTo === undefined ? {} : { payTo: input.payTo }),
