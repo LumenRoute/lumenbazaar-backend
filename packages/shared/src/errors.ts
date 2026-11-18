@@ -1,4 +1,5 @@
 export const errorCodes = [
+  "SEARCH_SNAPSHOT_EXPIRED",
   "PAYMENT_REQUIRED",
   "UNSUPPORTED_NETWORK",
   "UNSUPPORTED_ASSET",
@@ -26,6 +27,7 @@ export const errorCodes = [
 export type ErrorCode = (typeof errorCodes)[number];
 
 export const defaultErrorStatus: Record<ErrorCode, number> = {
+  SEARCH_SNAPSHOT_EXPIRED: 410,
   PAYMENT_REQUIRED: 402,
   UNSUPPORTED_NETWORK: 400,
   UNSUPPORTED_ASSET: 400,

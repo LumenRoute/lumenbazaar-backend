@@ -6,6 +6,7 @@ import {
   type JsonObject,
   type Resource,
   type SearchDocument,
+  LumenError,
   normalizeLimit
 } from "@lumenbazaar/shared";
 
@@ -59,6 +60,12 @@ export class InMemorySearchDocumentStore implements SearchDocumentStore {
 }
 
 export class SearchService {
+  private readonly snapshots = new Map<
+    string,
+    { query: string; expires: number; result: SearchResult }
+  >();
+  private readonly snapshotTtlMs = 300_000;
+
   constructor(
     private readonly resourceService: ResourceService,
     private readonly metrics?: MetricsService,
@@ -101,22 +108,71 @@ export class SearchService {
     try {
       const filters = searchResourcesSchema.parse(input);
       const limit = normalizeLimit(filters.limit);
-      const page = await this.resourceService.listResources({
-        limit: 100,
-        status: "active",
-        ...(filters.network === undefined ? {} : { network: filters.network }),
-        ...(filters.asset === undefined ? {} : { asset: filters.asset }),
-        ...(filters.type === undefined ? {} : { type: filters.type }),
-        ...(filters.sellerId === undefined ? {} : { sellerId: filters.sellerId })
-      });
+      const query = JSON.stringify([
+        filters.q ?? "",
+        filters.network ?? "",
+        filters.asset ?? "",
+        filters.type ?? "",
+        filters.sellerId ?? ""
+      ]);
+      const now = Date.now();
+      for (const [id, snapshot] of this.snapshots)
+        if (snapshot.expires <= now) this.snapshots.delete(id);
+      if (filters.cursor) {
+        let cursor: { id: string; offset: number };
+        try {
+          cursor = JSON.parse(
+            Buffer.from(filters.cursor, "base64url").toString("utf8")
+          ) as typeof cursor;
+          if (
+            typeof cursor.id !== "string" ||
+            !Number.isSafeInteger(cursor.offset) ||
+            cursor.offset < 1 ||
+            filters.cursor.length > 512
+          )
+            throw new Error();
+        } catch {
+          throw new LumenError("VALIDATION_FAILED", "Invalid search cursor.");
+        }
+        const snapshot = this.snapshots.get(cursor.id);
+        if (!snapshot)
+          throw new LumenError(
+            "SEARCH_SNAPSHOT_EXPIRED",
+            "Search snapshot expired; restart without a cursor.",
+            { details: { restart: true } }
+          );
+        if (snapshot.query !== query || cursor.offset >= snapshot.result.resources.length)
+          throw new LumenError("VALIDATION_FAILED", "Search cursor does not match query.");
+        return this.snapshotPage(cursor.id, cursor.offset, limit, snapshot.result);
+      }
+      const allResources: Resource[] = [];
+      let sourceCursor: string | undefined;
+      do {
+        const page = await this.resourceService.listResources({
+          limit: 100,
+          ...(sourceCursor === undefined ? {} : { cursor: sourceCursor }),
+          status: "active",
+          ...(filters.network === undefined ? {} : { network: filters.network }),
+          ...(filters.asset === undefined ? {} : { asset: filters.asset }),
+          ...(filters.type === undefined ? {} : { type: filters.type }),
+          ...(filters.sellerId === undefined ? {} : { sellerId: filters.sellerId })
+        });
+        allResources.push(...page.resources);
+        if (allResources.length > 10_000)
+          throw new LumenError(
+            "VALIDATION_FAILED",
+            "Search snapshot capacity exceeded; narrow the query."
+          );
+        sourceCursor = page.nextCursor ?? undefined;
+      } while (sourceCursor !== undefined);
       const queryTerms = tokenize(filters.q ?? "");
       const documentEntries = await Promise.all(
-        page.resources.map(
+        allResources.map(
           async (resource) => [resource.id, await this.documentStore.get(resource.id)] as const
         )
       );
       const documents = new Map(documentEntries);
-      const ranked = page.resources
+      const ranked = allResources
         .map((resource) => {
           const document = documents.get(resource.id);
           const body = document?.body ?? buildSearchBody(resource);
@@ -137,22 +193,45 @@ export class SearchService {
             right.ranking.score - left.ranking.score ||
             left.name.localeCompare(right.name) ||
             left.id.localeCompare(right.id)
-        )
-        .slice(0, limit);
+        );
 
-      return {
-        resources: ranked,
+      const result: SearchResult = {
+        resources: structuredClone(ranked),
         ranking: {
           strategy: "postgres-full-text-v1"
         },
-        partialResults: page.resources.some(
+        partialResults: allResources.some(
           (resource) => documents.get(resource.id)?.stale !== false
         ),
         nextCursor: null
       };
+      if (this.snapshots.size >= 100)
+        throw new LumenError(
+          "RATE_LIMITED",
+          "Search snapshot capacity reached; retry after expiry."
+        );
+      const id = randomUUID();
+      this.snapshots.set(id, { query, expires: now + this.snapshotTtlMs, result });
+      return this.snapshotPage(id, 0, limit, result);
     } finally {
       this.metrics?.observeSearchLatency(Date.now() - startedAt);
     }
+  }
+  private snapshotPage(
+    id: string,
+    offset: number,
+    limit: number,
+    result: SearchResult
+  ): SearchResult {
+    const end = offset + limit;
+    return {
+      ...result,
+      resources: structuredClone(result.resources.slice(offset, end)),
+      nextCursor:
+        end < result.resources.length
+          ? Buffer.from(JSON.stringify({ id, offset: end })).toString("base64url")
+          : null
+    };
   }
 }
 

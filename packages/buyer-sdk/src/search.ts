@@ -55,6 +55,7 @@ export async function searchResources(
     method: "GET"
   });
 
+  if (response.status === 410) throw new SearchSnapshotExpired();
   if (!response.ok) {
     throw new Error(`Search failed: ${response.statusText}`);
   }
@@ -114,4 +115,12 @@ export async function searchHttpEndpoints(apiUrl: string, query?: string): Promi
     filters.q = query;
   }
   return searchResources(apiUrl, filters);
+}
+
+export class SearchSnapshotExpired extends Error {
+  readonly code = "SEARCH_SNAPSHOT_EXPIRED";
+  readonly restart = true;
+  constructor() {
+    super("Search snapshot expired; restart without a cursor.");
+  }
 }
