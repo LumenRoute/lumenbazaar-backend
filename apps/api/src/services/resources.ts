@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   LumenError,
   canonicalResourceUrl,
+  type MutationActor,
   type AppConfig,
   type JsonObject,
   type PaymentRequirement,
@@ -70,7 +71,11 @@ export type ListResourceFilters = z.output<typeof listResourcesSchema>;
 export type ResourceStore = {
   createResource: (input: CreateResourceInput) => Promise<Resource>;
   getResource: (resourceId: string) => Promise<Resource | undefined>;
-  updateResource: (resourceId: string, input: UpdateResourceInput) => Promise<Resource>;
+  updateResource: (
+    resourceId: string,
+    input: UpdateResourceInput,
+    actor?: MutationActor
+  ) => Promise<Resource>;
   listResources: (
     filters: ListResourceFilters
   ) => Promise<{ resources: Resource[]; nextCursor: string | null }>;
@@ -81,7 +86,8 @@ export type ResourceStore = {
   rollbackResource: (
     resourceId: string,
     patch: UpdateResourceInput,
-    metadata: JsonObject
+    metadata: JsonObject,
+    actor?: MutationActor
   ) => Promise<{ resource: Resource; version: ResourceVersion }>;
   createSchema: (resource: Resource) => Promise<ResourceSchema>;
   createPaymentRequirement: (resource: Resource) => Promise<PaymentRequirement>;
@@ -354,7 +360,11 @@ export class ResourceService {
       normalized.routeTemplate,
       seller.domain
     );
-    const updated = await this.store.updateResource(resourceId, normalized);
+    const updated = await this.store.updateResource(resourceId, normalized, {
+      actorId: sellerContext?.sellerId ?? "internal",
+      actorType: sellerContext ? "seller" : "system",
+      reason: normalized.status !== existing.status ? "resource.status_change" : "resource.update"
+    });
     await this.queueLatestVersion(updated.id);
     return updated;
   }
@@ -429,7 +439,12 @@ export class ResourceService {
     const { resource, version } = await this.store.rollbackResource(
       resourceId,
       target.metadata as unknown as UpdateResourceInput,
-      metadata
+      metadata,
+      {
+        actorId: sellerContext?.sellerId ?? "internal",
+        actorType: sellerContext ? "seller" : "system",
+        reason: "resource.rollback"
+      }
     );
     await this.queueLatestVersion(resource.id);
     return { resource, version };

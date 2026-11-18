@@ -6,6 +6,8 @@ import { Redis } from "ioredis";
 
 import {
   canonicalResourceUrl,
+  appendPrivilegedAudit,
+  type MutationActor,
   decodeCursor,
   encodeCursor,
   getTraceparent,
@@ -130,7 +132,11 @@ export class PrismaResourceStore implements ResourceStore {
     return row === null ? undefined : mapResource(row);
   }
 
-  async updateResource(resourceId: string, input: UpdateResourceInput) {
+  async updateResource(
+    resourceId: string,
+    input: UpdateResourceInput,
+    actor: MutationActor = { actorId: "internal", actorType: "system", reason: "resource.update" }
+  ) {
     return this.db.$transaction(async (tx) => {
       const resource = mapResource(
         await tx.resource.update({
@@ -155,6 +161,7 @@ export class PrismaResourceStore implements ResourceStore {
         where: { resourceId },
         data: { stale: true }
       });
+      await appendPrivilegedAudit(tx, "resource.update", resourceId, actor);
       return resource;
     });
   }
@@ -219,7 +226,12 @@ export class PrismaResourceStore implements ResourceStore {
     return rows.map(mapResourceVersion);
   }
 
-  async rollbackResource(resourceId: string, patch: UpdateResourceInput, metadata: JsonObject) {
+  async rollbackResource(
+    resourceId: string,
+    patch: UpdateResourceInput,
+    metadata: JsonObject,
+    actor: MutationActor = { actorId: "internal", actorType: "system", reason: "resource.rollback" }
+  ) {
     return this.db.$transaction(async (tx) => {
       const resource = mapResource(
         await tx.resource.update({
@@ -246,6 +258,7 @@ export class PrismaResourceStore implements ResourceStore {
         where: { resourceId },
         data: { stale: true }
       });
+      await appendPrivilegedAudit(tx, "resource.rollback", resourceId, actor);
       return { resource, version };
     });
   }

@@ -528,3 +528,18 @@ model ProcessedOutboxEvent {
   @@index([aggregateType, aggregateId, consumerId])
 }
 
+
+model PrivilegedMutationAudit {
+  sequence BigInt @id @default(autoincrement())
+  id String @unique
+  actorId String
+  actorType String
+  action String
+  targetId String
+  targetType String
+  reason String
+  correlationId String
+  outcome String
+  previousHash String
+  recordHash String @unique
+}
