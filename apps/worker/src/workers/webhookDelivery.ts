@@ -1,8 +1,6 @@
-import { URL } from "node:url";
 import crypto from "node:crypto";
 
 import {
-  type AppConfig,
   type WebhookPayload,
   computeWebhookSignature,
   serializeWebhookPayload,
@@ -12,8 +10,7 @@ import {
   WEBHOOK_TIMESTAMP_HEADER,
   WEBHOOK_DELIVERY_REQUEST_TIMEOUT_MS,
   WEBHOOK_MAX_DELIVERY_ATTEMPTS,
-  WEBHOOK_DELIVERY_INITIAL_BACKOFF_MS,
-  LumenError
+  WEBHOOK_DELIVERY_INITIAL_BACKOFF_MS
 } from "@lumenbazaar/shared";
 
 /**
@@ -135,7 +132,6 @@ export async function deliverWebhook(
 
     // Non-2xx response: decide if retryable
     const statusCode = response.status;
-    const isClientError = statusCode >= 400 && statusCode < 500;
     const isServerError = statusCode >= 500;
 
     // Don't retry 4xx errors (except 408, 429, 503 which are retriable)

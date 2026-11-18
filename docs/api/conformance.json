@@ -1,7 +1,7 @@
 {
   "suite": "stellar-x402",
   "version": "0.1.0",
-  "commit": "7e3d1f20a8c1bff38e989c821781f70da2cd93ec",
+  "commit": "1ee37ee3b31035fcf338b4aed792947566e6e6d0",
   "protocol": {
     "name": "x402",
     "version": 2,

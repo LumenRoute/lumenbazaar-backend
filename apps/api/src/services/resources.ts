@@ -234,7 +234,9 @@ export class InMemoryResourceStore implements ResourceStore {
     }
     const updated: Resource = {
       ...existing,
-      ...patch,
+      ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
+      url: canonicalResourceUrl(patch.url ?? existing.url),
+      displayUrl: patch.displayUrl ?? patch.url ?? existing.displayUrl ?? existing.url,
       updatedAt: new Date().toISOString()
     };
     this.resources.set(resourceId, updated);

@@ -13,16 +13,16 @@
  *   node scripts/migrations.mjs cleanup              - Remove all test_* databases
  */
 
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync } from "node:fs";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+const execAsync = ({ file, args, env }) => execFileAsync(file, args, { env });
 
 const SCHEMA_PATH = "prisma/schema.prisma";
 const MAINTENANCE_DB_URL =
-  process.env.MAINTENANCE_DB_URL ||
-  "postgresql://postgres:postgres@localhost:5432/postgres";
+  process.env.MAINTENANCE_DB_URL || "postgresql://postgres:postgres@localhost:5432/postgres";
 
 /**
  * Parse PostgreSQL connection URL components
@@ -43,12 +43,24 @@ function parsePostgresUrl(url) {
  */
 function buildPsqlCommand(url, query) {
   const params = parsePostgresUrl(url);
-  const pgpassFile = [
-    `${params.host}:${params.port}:*:${params.user}:${params.password}`
-  ].join(":");
-
-  // Use PGPASSWORD environment variable to avoid password prompt
-  return `PGPASSWORD="${params.password}" psql -h ${params.host} -p ${params.port} -U ${params.user} -d ${params.database} -c "${query}"`;
+  return {
+    file: "psql",
+    args: [
+      "-h",
+      params.host,
+      "-p",
+      params.port,
+      "-U",
+      params.user,
+      "-d",
+      params.database,
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      query
+    ],
+    env: { ...process.env, PGPASSWORD: params.password }
+  };
 }
 
 /**
@@ -61,10 +73,7 @@ async function createTestDatabase(name = null) {
 
   console.log(`Creating disposable test database: ${dbName}`);
 
-  const createCommand = buildPsqlCommand(
-    MAINTENANCE_DB_URL,
-    `CREATE DATABASE ${dbName};`
-  );
+  const createCommand = buildPsqlCommand(MAINTENANCE_DB_URL, `CREATE DATABASE ${dbName};`);
 
   try {
     const { stdout, stderr } = await execAsync(createCommand);
@@ -73,7 +82,7 @@ async function createTestDatabase(name = null) {
     const params = parsePostgresUrl(MAINTENANCE_DB_URL);
     const dbUrl = `postgresql://${params.user}:${params.password}@${params.host}:${params.port}/${dbName}`;
 
-    console.log(`Database URL: ${dbUrl}`);
+    console.log("Disposable test database is ready.");
     return dbUrl;
   } catch (error) {
     console.error(`✗ Failed to create database ${dbName}`);
@@ -93,7 +102,11 @@ async function runMigrationsOnDatabase(databaseUrl) {
 
   console.log("Running migrations...");
 
-  const command = `DATABASE_URL="${databaseUrl}" pnpm exec prisma migrate deploy --schema "${SCHEMA_PATH}"`;
+  const command = {
+    file: process.execPath,
+    args: ["node_modules/prisma/build/index.js", "migrate", "deploy", "--schema", SCHEMA_PATH],
+    env: { ...process.env, DATABASE_URL: databaseUrl }
+  };
 
   try {
     const { stdout, stderr } = await execAsync(command);
