@@ -1,6 +1,5 @@
 import { URL } from "node:url";
 import crypto from "node:crypto";
-import fetch from "node-fetch";
 
 import {
   type AppConfig,
@@ -111,7 +110,7 @@ export async function deliverWebhook(
       method: "POST",
       headers,
       body: rawBody,
-      timeout: WEBHOOK_DELIVERY_REQUEST_TIMEOUT_MS,
+      signal: AbortSignal.timeout(WEBHOOK_DELIVERY_REQUEST_TIMEOUT_MS),
       // Explicitly disable redirects to prevent SSRF/bounce attacks
       redirect: "error"
     });

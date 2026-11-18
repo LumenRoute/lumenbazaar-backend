@@ -185,6 +185,7 @@ const resource: SchemaObject = {
     name: { type: "string" },
     description: { type: "string" },
     url: { type: "string", format: "uri" },
+    displayUrl: { type: ["string", "null"] },
     routeTemplate: { type: "string" },
     network: { type: "string", enum: ["stellar:testnet", "stellar:pubnet"] },
     payTo: { type: "string" },

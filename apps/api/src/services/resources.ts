@@ -36,7 +36,7 @@ export const createResourceSchema = z.object({
   name: z.string().trim().min(1).max(160),
   description: z.string().trim().min(1).max(2000),
   url: z.string().url(),
-  displayUrl: z.string().optional(),
+  displayUrl: z.string().nullable().optional(),
   routeTemplate: z.string().min(1),
   network: z.enum(["stellar:testnet", "stellar:pubnet"]),
   payTo: z.string().min(1),

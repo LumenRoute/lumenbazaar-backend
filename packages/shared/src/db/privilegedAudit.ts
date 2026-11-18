@@ -18,6 +18,7 @@ export async function appendPrivilegedAudit(
   const previous = await tx.privilegedMutationAudit.findFirst({ orderBy: { sequence: "desc" } });
   const data = {
     id: randomUUID(),
+    createdAt: new Date().toISOString(),
     actorId: actor.actorId,
     actorType: actor.actorType,
     action,

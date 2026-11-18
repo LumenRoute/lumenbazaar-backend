@@ -1,5 +1,5 @@
 CREATE TABLE "PrivilegedMutationAudit" (
-  "sequence" BIGSERIAL PRIMARY KEY, "id" TEXT NOT NULL UNIQUE,
+  "sequence" BIGSERIAL PRIMARY KEY, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "id" TEXT NOT NULL UNIQUE,
   "actorId" TEXT NOT NULL, "actorType" TEXT NOT NULL, "action" TEXT NOT NULL,
   "targetId" TEXT NOT NULL, "targetType" TEXT NOT NULL, "reason" TEXT NOT NULL,
   "correlationId" TEXT NOT NULL, "outcome" TEXT NOT NULL,

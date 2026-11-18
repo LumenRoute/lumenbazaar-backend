@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { z } from "zod";
 import type { SettlementStatus, NetworkId } from "./models.js";
 
@@ -166,8 +167,6 @@ export function computeWebhookSignature(
   timestamp: string,
   rawBody: string
 ): string {
-  const crypto = require("crypto");
-
   // Decode secret if base64 (attempt; if fails, treat as raw string)
   let secretBytes: Buffer;
   try {
@@ -206,8 +205,6 @@ export function verifyWebhookSignature(
   signature: string,
   replayWindowSeconds: number = 300
 ): boolean {
-  const crypto = require("crypto");
-
   // Verify timestamp is within replay window
   const receivedTime = new Date(timestamp);
   if (isNaN(receivedTime.getTime())) {

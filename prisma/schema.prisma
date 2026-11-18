@@ -530,6 +530,7 @@ model ProcessedOutboxEvent {
 
 
 model PrivilegedMutationAudit {
+  createdAt DateTime @default(now())
   sequence BigInt @id @default(autoincrement())
   id String @unique
   actorId String

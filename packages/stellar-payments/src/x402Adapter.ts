@@ -396,6 +396,7 @@ function failureCode(reason: string): ErrorCode {
 function failureMessage(reason: string): string {
   const code = failureCode(reason);
   const messages: Record<ErrorCode, string> = {
+    SEARCH_SNAPSHOT_EXPIRED: "Search snapshot expired.",
     AMOUNT_MISMATCH: "Payment amount does not match the requirement.",
     ASSET_MISMATCH: "Payment asset does not match the requirement.",
     AUTH_EXPIRED: "Payment authorization expiry is invalid.",
