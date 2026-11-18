@@ -10,6 +10,14 @@ Run the full check before pushing:
 pnpm check
 ```
 
+Enable the repository hook and run the dependency-free malware checks before pushing:
+
+```bash
+pnpm security:install-hooks
+pnpm security:malware-scan
+pnpm security:malware-test
+```
+
 For database changes, validate the Prisma schema and include migration files.
 
 ## Commit Guidance
