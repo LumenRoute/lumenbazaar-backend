@@ -6,13 +6,15 @@ import {
   type AppConfig,
   type WebhookPayload,
   computeWebhookSignature,
+  serializeWebhookPayload,
+  WebhookPayloadTooLarge,
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_EVENT_ID_HEADER,
   WEBHOOK_TIMESTAMP_HEADER,
   WEBHOOK_DELIVERY_REQUEST_TIMEOUT_MS,
   WEBHOOK_MAX_DELIVERY_ATTEMPTS,
   WEBHOOK_DELIVERY_INITIAL_BACKOFF_MS,
-  LumenError,
+  LumenError
 } from "@lumenbazaar/shared";
 
 /**
@@ -67,9 +69,22 @@ export function computeBackoffDelay(
  * @param input - Webhook delivery job input
  * @returns Delivery result with retry instructions
  */
-export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<WebhookDeliveryResult> {
+export async function deliverWebhook(
+  input: WebhookDeliveryJobInput
+): Promise<WebhookDeliveryResult> {
   const startTime = Date.now();
-  const rawBody = JSON.stringify(input.payload);
+  let rawBody: string;
+  try {
+    rawBody = serializeWebhookPayload(input.payload);
+  } catch (error) {
+    if (!(error instanceof WebhookPayloadTooLarge)) throw error;
+    return {
+      success: false,
+      latencyMs: Date.now() - startTime,
+      errorClass: error.name,
+      shouldRetry: false
+    };
+  }
   const timestamp = new Date().toISOString();
 
   // Compute signatures with current secret
@@ -86,9 +101,9 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
       ? {
           "x-lumenbazaar-signature-previous": input.previousSecrets
             .map((secret) => computeWebhookSignature(secret, timestamp, rawBody))
-            .join(","),
+            .join(",")
         }
-      : {}),
+      : {})
   };
 
   try {
@@ -98,7 +113,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
       body: rawBody,
       timeout: WEBHOOK_DELIVERY_REQUEST_TIMEOUT_MS,
       // Explicitly disable redirects to prevent SSRF/bounce attacks
-      redirect: "error",
+      redirect: "error"
     });
 
     const latencyMs = Date.now() - startTime;
@@ -106,9 +121,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
 
     // Truncate and redact response body (max 500 chars)
     const responseBodyTruncated =
-      responseText.length > 500
-        ? responseText.substring(0, 500) + "..."
-        : responseText;
+      responseText.length > 500 ? responseText.substring(0, 500) + "..." : responseText;
 
     const success = response.ok; // 2xx status
 
@@ -117,7 +130,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
         success: true,
         statusCode: response.status,
         latencyMs,
-        shouldRetry: false,
+        shouldRetry: false
       };
     }
 
@@ -137,9 +150,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
       latencyMs,
       responseBodyTruncated,
       shouldRetry,
-      nextAttemptDelayMs: shouldRetry
-        ? computeBackoffDelay(input.attemptNumber)
-        : undefined,
+      nextAttemptDelayMs: shouldRetry ? computeBackoffDelay(input.attemptNumber) : undefined
     };
   } catch (error) {
     const latencyMs = Date.now() - startTime;
@@ -157,7 +168,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
         "invalid url",
         "malformed",
         "invalid_argument",
-        "unsupported protocol",
+        "unsupported protocol"
       ];
 
       shouldRetry =
@@ -174,7 +185,7 @@ export async function deliverWebhook(input: WebhookDeliveryJobInput): Promise<We
       latencyMs,
       errorClass,
       shouldRetry,
-      nextAttemptDelayMs,
+      nextAttemptDelayMs
     };
   }
 }
@@ -211,7 +222,7 @@ export function redactSensitiveHeaders(headers: Record<string, string>): Record<
     /^cookie$/i,
     /^set-cookie$/i,
     /^x-api-key$/i,
-    /^x-auth-token$/i,
+    /^x-auth-token$/i
   ];
 
   for (const [key, value] of Object.entries(headers)) {
@@ -248,6 +259,6 @@ export function createWebhookDeliveryAttemptRecord(
     responseBodyTruncated: result.responseBodyTruncated ?? null,
     latencyMs: result.latencyMs,
     errorClass: result.errorClass ?? null,
-    createdAt: new Date().toISOString(),
+    createdAt: new Date().toISOString()
   };
 }
