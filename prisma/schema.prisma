@@ -90,6 +90,10 @@ model Resource {
   version             Int                  @default(1)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+  deletedBy           String?
+  restoreDeadline     DateTime?
+  purgedAt            DateTime?
   seller              Seller               @relation(fields: [sellerId], references: [id], onDelete: Restrict)
   versions            ResourceVersion[]
   schemas             ResourceSchema[]
@@ -104,6 +108,9 @@ model Resource {
   @@index([sellerId])
   @@index([network, assetCode])
   @@index([type, status])
+  @@index([deletedAt])
+  @@index([restoreDeadline])
+  @@index([status, restoreDeadline]) // For batched purge queries
 }
 
 model ResourceVersion {

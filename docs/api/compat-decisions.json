@@ -1,0 +1,24 @@
+{
+  "description": "Approved breaking changes to the OpenAPI contract. Each entry records a reviewed decision to accept a breaking change, with justification and migration notes for clients.",
+  "approvedChanges": [
+    {
+      "changeId": "example_breaking_change",
+      "description": "Example: Removed deprecated endpoint /v1/resources/legacy",
+      "apiVersion": "0.2.0",
+      "migrationNotes": "Clients should migrate to /v1/resources. The new endpoint provides the same functionality with improved performance. Transition timeline: deprecated v0.1.x endpoints will be removed in v1.0.0.",
+      "approvedAt": "2024-01-10T14:00:00Z",
+      "reason": "Cleanup of deprecated API surface before 1.0.0 release. Migration path is clear and documented."
+    }
+  ],
+  "policyNotes": {
+    "description": "Guidelines for recording approved breaking changes",
+    "rules": [
+      "Every breaking change must have an entry in this file with changeId, description, apiVersion, migrationNotes, approvedAt, and reason",
+      "apiVersion must be higher than the baseline version when approving the change",
+      "migrationNotes must be non-empty and provide clear guidance for API consumers",
+      "approvedAt should be an ISO 8601 timestamp when the decision was made",
+      "reason should explain why the breaking change was necessary and how it benefits the API",
+      "Unapproved breaking changes will fail the OpenAPI breaking-change gate in CI"
+    ]
+  }
+}

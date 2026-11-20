@@ -15,6 +15,7 @@ export const queueNames = {
   webhookDelivery: "webhook-delivery",
   outboxRelay: "outbox-relay",
   outboxCleanup: "outbox-cleanup",
+  resourcePurge: "resource-purge",
   deadLetter: "dead-letter",
   quarantine: "dead-letter" // Quarantine jobs use the same dead-letter queue
 } as const;

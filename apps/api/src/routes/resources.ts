@@ -75,6 +75,15 @@ export function registerResourceRoutes(app: FastifyInstance, options: ResourceRo
     );
   });
 
+  app.post("/v1/resources/:id/restore", async (request) => {
+    const params = parseParams(request, z.object({ id: z.string().min(1) }));
+    return options.resourceService.restoreResource(
+      params.id,
+      getSellerContext(request),
+      { expectedVersion: parseIfMatchHeader(request) }
+    );
+  });
+
   // Authorization-specific: seller-scoped list, never a shared/public validator.
   app.get("/v1/sellers/:sellerId/resources", async (request, reply) => {
     const params = parseParams(request, z.object({ sellerId: z.string().min(1) }));

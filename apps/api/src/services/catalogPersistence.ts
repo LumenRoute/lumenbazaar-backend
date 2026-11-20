@@ -333,6 +333,169 @@ export class PrismaResourceStore implements ResourceStore {
       await this.db.paymentRequirement.create({ data: paymentRequirementData(resource) })
     );
   }
+
+  async softDeleteResource(
+    resourceId: string,
+    deletedBy: string,
+    options: ResourceMutationOptions
+  ) {
+    return this.db.$transaction(async (tx) => {
+      const current = await tx.resource.findUnique({ where: { id: resourceId } });
+      if (current === null) {
+        throw new LumenError("RESOURCE_NOT_FOUND", "Resource was not found.");
+      }
+      assertPrismaExpectedVersion(current.version, resourceId, options);
+
+      const { calculateRestorationDeadline } = await import("@lumenbazaar/shared");
+      const now = new Date();
+      const restoreDeadline = calculateRestorationDeadline(now);
+
+      const matched = await tx.resource.updateMany({
+        where: { id: resourceId, version: options.expectedVersion },
+        data: {
+          deletedAt: now,
+          deletedBy,
+          restoreDeadline,
+          version: { increment: 1 }
+        }
+      });
+
+      if (matched.count === 0) {
+        const fresh = await tx.resource.findUnique({ where: { id: resourceId } });
+        throw new LumenError(
+          "RESOURCE_VERSION_CONFLICT",
+          "Resource was modified by another writer.",
+          {
+            details: {
+              expectedVersion: options.expectedVersion,
+              currentVersion: fresh?.version ?? current.version,
+              resourceId
+            }
+          }
+        );
+      }
+
+      const resource = mapResource(
+        await tx.resource.findUniqueOrThrow({ where: { id: resourceId } })
+      );
+      return resource;
+    });
+  }
+
+  async restoreResource(resourceId: string, options: ResourceMutationOptions) {
+    return this.db.$transaction(async (tx) => {
+      const current = await tx.resource.findUnique({ where: { id: resourceId } });
+      if (current === null) {
+        throw new LumenError("RESOURCE_NOT_FOUND", "Resource was not found.");
+      }
+      assertPrismaExpectedVersion(current.version, resourceId, options);
+
+      if (current.deletedAt === null) {
+        throw new LumenError(
+          "VALIDATION_FAILED",
+          "Resource is not soft-deleted and cannot be restored."
+        );
+      }
+
+      if (current.purgedAt !== null) {
+        throw new LumenError(
+          "RESOURCE_PURGED",
+          "Resource has been permanently purged and cannot be restored."
+        );
+      }
+
+      const { isWithinRestorationWindow } = await import("@lumenbazaar/shared");
+      if (!isWithinRestorationWindow(current.restoreDeadline)) {
+        throw new LumenError(
+          "RESTORE_WINDOW_EXPIRED",
+          "Restoration window has expired. Resource can no longer be restored."
+        );
+      }
+
+      const matched = await tx.resource.updateMany({
+        where: { id: resourceId, version: options.expectedVersion },
+        data: {
+          deletedAt: null,
+          deletedBy: null,
+          restoreDeadline: null,
+          version: { increment: 1 }
+        }
+      });
+
+      if (matched.count === 0) {
+        const fresh = await tx.resource.findUnique({ where: { id: resourceId } });
+        throw new LumenError(
+          "RESOURCE_VERSION_CONFLICT",
+          "Resource was modified by another writer.",
+          {
+            details: {
+              expectedVersion: options.expectedVersion,
+              currentVersion: fresh?.version ?? current.version,
+              resourceId
+            }
+          }
+        );
+      }
+
+      const resource = mapResource(
+        await tx.resource.findUniqueOrThrow({ where: { id: resourceId } })
+      );
+      return resource;
+    });
+  }
+
+  async listExpiredResources(limit: number) {
+    const now = new Date();
+    const expired = await this.db.resource.findMany({
+      where: {
+        deletedAt: { not: null },
+        restoreDeadline: { lt: now },
+        purgedAt: null
+      },
+      orderBy: [{ restoreDeadline: "asc" }, { id: "asc" }],
+      take: limit,
+      select: { id: true, restoreDeadline: true }
+    });
+
+    return expired.map((r) => ({
+      id: r.id,
+      restoreDeadline: r.restoreDeadline!
+    }));
+  }
+
+  async purgeResource(resourceId: string) {
+    await this.db.$transaction(async (tx) => {
+      const resource = await tx.resource.findUnique({ where: { id: resourceId } });
+      if (resource === null || resource.purgedAt !== null) {
+        return; // Already purged or never existed
+      }
+
+      // Tombstone the resource to preserve record for settlement evidence
+      // but redact sensitive catalog data
+      await tx.resource.update({
+        where: { id: resourceId },
+        data: {
+          purgedAt: new Date(),
+          name: "[Purged]",
+          description: "[Purged]",
+          url: "https://removed/",
+          displayUrl: "[Purged]",
+          inputSchema: {},
+          outputSchema: {},
+          extensions: {},
+          deletedAt: null,
+          deletedBy: null,
+          restoreDeadline: null
+        }
+      });
+
+      // Mark search document as stale to trigger reindexing
+      await tx.searchDocument.updateMany({
+        where: { resourceId },
+        data: { stale: true }
+      });
+    });
+  }
 }
 
 export class PrismaSellerApiKeyStore implements SellerApiKeyStore {
@@ -604,7 +767,11 @@ function mapResource(row: Prisma.ResourceGetPayload<object>): Resource {
     extensions: row.extensions as JsonObject,
     status: row.status as Resource["status"],
     createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString()
+    updatedAt: row.updatedAt.toISOString(),
+    deletedAt: row.deletedAt?.toISOString() ?? null,
+    deletedBy: row.deletedBy,
+    restoreDeadline: row.restoreDeadline?.toISOString() ?? null,
+    purgedAt: row.purgedAt?.toISOString() ?? null
   };
 }
 

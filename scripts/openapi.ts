@@ -11,6 +11,14 @@ import {
   buildConformanceSpec,
   renderConformanceMarkdown
 } from "../apps/api/src/services/conformance.js";
+import {
+  detectChanges,
+  generateReport,
+  loadCompatibilityDecisions,
+  formatReport,
+  writeReportArtifact,
+  type OpenApiSpec
+} from "./openapiBreakingChangeDetector.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -217,7 +225,110 @@ export async function generateReleaseArtifacts(options: { checkOnly?: boolean } 
   return { success: true, artifacts: allArtifacts };
 }
 
+/**
+ * Check generated OpenAPI spec for breaking changes against baseline
+ */
+export async function checkBreakingChanges(options: { baselineDir?: string } = {}) {
+  const baselineDir = options.baselineDir || resolve(root, "docs/api/baseline");
+  const generatedPath = resolve(root, "docs/api/openapi.json");
+  const baselinePath = resolve(baselineDir, "openapi.baseline.json");
+  const compatDecisionsPath = resolve(root, "docs/api/compat-decisions.json");
+  const reportPath = resolve(root, "docs/api/breaking-changes-report.json");
+
+  // Load baseline
+  let baseline: OpenApiSpec | undefined;
+  try {
+    const baselineContent = await readFile(baselinePath, "utf8");
+    baseline = JSON.parse(baselineContent);
+  } catch (error) {
+    console.error(`Failed to load baseline from ${baselinePath}`);
+    if (process.argv.includes("--fail-on-missing-baseline")) {
+      process.exitCode = 1;
+      return { success: false };
+    }
+    console.warn("Baseline not found. Creating new baseline from current spec.");
+    baseline = undefined;
+  }
+
+  // Load generated spec
+  let generated: OpenApiSpec;
+  try {
+    const generatedContent = await readFile(generatedPath, "utf8");
+    generated = JSON.parse(generatedContent);
+  } catch (error) {
+    console.error(`Failed to load generated spec from ${generatedPath}`);
+    process.exitCode = 1;
+    return { success: false };
+  }
+
+  // If no baseline, use generated as baseline
+  if (baseline === undefined) {
+    await mkdir(dirname(baselinePath), { recursive: true });
+    await writeFile(baselinePath, JSON.stringify(generated, null, 2), "utf8");
+    console.log(`Created new baseline at ${baselinePath}`);
+    await writeFile(
+      reportPath,
+      writeReportArtifact({
+        baselineVersion: generated.info.version,
+        generatedVersion: generated.info.version,
+        versionBumped: false,
+        breaking: [],
+        approvedBreaking: [],
+        additive: [],
+        unknown: [],
+        isValid: true
+      }),
+      "utf8"
+    );
+    return { success: true };
+  }
+
+  // Detect changes
+  const changes = detectChanges(baseline, generated);
+
+  // Load compatibility decisions
+  const approvedDecisions = await loadCompatibilityDecisions(compatDecisionsPath);
+
+  // Generate report
+  const report = generateReport(
+    changes,
+    baseline.info.version,
+    generated.info.version,
+    approvedDecisions
+  );
+
+  // Write report artifact
+  await writeFile(reportPath, writeReportArtifact(report), "utf8");
+  console.log(`\nReport written to ${reportPath}`);
+
+  // Print formatted report
+  console.log("\n" + formatReport(report));
+
+  if (!report.isValid) {
+    console.error(
+      "\n❌ BREAKING CHANGES DETECTED\nApprove changes in docs/api/compat-decisions.json or fix the spec."
+    );
+    process.exitCode = 1;
+    return { success: false };
+  }
+
+  // If all changes are approved, update baseline
+  if (report.approvedBreaking.length > 0 || report.additive.length > 0) {
+    await mkdir(dirname(baselinePath), { recursive: true });
+    await writeFile(baselinePath, JSON.stringify(generated, null, 2), "utf8");
+    console.log(`\n✓ Baseline updated to ${generated.info.version}`);
+  }
+
+  return { success: true };
+}
+
 // Auto-run when executed directly via tsx / node
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  const generateOnly = process.argv.includes("--generate-only");
+  
   await generateReleaseArtifacts();
+  
+  if (!generateOnly && !process.argv.includes("--skip-breaking-change-check")) {
+    await checkBreakingChanges();
+  }
 }

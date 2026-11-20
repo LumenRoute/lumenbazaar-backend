@@ -52,6 +52,17 @@ jobs:
       - name: Run checks
         run: pnpm check
 
+      - name: Check OpenAPI breaking changes
+        run: pnpm openapi:check
+        continue-on-error: false
+
+      - name: Upload OpenAPI report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-breaking-changes-report
+          path: docs/api/breaking-changes-report.json
+
       - name: Check configuration reference is in sync
         run: pnpm config:reference:check
 

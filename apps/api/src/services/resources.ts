@@ -107,6 +107,19 @@ export type ResourceStore = {
   ) => Promise<{ resource: Resource; version: ResourceVersion }>;
   createSchema: (resource: Resource) => Promise<ResourceSchema>;
   createPaymentRequirement: (resource: Resource) => Promise<PaymentRequirement>;
+  softDeleteResource: (
+    resourceId: string,
+    deletedBy: string,
+    options: ResourceMutationOptions
+  ) => Promise<Resource>;
+  restoreResource: (
+    resourceId: string,
+    options: ResourceMutationOptions
+  ) => Promise<Resource>;
+  listExpiredResources: (
+    limit: number
+  ) => Promise<Array<{ id: string; restoreDeadline: Date }>>;
+  purgeResource: (resourceId: string) => Promise<void>;
 };
 
 export type ResourceChangeQueue = {
@@ -329,7 +342,115 @@ export class InMemoryResourceStore implements ResourceStore {
     this.paymentRequirements.set(resource.id, [...existing, paymentRequirement]);
     return paymentRequirement;
   }
-}
+
+  async softDeleteResource(
+    resourceId: string,
+    deletedBy: string,
+    options: ResourceMutationOptions
+  ) {
+    const existing = this.resources.get(resourceId);
+    if (existing === undefined) {
+      throw new LumenError("RESOURCE_NOT_FOUND", "Resource was not found.");
+    }
+
+    assertExpectedVersion(existing, options);
+
+    const now = new Date();
+    const { calculateRestorationDeadline } = await import("@lumenbazaar/shared");
+    const restoreDeadline = calculateRestorationDeadline(now);
+
+    const deleted: Resource = {
+      ...existing,
+      deletedAt: now.toISOString(),
+      deletedBy,
+      restoreDeadline: restoreDeadline.toISOString(),
+      version: existing.version + 1,
+      updatedAt: now.toISOString()
+    };
+
+    this.resources.set(resourceId, deleted);
+    return deleted;
+  }
+
+  async restoreResource(resourceId: string, options: ResourceMutationOptions) {
+    const existing = this.resources.get(resourceId);
+    if (existing === undefined) {
+      throw new LumenError("RESOURCE_NOT_FOUND", "Resource was not found.");
+    }
+
+    assertExpectedVersion(existing, options);
+
+    if (existing.deletedAt === null || existing.deletedAt === undefined) {
+      throw new LumenError(
+        "VALIDATION_FAILED",
+        "Resource is not soft-deleted and cannot be restored."
+      );
+    }
+
+    const restored: Resource = {
+      ...existing,
+      deletedAt: null,
+      deletedBy: null,
+      restoreDeadline: null,
+      version: existing.version + 1,
+      updatedAt: new Date().toISOString()
+    };
+
+    this.resources.set(resourceId, restored);
+    return restored;
+  }
+
+  async listExpiredResources(limit: number) {
+    const now = new Date();
+    return [...this.resources.values()]
+      .filter(
+        (r) =>
+          r.deletedAt !== null &&
+          r.deletedAt !== undefined &&
+          r.restoreDeadline !== null &&
+          r.restoreDeadline !== undefined &&
+          new Date(r.restoreDeadline) < now &&
+          (r.purgedAt === null || r.purgedAt === undefined)
+      )
+      .sort((a, b) => {
+        const deadlineCompare =
+          new Date(a.restoreDeadline!).getTime() - new Date(b.restoreDeadline!).getTime();
+        return deadlineCompare !== 0 ? deadlineCompare : a.id.localeCompare(b.id);
+      })
+      .slice(0, limit)
+      .map((r) => ({ id: r.id, restoreDeadline: new Date(r.restoreDeadline!) }));
+  }
+
+  async purgeResource(resourceId: string) {
+    const existing = this.resources.get(resourceId);
+    if (existing === undefined) {
+      return; // Already purged or never existed
+    }
+
+    const now = new Date();
+    const purged: Resource = {
+      ...existing,
+      purgedAt: now.toISOString(),
+      deletedAt: null,
+      deletedBy: null,
+      restoreDeadline: null,
+      updatedAt: now.toISOString()
+    };
+
+    // Tombstone catalog data
+    const tombstoned: Resource = {
+      ...purged,
+      name: "[Purged]",
+      description: "[Purged]",
+      url: "https://removed/",
+      displayUrl: "[Purged]",
+      inputSchema: {},
+      outputSchema: {},
+      extensions: {}
+    };
+
+    this.resources.set(resourceId, tombstoned);
+  }
 
 export class ResourceService {
   constructor(
@@ -430,7 +551,110 @@ export class ResourceService {
     sellerContext?: { sellerId: string; auditable: boolean },
     options?: { expectedVersion?: number | undefined }
   ) {
-    return this.updateResource(resourceId, { status: "inactive" }, sellerContext, options);
+    const existing = await this.getResource(resourceId);
+
+    // Enforce seller ownership when seller context is provided (authenticated request)
+    if (sellerContext?.auditable && existing.sellerId !== sellerContext.sellerId) {
+      await this.auditLogService?.record({
+        action: "resource.ownership_denied",
+        actorType: "seller",
+        actorId: sellerContext.sellerId,
+        targetType: "resource",
+        targetId: resourceId,
+        metadata: {
+          reason: "Attempted to delete resource owned by different seller",
+          attemptedOperation: "delete",
+          actualOwnerId: existing.sellerId
+        }
+      });
+      throw new LumenError("FORBIDDEN", "API key does not own this resource.");
+    }
+
+    const expectedVersion = resolveExpectedVersion(options?.expectedVersion, undefined);
+    const deleterId = sellerContext?.sellerId ?? "unknown";
+
+    const softDeleted = await this.store.softDeleteResource(resourceId, deleterId, {
+      expectedVersion
+    });
+
+    await this.auditLogService?.record({
+      action: "resource.soft_delete",
+      actorType: "seller",
+      actorId: deleterId,
+      targetType: "resource",
+      targetId: resourceId,
+      metadata: {
+        restoreDeadline: softDeleted.restoreDeadline
+      }
+    });
+
+    return softDeleted;
+  }
+
+  async restoreResource(
+    resourceId: string,
+    sellerContext?: { sellerId: string; auditable: boolean },
+    options?: { expectedVersion?: number | undefined }
+  ) {
+    const existing = await this.getResource(resourceId);
+
+    // Enforce seller ownership
+    if (sellerContext?.auditable && existing.sellerId !== sellerContext.sellerId) {
+      await this.auditLogService?.record({
+        action: "resource.ownership_denied",
+        actorType: "seller",
+        actorId: sellerContext.sellerId,
+        targetType: "resource",
+        targetId: resourceId,
+        metadata: {
+          reason: "Attempted to restore resource owned by different seller",
+          attemptedOperation: "restore",
+          actualOwnerId: existing.sellerId
+        }
+      });
+      throw new LumenError("FORBIDDEN", "API key does not own this resource.");
+    }
+
+    // Verify resource is soft-deleted
+    if (existing.deletedAt === null || existing.deletedAt === undefined) {
+      throw new LumenError(
+        "VALIDATION_FAILED",
+        "Resource is not soft-deleted and cannot be restored."
+      );
+    }
+
+    // Check if already purged
+    if (existing.purgedAt !== null && existing.purgedAt !== undefined) {
+      throw new LumenError(
+        "RESOURCE_PURGED",
+        "Resource has been permanently purged and cannot be restored."
+      );
+    }
+
+    // Check restoration window
+    const { isWithinRestorationWindow } = await import("@lumenbazaar/shared");
+    if (!isWithinRestorationWindow(existing.restoreDeadline)) {
+      throw new LumenError(
+        "RESTORE_WINDOW_EXPIRED",
+        "Restoration window has expired. Resource can no longer be restored."
+      );
+    }
+
+    const expectedVersion = resolveExpectedVersion(options?.expectedVersion, undefined);
+    const restored = await this.store.restoreResource(resourceId, { expectedVersion });
+
+    await this.auditLogService?.record({
+      action: "resource.restore",
+      actorType: "seller",
+      actorId: sellerContext?.sellerId ?? "unknown",
+      targetType: "resource",
+      targetId: resourceId,
+      metadata: {
+        restoredAt: new Date().toISOString()
+      }
+    });
+
+    return restored;
   }
 
   async listResourceVersions(resourceId: string) {

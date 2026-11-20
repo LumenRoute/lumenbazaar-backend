@@ -106,6 +106,14 @@ export type Resource = {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /** When the resource was soft-deleted (NULL if not deleted). */
+  deletedAt?: string | null;
+  /** Seller ID that performed the soft-delete. */
+  deletedBy?: string | null;
+  /** Deadline after which the resource can no longer be restored. */
+  restoreDeadline?: string | null;
+  /** When the resource was permanently purged (NULL if not purged). */
+  purgedAt?: string | null;
 };
 
 export type ResourceVersion = {

@@ -38,6 +38,7 @@ import {
   handleStalePaymentCleanup,
   type StalePaymentCleanupJobData
 } from "./workers/stalePaymentCleanup.js";
+import { handleResourcePurge, type ResourcePurgeJobData } from "./workers/resourcePurge.js";
 
 async function traceWorkerJob(
   job: Job<Record<string, unknown>>,
@@ -373,6 +374,28 @@ export class BullMqWorkerBackend implements WorkerBackend {
 
             await handleOutboxCleanup(job as Job<OutboxCleanupJobData>, this.config);
             this.recordProcessedJob(job, queueNames.outboxCleanup);
+          }),
+        {
+          connection: this.connection
+        }
+      )
+    );
+
+    // Add resource purge worker
+    this.workers.push(
+      new Worker(
+        queueNames.resourcePurge,
+        async (job: Job<Record<string, unknown>>) =>
+          traceWorkerJob(job, queueNames.resourcePurge, async () => {
+            const payload = await validateJobPayload(
+              job,
+              queueNames.resourcePurge,
+              this.deadLetterQueue
+            );
+            if (payload === null) return; // Job was quarantined
+
+            await handleResourcePurge(job as Job<ResourcePurgeJobData>, this.config);
+            this.recordProcessedJob(job, queueNames.resourcePurge);
           }),
         {
           connection: this.connection
