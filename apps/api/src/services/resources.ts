@@ -122,6 +122,19 @@ export type ResourceStore = {
   purgeResource: (resourceId: string) => Promise<void>;
 };
 
+export type ResourceFingerprintService = {
+  registerResourceFingerprint: (input: {
+    resourceId: string;
+    sellerId: string;
+    url: string;
+    network: string;
+    assetCode: string;
+    assetIssuer: string;
+    amount: string;
+    payTo: string;
+  }) => Promise<{ fingerprint: { version: number; hash: string }; collisions: string[] }>;
+};
+
 export type ResourceChangeQueue = {
   addResourceIndexingJob: (job: {
     name: "resource.index";
@@ -458,7 +471,8 @@ export class ResourceService {
     private readonly sellerService: SellerService,
     private readonly store: ResourceStore = new InMemoryResourceStore(),
     private readonly indexingQueue?: ResourceChangeQueue,
-    private readonly auditLogService?: AuditLogService
+    private readonly auditLogService?: AuditLogService,
+    private readonly fingerprintService?: ResourceFingerprintService
   ) {}
 
   async createResource(input: unknown, sellerContext?: { sellerId: string; auditable: boolean }) {
@@ -485,6 +499,34 @@ export class ResourceService {
     await this.sellerService.requireActiveSeller(resource.sellerId, "write");
     assertSafeResourceTarget(resource.url, resource.type, resource.routeTemplate, seller.domain);
     const created = await this.store.createResource(resource);
+
+    // Register fingerprint and detect duplicates
+    const duplicates = await this.fingerprintService?.registerResourceFingerprint({
+      resourceId: created.id,
+      sellerId: created.sellerId,
+      url: created.url,
+      network: created.network,
+      assetCode: created.assetCode,
+      assetIssuer: created.assetIssuer,
+      amount: created.amount,
+      payTo: created.payTo
+    });
+
+    // Log detected duplicates for moderation
+    if (duplicates && duplicates.collisions.length > 0) {
+      await this.auditLogService?.record({
+        action: "resource.duplicate_detected",
+        actorType: "system",
+        actorId: "fingerprinting",
+        targetType: "resource",
+        targetId: created.id,
+        metadata: {
+          fingerprintHash: duplicates.fingerprint.hash,
+          collidingResourceIds: duplicates.collisions
+        }
+      });
+    }
+
     await this.queueLatestVersion(created.id);
     return created;
   }
