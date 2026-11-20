@@ -28,4 +28,5 @@ export * from "./validation.js";
 export * from "./ssrfProtection.js";
 
 export * from "./resourceUrl.js";
+export * from "./resourceFingerprint.js";
 export * from "./db/privilegedAudit.js";

@@ -100,6 +100,8 @@ model Resource {
   catalogEvents       CatalogEvent[]
   mcpTools            McpTool[]
   searchDocument      SearchDocument?
+  fingerprint         ResourceFingerprint?
+  duplicateFlags      ResourceDuplicateFlag[]
 
   @@index([sellerId])
   @@index([network, assetCode])
@@ -533,6 +535,39 @@ model ProcessedOutboxEvent {
   @@index([aggregateType, aggregateId, consumerId])
 }
 
+
+model ResourceFingerprint {
+  id        String   @id @default(cuid())
+  resourceId String  @unique
+  version   Int      @default(1)
+  hash      String
+  createdAt DateTime @default(now())
+  resource  Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([hash, version])
+  @@index([createdAt])
+}
+
+model ResourceDuplicateFlag {
+  id                  String    @id @default(cuid())
+  resourceId          String
+  collidingResourceIds String   // JSON array
+  fingerprintHash     String
+  fingerprintVersion  Int
+  severity            String    @default("high") // high, medium, low
+  status              String    @default("pending") // pending, reviewed, dismissed, resolved
+  reviewedAt          DateTime?
+  reviewedBy          String?
+  resolution          String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  resource            Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId])
+  @@index([fingerprintHash])
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
 
 model PrivilegedMutationAudit {
   createdAt DateTime @default(now())
